@@ -1,9 +1,10 @@
 /**
  * Scraper Fallback API Route
- * Integrates with Python scraper when AniList fails
+ * Provides alternative anime search using AniList integration
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { anilist } from "@/lib/anilist";
 
 // ===================================
 // Types
@@ -26,32 +27,33 @@ interface ScrapeResponse {
 // ===================================
 
 /**
- * Call the Python scraper via subprocess
- * Note: In production, you'd want a running scraper service
- * This is a simplified example
+ * Search anime using AniList as the scraper
  */
 async function callScraper(query: string, type: string = "search", maxResults: number = 10): Promise<any> {
-  const scraperPath = process.env.SCRAPER_PATH || "/mnt/c/Users/ErnestW11/DEVPROJECTS/scripts/web-scraper";
-
   try {
-    // For now, return mock data since we can't directly call Python from Next.js API routes
-    // In production, you'd set up a separate microservice or use child_process.spawn
-
-    // Mock response for demonstration
     if (type === "search") {
+      // Use AniList search functionality
+      const result = await anilist.search({ search: query, page: 1, perPage: maxResults });
+      const media = result.data?.Page?.media || [];
+
       return {
-        results: [
-          {
-            id: 1,
-            title: { romaji: "Demon Slayer", english: "Demon Slayer" },
-            coverImage: { extraLarge: "/placeholder.jpg" },
-            description: "Mock result from scraper",
-            episodes: 26,
-            status: "FINISHED",
-            format: "TV",
-            seasonYear: 2019,
+        results: media.map((m: any) => ({
+          id: m.id,
+          title: {
+            romaji: m.title?.romaji,
+            english: m.title?.english,
+            native: m.title?.native,
           },
-        ],
+          coverImage: {
+            extraLarge: m.coverImage?.extraLarge || m.coverImage?.large || "/placeholder.jpg",
+          },
+          description: m.description,
+          episodes: m.episodes,
+          status: m.status,
+          format: m.format,
+          seasonYear: m.seasonYear,
+          averageScore: m.averageScore,
+        })),
       };
     }
 
