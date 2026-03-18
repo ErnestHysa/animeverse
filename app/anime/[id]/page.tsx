@@ -173,7 +173,7 @@ async function HeroSection({ anime }: { anime: any }) {
                     </span>
                   </Link>
                 </Button>
-                <AnimeActions animeId={anime.id} />
+                <AnimeActions animeId={anime.id} animeTitle={title} />
               </div>
 
               {/* External Links */}

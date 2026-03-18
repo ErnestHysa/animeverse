@@ -1,20 +1,22 @@
 /**
  * Anime Actions Component
- * Client-side buttons for watchlist and favorites
+ * Client-side buttons for watchlist, favorites, and sharing
  */
 
 "use client";
 
-import { Plus, Check, Heart } from "lucide-react";
+import { Plus, Check, Heart, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useWatchlist, useFavorites } from "@/store";
 import { useEffect, useState } from "react";
+import { ShareButton } from "@/components/player/share-dialog";
 
 interface AnimeActionsProps {
   animeId: number;
+  animeTitle?: string;
 }
 
-export function AnimeActions({ animeId }: AnimeActionsProps) {
+export function AnimeActions({ animeId, animeTitle }: AnimeActionsProps) {
   const { isInWatchlist, toggleWatchlist } = useWatchlist();
   const { isFavorite, toggleFavorite } = useFavorites();
   const [mounted, setMounted] = useState(false);
@@ -34,6 +36,10 @@ export function AnimeActions({ animeId }: AnimeActionsProps) {
         <Button variant="glass" size="lg" disabled>
           <Heart className="w-5 h-5 mr-2" />
           Favorite
+        </Button>
+        <Button variant="glass" size="lg" disabled>
+          <Share2 className="w-5 h-5 mr-2" />
+          Share
         </Button>
       </>
     );
@@ -66,6 +72,7 @@ export function AnimeActions({ animeId }: AnimeActionsProps) {
         <Heart className={`w-5 h-5 mr-2 ${isFav ? "fill-red-400" : ""}`} />
         {isFav ? "Favorited" : "Favorite"}
       </Button>
+      <ShareButton title={animeTitle || "Anime"} />
     </>
   );
 }

@@ -21,6 +21,7 @@ import {
   Tv,
   Calendar,
   Shuffle,
+  MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -95,6 +96,18 @@ export function Header() {
               >
                 <Search className="w-5 h-5" />
               </Button>
+
+              {/* Discord Community */}
+              <a
+                href="https://discord.gg/animeverse"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hidden sm:inline-flex items-center justify-center rounded-lg text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 h-10 px-3 gap-2 transition-colors text-sm font-medium"
+                aria-label="Join Discord"
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span>Discord</span>
+              </a>
 
               {/* Settings */}
               <button
