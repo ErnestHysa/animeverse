@@ -282,7 +282,7 @@ export default function SettingsPage() {
               <div className="space-y-4">
                 <div className="py-3 border-b border-white/10">
                   <p className="text-sm text-muted-foreground mb-3">
-                    Theme (coming soon)
+                    Theme
                   </p>
                   <div className="flex gap-2">
                     <button
@@ -294,6 +294,7 @@ export default function SettingsPage() {
                     <button
                       disabled
                       className="flex-1 px-4 py-2 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center gap-2 opacity-50"
+                      title="Light theme coming soon"
                     >
                       <Sun className="w-4 h-4" />
                       Light
@@ -301,11 +302,15 @@ export default function SettingsPage() {
                     <button
                       disabled
                       className="flex-1 px-4 py-2 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center gap-2 opacity-50"
+                      title="System theme coming soon"
                     >
                       <Monitor className="w-4 h-4" />
                       System
                     </button>
                   </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Currently using dark theme. Light and system themes coming soon.
+                  </p>
                 </div>
               </div>
             </GlassCard>
