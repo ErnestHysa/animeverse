@@ -58,18 +58,26 @@ export default function RandomPage() {
   const [randomAnime, setRandomAnime] = useState<Media | null>(null);
   const [recommendations, setRecommendations] = useState<Media[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    const anime = await getRandomAnime();
-    if (!anime) {
+    setError(null);
+    try {
+      const anime = await getRandomAnime();
+      if (!anime) {
+        setLoading(false);
+        return;
+      }
+      setRandomAnime(anime);
+      const recs = await getRecommendations(anime.genres);
+      setRecommendations(recs);
+    } catch (err) {
+      console.error("Failed to load random anime:", err);
+      setError("Failed to load anime. Please try again.");
+    } finally {
       setLoading(false);
-      return;
     }
-    setRandomAnime(anime);
-    const recs = await getRecommendations(anime.genres);
-    setRecommendations(recs);
-    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -88,6 +96,22 @@ export default function RandomPage() {
           <div className="text-center">
             <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
             <p className="text-muted-foreground">Finding anime for you...</p>
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
+
+  if (error) {
+    return (
+      <>
+        <Header />
+        <main className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <h1 className="text-2xl font-semibold mb-2">Error</h1>
+            <p className="text-muted-foreground mb-4">{error}</p>
+            <Button onClick={handleRefresh}>Try Again</Button>
           </div>
         </main>
         <Footer />
@@ -249,14 +273,3 @@ export default function RandomPage() {
     </>
   );
 }
-
-// ===================================
-// Metadata
-// ===================================
-
-export const metadata = {
-  title: "Random Anime",
-  description: "Discover new anime with our random picker.",
-};
-
-export const dynamic = "force-dynamic";

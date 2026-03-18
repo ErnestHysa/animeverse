@@ -18,32 +18,30 @@ import { ANILIST_API_URL, API_CONFIG } from "./constants";
 // Media Fragments (Reusable GraphQL)
 // ===================================
 
-const MEDIA_FRAGMENTS = {
-  minimal: `id idMal title { romaji english native userPreferred } coverImage { extraLarge large medium color } format status episodes averageScore genres seasonYear`,
+const MEDIA_MINIMAL_FRAGMENT = `id idMal title { romaji english native userPreferred } coverImage { extraLarge large medium color } format status episodes averageScore genres seasonYear`;
 
-  full: `id idMal title { romaji english native userPreferred } format type status description synonyms isLicensed source countryOfOrigin isAdult genres tags { id name rank } studios { nodes { id name isAnimationStudio } } startDate { year month day } endDate { year month day } season seasonYear seasonInt averageScore meanScore popularity favourites trending episodes duration coverImage { extraLarge large medium color } bannerImage trailer { id site thumbnail } relations { edges { node { ${"MEDIA_FRAGMENTS.minimal"} } relationType } } characters(sort: FAVORITE_DESC, perPage: 10) { edges { node { id name { full native } image { large medium } } role } } externalLinks { site url type icon } nextAiringEpisode { id airingAt timeUntilAiring episode } streamingEpisodes { site title thumbnail url }`
-};
+const MEDIA_FULL_FRAGMENT = `id idMal title { romaji english native userPreferred } format type status description synonyms isLicensed source countryOfOrigin isAdult genres tags { id name rank } studios { nodes { id name isAnimationStudio } } startDate { year month day } endDate { year month day } season seasonYear seasonInt averageScore meanScore popularity favourites trending episodes duration coverImage { extraLarge large medium color } bannerImage trailer { id site thumbnail } relations { edges { node { ${MEDIA_MINIMAL_FRAGMENT} } relationType } } characters(sort: FAVOURITES, perPage: 10) { edges { node { id name { full native } image { large medium } } role } } externalLinks { site url type icon } nextAiringEpisode { id airingAt timeUntilAiring episode } streamingEpisodes { site title thumbnail url }`;
 
 // ===================================
 // GraphQL Queries
 // ===================================
 
 const QUERIES = {
-  trending: `query Trending($page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME, sort: TRENDING_DESC) { ${"MEDIA_FRAGMENTS.full"} } } }`,
+  trending: `query Trending($page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME, sort: TRENDING_DESC) { ${MEDIA_FULL_FRAGMENT} } } }`,
 
-  popular: `query Popular($page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME, sort: POPULARITY_DESC) { ${"MEDIA_FRAGMENTS.full"} } } }`,
+  popular: `query Popular($page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME, sort: POPULARITY_DESC) { ${MEDIA_FULL_FRAGMENT} } } }`,
 
-  seasonal: `query Seasonal($season: MediaSeason, $year: Int, $page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME, season: $season, seasonYear: $year, sort: POPULARITY_DESC) { ${"MEDIA_FRAGMENTS.full"} } } }`,
+  seasonal: `query Seasonal($season: MediaSeason, $year: Int, $page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME, season: $season, seasonYear: $year, sort: POPULARITY_DESC) { ${MEDIA_FULL_FRAGMENT} } } }`,
 
-  airing: `query Airing($page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } airingSchedules(airingAt_greater: ${Math.floor(Date.now() / 1000)}, sort: TIME) { id airingAt timeUntilAiring episode media { ${"MEDIA_FRAGMENTS.minimal"} } } } }`,
+  airing: `query Airing($page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } airingSchedules(airingAt_greater: ${Math.floor(Date.now() / 1000)}, sort: TIME) { id airingAt timeUntilAiring episode media { ${MEDIA_MINIMAL_FRAGMENT} } } } }`,
 
-  search: `query Search($search: String, $page: Int, $perPage: Int, $sort: [MediaSort], $format: MediaFormat, $genre: String, $status: MediaStatus, $year: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME search: $search sort: $sort format_in: $format genre: $genre status: $status seasonYear: $year) { ${"MEDIA_FRAGMENTS.full"} } } }`,
+  search: `query Search($search: String, $page: Int, $perPage: Int, $sort: [MediaSort], $format: [MediaFormat], $genre: String, $status: MediaStatus, $year: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME search: $search sort: $sort format_in: $format genre: $genre status: $status seasonYear: $year) { ${MEDIA_FULL_FRAGMENT} } } }`,
 
-  byId: `query ById($id: Int) { Media(id: $id, type: ANIME) { ${"MEDIA_FRAGMENTS.full"} } }`,
+  byId: `query ById($id: Int) { Media(id: $id, type: ANIME) { ${MEDIA_FULL_FRAGMENT} } }`,
 
-  recommendations: `query Recommendations($id: Int) { Media(id: $id) { recommendations(perPage: 10, sort: RATING_DESC) { nodes { mediaRecommendation { ${"MEDIA_FRAGMENTS.minimal"} } } } } }`,
+  recommendations: `query Recommendations($id: Int) { Media(id: $id) { recommendations(perPage: 10, sort: RATING_DESC) { nodes { mediaRecommendation { ${MEDIA_MINIMAL_FRAGMENT} } } } } }`,
 
-  byIds: `query GetByIds($ids: [Int]) { Page(page: 1, perPage: 50) { pageInfo { total } media(id_in: $ids, type: ANIME) { ${"MEDIA_FRAGMENTS.minimal"} } } }`
+  byIds: `query GetByIds($ids: [Int]) { Page(page: 1, perPage: 50) { pageInfo { total } media(id_in: $ids, type: ANIME) { ${MEDIA_MINIMAL_FRAGMENT} } } }`,
 };
 
 // ===================================
@@ -70,17 +68,17 @@ class AniListClient {
         next: { revalidate: 300 },
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
         return {
           data: null,
           error: {
-            message: `HTTP ${response.status}: ${response.statusText}`,
+            message: data.errors?.[0]?.message || `HTTP ${response.status}: ${response.statusText}`,
             status: response.status,
           },
         };
       }
-
-      const data = await response.json();
 
       if (data.errors) {
         return {

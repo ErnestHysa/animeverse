@@ -16,6 +16,17 @@ import Image from "next/image";
 import { Suspense } from "react";
 import type { Media } from "@/types/anilist";
 
+// Client wrapper for buttons with navigation
+function HeroButton({ href, children, variant = "default", size = "default" }: { href: string; children: React.ReactNode; variant?: string; size?: string }) {
+  return (
+    <Link href={href} className="no-underline">
+      <Button variant={variant as any} size={size as any}>
+        {children}
+      </Button>
+    </Link>
+  );
+}
+
 // ===================================
 // Data Fetching
 // ===================================
@@ -119,19 +130,15 @@ async function HeroSection({ anime }: { anime: Media[] }) {
 
             {/* Actions */}
             <div className="flex flex-wrap gap-3 pt-2">
-              <Button size="lg" asChild>
-                <Link href={`/watch/${featured.id}/1`}>
-                  <span className="flex items-center gap-2">
-                    <Play className="w-5 h-5" />
-                    Watch Now
-                  </span>
-                </Link>
-              </Button>
-              <Button variant="glass" size="lg" asChild>
-                <Link href={`/anime/${featured.id}`}>
-                  <span>View Details</span>
-                </Link>
-              </Button>
+              <HeroButton size="lg" href={`/watch/${featured.id}/1`}>
+                <span className="flex items-center gap-2">
+                  <Play className="w-5 h-5" />
+                  Watch Now
+                </span>
+              </HeroButton>
+              <HeroButton variant="glass" size="lg" href={`/anime/${featured.id}`}>
+                <span>View Details</span>
+              </HeroButton>
             </div>
           </div>
         </div>

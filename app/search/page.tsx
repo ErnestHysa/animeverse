@@ -30,8 +30,8 @@ async function searchAnime(params: SearchPageProps["searchParams"]) {
   const query = params.q;
   const sort = params.sort || "POPULARITY_DESC";
 
-  if (!query) {
-    // Return empty if no query
+  // Return empty if no query provided (undefined or empty string)
+  if (!query || query.trim() === "") {
     return [];
   }
 
