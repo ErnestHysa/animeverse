@@ -1,0 +1,164 @@
+/**
+ * AnimeCard Component
+ * Displays anime poster with hover effects and metadata
+ */
+
+"use client";
+
+import Link from "next/link";
+import Image from "next/image";
+import { Star, Play, Clock } from "lucide-react";
+import type { Media } from "@/types/anilist";
+import { getAnimeTitle, getAnimeCover, formatEpisodeCount, getStarRating } from "@/lib/anilist";
+import { cn } from "@/lib/utils";
+
+export interface AnimeCardProps {
+  anime: Media;
+  priority?: boolean;
+  showProgress?: boolean;
+  progress?: number;
+  className?: string;
+}
+
+export function AnimeCard({
+  anime,
+  priority = false,
+  showProgress = false,
+  progress = 0,
+  className,
+}: AnimeCardProps) {
+  const title = getAnimeTitle(anime);
+  const cover = getAnimeCover(anime);
+  const rating = getStarRating(anime.averageScore);
+  const episodes = formatEpisodeCount(anime.episodes, anime.status);
+  const isAiring = anime.status === "RELEASING";
+
+  return (
+    <Link href={`/anime/${anime.id}`} className={cn("group block", className)}>
+      <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-muted">
+        {/* Cover Image */}
+        <Image
+          src={cover}
+          alt={title}
+          fill
+          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+          className="object-cover transition-transform duration-300 group-hover:scale-105"
+          priority={priority}
+        />
+
+        {/* Gradient Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover:opacity-80 transition-opacity" />
+
+        {/* Airing Badge */}
+        {isAiring && (
+          <div className="absolute top-2 left-2 px-2 py-1 bg-primary/80 backdrop-blur-sm rounded-full text-xs font-medium text-white flex items-center gap-1">
+            <span className="w-1.5 h-1 bg-green-400 rounded-full animate-pulse" />
+            AIRING
+          </div>
+        )}
+
+        {/* Episode Badge */}
+        <div className="absolute top-2 right-2 px-2 py-1 bg-black/60 backdrop-blur-sm rounded-full text-xs font-medium text-white">
+          {episodes}
+        </div>
+
+        {/* Play Button (on hover) */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          <div className="w-12 h-12 rounded-full bg-primary/90 backdrop-blur-sm flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition-transform">
+            <Play className="w-5 h-5 text-white ml-0.5" fill="currentColor" />
+          </div>
+        </div>
+
+        {/* Progress Bar */}
+        {showProgress && progress > 0 && (
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
+            <div
+              className="h-full bg-primary transition-all duration-300"
+              style={{ width: `${Math.min(progress, 100)}%` }}
+            />
+          </div>
+        )}
+
+        {/* Rating Badge */}
+        {anime.averageScore && (
+          <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/60 backdrop-blur-sm rounded-lg text-xs font-medium flex items-center gap-1">
+            <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+            <span>{rating}/5</span>
+          </div>
+        )}
+      </div>
+
+      {/* Info */}
+      <div className="mt-3 space-y-1">
+        <h3 className="font-medium text-sm leading-tight line-clamp-2 group-hover:text-primary transition-colors">
+          {title}
+        </h3>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          {anime.format && <span>{anime.format.replace("_", " ")}</span>}
+          {anime.seasonYear && <span>• {anime.seasonYear}</span>}
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+/**
+ * Compact AnimeCard variant for horizontal lists
+ */
+export interface AnimeCardCompactProps {
+  anime: Media;
+  showNumber?: boolean;
+  number?: number;
+  className?: string;
+}
+
+export function AnimeCardCompact({ anime, showNumber = false, number, className }: AnimeCardCompactProps) {
+  const title = getAnimeTitle(anime);
+  const cover = getAnimeCover(anime);
+
+  return (
+    <Link href={`/anime/${anime.id}`} className={cn("flex gap-3 group", className)}>
+      {/* Rank Number */}
+      {showNumber && number !== undefined && (
+        <div className="flex-shrink-0 w-8 flex items-center justify-center text-2xl font-bold text-muted-foreground group-hover:text-primary transition-colors">
+          {number}
+        </div>
+      )}
+
+      {/* Cover Image */}
+      <div className="relative w-16 h-24 flex-shrink-0 rounded-lg overflow-hidden bg-muted">
+        <Image
+          src={cover}
+          alt={title}
+          fill
+          sizes="64px"
+          className="object-cover transition-transform duration-300 group-hover:scale-105"
+        />
+      </div>
+
+      {/* Info */}
+      <div className="flex-1 min-w-0 py-1">
+        <h4 className="font-medium text-sm line-clamp-2 group-hover:text-primary transition-colors">
+          {title}
+        </h4>
+        <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+          {anime.format && <span>{anime.format.replace("_", " ")}</span>}
+          {anime.seasonYear && <span>• {anime.seasonYear}</span>}
+          {anime.episodes && <span>• {anime.episodes} eps</span>}
+        </div>
+        {anime.genres && anime.genres.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-2">
+            {anime.genres.slice(0, 3).map((genre) => (
+              <span
+                key={genre}
+                className="px-2 py-0.5 text-xs bg-white/5 rounded-full"
+              >
+                {genre}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </Link>
+  );
+}

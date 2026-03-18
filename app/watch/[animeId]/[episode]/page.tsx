@@ -1,0 +1,377 @@
+/**
+ * Watch Page
+ * Enhanced video player with episode list, autoplay, and navigation
+ */
+
+import { Header } from "@/components/layout/header";
+import { Footer } from "@/components/layout/footer";
+import { VideoSourceLoader } from "@/components/player/video-source-loader";
+import { GlassCard } from "@/components/ui/glass-card";
+import { Button } from "@/components/ui/button";
+import { ShareButton } from "@/components/player/share-dialog";
+import { ReportButton } from "@/components/player/report-dialog";
+import { KeyboardShortcutsButton } from "@/components/player/keyboard-shortcuts";
+import { anilist, getAnimeTitle } from "@/lib/anilist";
+import { Play, ChevronLeft, ChevronRight, Heart, Clock } from "lucide-react";
+import Link from "next/link";
+import Image from "next/image";
+import { Suspense } from "react";
+
+// ===================================
+// Data Fetching
+// ===================================
+
+interface PageProps {
+  params: Promise<{
+    animeId: string;
+    episode: string;
+  }>;
+}
+
+async function getAnimeData(id: string) {
+  const result = await anilist.getById(parseInt(id));
+  return result.data?.Media;
+}
+
+// ===================================
+// Components
+// ===================================
+
+async function VideoSection({ anime, episodeNum }: { anime: any; episodeNum: number }) {
+  const title = getAnimeTitle(anime);
+  const totalEpisodes = anime.episodes || 12;
+  const hasNext = episodeNum < totalEpisodes;
+  const hasPrev = episodeNum > 1;
+
+  return (
+    <div className="space-y-4">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-sm text-muted-foreground overflow-x-auto">
+        <Link href="/" className="hover:text-foreground transition-colors flex-shrink-0">
+          Home
+        </Link>
+        <span className="flex-shrink-0">›</span>
+        <Link href={`/anime/${anime.id}`} className="hover:text-foreground transition-colors truncate max-w-[150px] flex-shrink-0">
+          {title}
+        </Link>
+        <span className="flex-shrink-0">›</span>
+        <span className="text-foreground flex-shrink-0">Episode {episodeNum}</span>
+      </div>
+
+      {/* Player */}
+      <VideoSourceLoader
+        animeId={anime.id}
+        episodeNumber={episodeNum}
+        animeTitle={title}
+        poster={anime.coverImage?.extraLarge || undefined}
+        nextEpisodeUrl={hasNext ? `/watch/${anime.id}/${episodeNum + 1}` : undefined}
+        onError={(error) => console.error("Player error:", error)}
+      />
+
+      {/* Episode Info & Actions */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">
+            {title} - Episode {episodeNum}
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            {anime.format && anime.format.replace("_", " ")} • {anime.seasonYear}
+          </p>
+        </div>
+
+        {/* Navigation & Actions */}
+        <div className="flex items-center gap-2">
+          {hasPrev && (
+            <Link href={`/watch/${anime.id}/${episodeNum - 1}`}>
+              <button className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg transition-colors">
+                <ChevronLeft className="w-4 h-4" />
+                Previous
+              </button>
+            </Link>
+          )}
+          {hasNext && (
+            <Link href={`/watch/${anime.id}/${episodeNum + 1}`}>
+              <button className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 rounded-lg transition-colors">
+                Next
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </Link>
+          )}
+
+          {/* Quick Actions */}
+          <div className="hidden sm:flex items-center gap-2">
+            <ReportButton
+              animeId={anime.id}
+              animeTitle={title}
+              episodeNumber={episodeNum}
+            />
+            <ShareButton
+              title={`${title} - Episode ${episodeNum}`}
+            />
+            <KeyboardShortcutsButton />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+async function EpisodesList({ anime, currentEpisode }: { anime: any; currentEpisode: number }) {
+  const totalEpisodes = anime.episodes || 12;
+
+  return (
+    <GlassCard className="p-4">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-semibold">Episodes</h2>
+        <span className="text-sm text-muted-foreground">{totalEpisodes} episodes</span>
+      </div>
+      <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-2">
+        {Array.from({ length: totalEpisodes }, (_, i) => {
+          const epNum = i + 1;
+          const isCurrent = epNum === currentEpisode;
+          const isWatched = false; // Could be determined from watch progress
+
+          return (
+            <Link
+              key={epNum}
+              href={`/watch/${anime.id}/${epNum}`}
+              className="flex items-center gap-3 p-3 rounded-lg transition-all hover:bg-white/5"
+              style={{
+                backgroundColor: isCurrent ? "rgba(139, 92, 246, 0.2)" : undefined,
+                border: isCurrent ? "1px solid rgba(139, 92, 246, 0.3)" : undefined,
+              }}
+            >
+              <div
+                className="w-8 h-8 rounded flex items-center justify-center text-sm font-medium flex-shrink-0"
+                style={{
+                  backgroundColor: isCurrent ? "rgb(139, 92, 246)" : "rgba(255, 255, 255, 0.05)",
+                  color: isCurrent ? "white" : undefined,
+                }}
+              >
+                {isWatched ? (
+                  <Clock className="w-4 h-4" />
+                ) : isCurrent ? (
+                  <Play className="w-4 h-4 fill-current" />
+                ) : (
+                  epNum
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium truncate">{isCurrent ? `Episode ${epNum}` : `Episode ${epNum}`}</p>
+                {isCurrent && (
+                  <p className="text-xs text-primary">Now Playing</p>
+                )}
+              </div>
+              {isWatched && (
+                <div className="flex-shrink-0">
+                  <div className="h-1 bg-green-500 rounded-full w-8" style={{ width: "70%" }}></div>
+                </div>
+              )}
+            </Link>
+          );
+        })}
+      </div>
+    </GlassCard>
+  );
+}
+
+async function AnimeInfo({ anime }: { anime: any }) {
+  const title = getAnimeTitle(anime);
+
+  return (
+    <GlassCard className="p-4">
+      <Link href={`/anime/${anime.id}`} className="flex gap-4 group">
+        <div className="relative w-20 h-28 flex-shrink-0 rounded-lg overflow-hidden bg-muted">
+          <Image
+            src={anime.coverImage?.large || ""}
+            alt={title}
+            fill
+            className="object-cover transition-transform group-hover:scale-105"
+            sizes="80px"
+          />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="font-semibold line-clamp-2 group-hover:text-primary transition-colors">
+            {title}
+          </h3>
+          <p className="text-sm text-muted-foreground mt-1 line-clamp-3">
+            {anime.description?.slice(0, 150)}...
+          </p>
+          <div className="flex flex-wrap gap-2 mt-2">
+            {anime.genres?.slice(0, 3).map((genre: string) => (
+              <span
+                key={genre}
+                className="px-2 py-1 bg-white/5 rounded text-xs"
+              >
+                {genre}
+              </span>
+            ))}
+          </div>
+        </div>
+      </Link>
+
+      {anime.genres && anime.genres.length > 0 && (
+        <div className="mt-4 pt-4 border-t border-white/10">
+          <p className="text-xs text-muted-foreground mb-2">Genres</p>
+          <div className="flex flex-wrap gap-1">
+            {anime.genres.slice(0, 6).map((genre: string) => (
+              <span
+                key={genre}
+                className="px-2 py-1 bg-white/5 rounded text-xs"
+              >
+                {genre}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </GlassCard>
+  );
+}
+
+async function RecommendedSection({ animeId }: { animeId: number }) {
+  const result = await anilist.getRecommendations(animeId);
+  const recommendations = (result.data as any)?.Media?.recommendations?.nodes
+    ?.map((n: any) => n.mediaRecommendation)
+    .filter(Boolean);
+
+  if (!recommendations || recommendations.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mt-6">
+      <h3 className="font-semibold mb-4">You May Also Like</h3>
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+        {recommendations.slice(0, 8).map((rec: any) => (
+          <Link
+            key={rec.id}
+            href={`/anime/${rec.id}`}
+            className="group"
+          >
+            <div className="relative aspect-[3/4] rounded-lg overflow-hidden bg-muted mb-2">
+              <Image
+                src={rec.coverImage?.large || ""}
+                alt={rec.title?.romaji || rec.title?.english || "Unknown"}
+                fill
+                className="object-cover transition-transform group-hover:scale-105"
+                sizes="(max-width: 768px) 50vw, 25vw"
+              />
+            </div>
+            <p className="text-sm font-medium line-clamp-2 group-hover:text-primary transition-colors">
+              {rec.title?.romaji || rec.title?.english || "Unknown"}
+            </p>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ===================================
+// Page Component
+// ===================================
+
+export default async function WatchPage({ params }: PageProps) {
+  const { animeId, episode } = await params;
+  const anime = await getAnimeData(animeId);
+  const episodeNum = parseInt(episode);
+
+  if (!anime) {
+    return (
+      <>
+        <Header />
+        <main className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <h1 className="text-2xl font-semibold mb-2">Anime Not Found</h1>
+            <p className="text-muted-foreground mb-4">
+              The anime you're looking for doesn't exist.
+            </p>
+            <Button asChild>
+              <Link href="/">Go Home</Link>
+            </Button>
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
+
+  const totalEpisodes = anime.episodes || 12;
+
+  if (episodeNum < 1 || episodeNum > totalEpisodes) {
+    return (
+      <>
+        <Header />
+        <main className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <h1 className="text-2xl font-semibold mb-2">Episode Not Found</h1>
+            <p className="text-muted-foreground mb-4">
+              This episode doesn't exist or hasn't been released yet.
+            </p>
+            <Button asChild>
+              <Link href={`/anime/${animeId}`}>Back to Anime</Link>
+            </Button>
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <Header />
+      <main className="min-h-screen">
+        <div className="container mx-auto px-4 pt-24 pb-12">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Main Content */}
+            <div className="lg:col-span-2 space-y-6">
+              <Suspense fallback={<div className="aspect-video bg-muted rounded-xl animate-pulse" />}>
+                <VideoSection anime={anime} episodeNum={episodeNum} />
+              </Suspense>
+
+              <Suspense fallback={<div className="h-64 bg-muted rounded-xl animate-pulse" />}>
+                <RecommendedSection animeId={anime.id} />
+              </Suspense>
+            </div>
+
+            {/* Sidebar */}
+            <div className="space-y-6">
+              <Suspense fallback={<div className="h-64 bg-muted rounded-xl animate-pulse" />}>
+                <EpisodesList anime={anime} currentEpisode={episodeNum} />
+              </Suspense>
+
+              <Suspense fallback={<div className="h-48 bg-muted rounded-xl animate-pulse" />}>
+                <AnimeInfo anime={anime} />
+              </Suspense>
+            </div>
+          </div>
+        </div>
+      </main>
+      <Footer />
+    </>
+  );
+}
+
+// ===================================
+// Metadata
+// ===================================
+
+export async function generateMetadata({ params }: PageProps) {
+  const { animeId, episode } = await params;
+  const anime = await getAnimeData(animeId);
+
+  if (!anime) {
+    return {
+      title: "Not Found",
+    };
+  }
+
+  const title = getAnimeTitle(anime);
+
+  return {
+    title: `Watching ${title} - Episode ${episode}`,
+    description: `Watch ${title} Episode ${episode} online.`,
+  };
+}
