@@ -3,8 +3,10 @@
  * "I'm feeling lucky" feature for anime discovery
  */
 
-import { Header } from "@/components/layout/header";
-import { Footer } from "@/components/layout/footer";
+"use client";
+
+import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { anilist } from "@/lib/anilist";
 import { Shuffle, Zap, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,15 +14,19 @@ import { AnimeCard } from "@/components/anime/anime-card";
 import { GlassCard } from "@/components/ui/glass-card";
 import Link from "next/link";
 import Image from "next/image";
-import { Suspense } from "react";
+import { Header } from "@/components/layout/header";
+import { Footer } from "@/components/layout/footer";
+import type { Media } from "@/types/anilist";
 
-async function getRandomAnime() {
-  // Get a large batch and pick a random one
+// ===================================
+// Data Fetching
+// ===================================
+
+async function getRandomAnime(): Promise<Media | null> {
   const result = await anilist.getTrending(1, 50);
   const anime = result.data?.Page.media ?? [];
 
   if (anime.length === 0) {
-    // Return a fallback if no anime found
     return null;
   }
 
@@ -28,14 +34,12 @@ async function getRandomAnime() {
   return anime[randomIndex];
 }
 
-async function getRecommendations(genres?: string[] | null) {
-  // Get anime from similar genres
+async function getRecommendations(genres?: string[] | null): Promise<Media[]> {
   if (!genres || genres.length === 0) {
     const result = await anilist.getTrending(1, 12);
     return result.data?.Page.media ?? [];
   }
 
-  // Search by first genre
   const result = await anilist.search({
     genre: genres[0]!,
     sort: "SCORE_DESC",
@@ -45,8 +49,51 @@ async function getRecommendations(genres?: string[] | null) {
   return result.data?.Page.media ?? [];
 }
 
-export default async function RandomPage() {
-  const randomAnime = await getRandomAnime();
+// ===================================
+// Page Component
+// ===================================
+
+export default function RandomPage() {
+  const router = useRouter();
+  const [randomAnime, setRandomAnime] = useState<Media | null>(null);
+  const [recommendations, setRecommendations] = useState<Media[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    const anime = await getRandomAnime();
+    if (!anime) {
+      setLoading(false);
+      return;
+    }
+    setRandomAnime(anime);
+    const recs = await getRecommendations(anime.genres);
+    setRecommendations(recs);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const handleRefresh = () => {
+    loadData();
+  };
+
+  if (loading) {
+    return (
+      <>
+        <Header />
+        <main className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Finding anime for you...</p>
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
 
   if (!randomAnime) {
     return (
@@ -58,9 +105,7 @@ export default async function RandomPage() {
             <p className="text-muted-foreground mb-4">
               Unable to fetch anime at this time.
             </p>
-            <Button asChild>
-              <Link href="/">Go Home</Link>
-            </Button>
+            <Button onClick={() => router.push("/")}>Go Home</Button>
           </div>
         </main>
         <Footer />
@@ -68,14 +113,14 @@ export default async function RandomPage() {
     );
   }
 
-  const recommendations = await getRecommendations(randomAnime.genres);
-
   const title = randomAnime.title?.userPreferred ??
                 randomAnime.title?.english ??
                 randomAnime.title?.romaji ??
                 "Unknown Anime";
 
-  const description = randomAnime.description ? randomAnime.description.slice(0, 300) : "No description available.";
+  const description = randomAnime.description
+    ? randomAnime.description.slice(0, 300)
+    : "No description available.";
   const cover = randomAnime.bannerImage ?? randomAnime.coverImage?.extraLarge ?? "";
 
   return (
@@ -98,11 +143,9 @@ export default async function RandomPage() {
                 </p>
               </div>
             </div>
-            <Button asChild>
-              <Link href="/random">
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Try Another
-              </Link>
+            <Button onClick={handleRefresh}>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Try Another
             </Button>
           </div>
 
@@ -151,15 +194,18 @@ export default async function RandomPage() {
                 )}
 
                 <div className="flex flex-wrap gap-3">
-                  <Button size="lg" asChild>
-                    <Link href={`/watch/${randomAnime.id}/1`}>
-                      Watch Now
-                    </Link>
+                  <Button
+                    size="lg"
+                    onClick={() => router.push(`/watch/${randomAnime.id}/1`)}
+                  >
+                    Watch Now
                   </Button>
-                  <Button variant="glass" size="lg" asChild>
-                    <Link href={`/anime/${randomAnime.id}`}>
-                      View Details
-                    </Link>
+                  <Button
+                    variant="glass"
+                    size="lg"
+                    onClick={() => router.push(`/anime/${randomAnime.id}`)}
+                  >
+                    View Details
                   </Button>
                 </div>
 
@@ -189,7 +235,7 @@ export default async function RandomPage() {
               </h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
                 {recommendations
-                  .filter(a => a.id !== randomAnime.id)
+                  .filter((a) => a.id !== randomAnime.id)
                   .slice(0, 12)
                   .map((anime) => (
                     <AnimeCard key={anime.id} anime={anime} />
@@ -204,10 +250,13 @@ export default async function RandomPage() {
   );
 }
 
+// ===================================
+// Metadata
+// ===================================
+
 export const metadata = {
   title: "Random Anime",
   description: "Discover new anime with our random picker.",
 };
 
-export const revalidate = 60; // Revalidate every minute
 export const dynamic = "force-dynamic";

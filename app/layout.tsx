@@ -59,9 +59,9 @@ export const metadata: Metadata = {
     title: "AnimeVerse Stream",
   },
   icons: {
-    icon: "/icons/icon-192x192.png",
-    shortcut: "/icons/icon-96x96.png",
-    apple: "/icons/icon-152x152.png",
+    icon: "/file.svg",
+    shortcut: "/file.svg",
+    apple: "/file.svg",
   },
 };
 
