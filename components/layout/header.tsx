@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/ui/glass-card";
+import { EpisodeNotifications } from "@/components/notifications/episode-notifications";
 
 export function Header() {
   const [searchOpen, setSearchOpen] = useState(false);
@@ -108,6 +109,9 @@ export function Header() {
                 <MessageSquare className="w-4 h-4" />
                 <span>Discord</span>
               </a>
+
+              {/* Episode Notifications */}
+              <EpisodeNotifications />
 
               {/* Settings */}
               <button
