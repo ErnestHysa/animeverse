@@ -38,7 +38,7 @@ export function ContinueWatching() {
 
       // Combine anime data with progress
       const combined = history.map((item) => {
-        const anime = mediaList.find((m: any) => m.id === item.mediaId);
+        const anime = mediaList.find((m: Media) => m.id === item.mediaId);
         if (!anime) return null;
 
         // Calculate progress percentage based on episode duration (default 24 min)

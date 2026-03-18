@@ -87,9 +87,9 @@ class NotificationManager {
         userVisibleOnly: true,
       });
       // In production, send subscription to server
-      console.log("Push subscription:", subscription);
+      // Push subscription created successfully
     } catch (error) {
-      console.log("Push not supported:", error);
+      // Push not supported or user declined
     }
   }
 

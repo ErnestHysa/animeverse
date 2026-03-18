@@ -6,7 +6,6 @@
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { AnimeGrid } from "@/components/anime/anime-grid";
-import { AnimeCardCompact } from "@/components/anime/anime-card";
 import { ContinueWatching } from "@/components/continue-watching";
 import { AIRecommendationsSection } from "@/components/recommendations/ai-recommendations-section";
 import { anilist } from "@/lib/anilist";
@@ -40,7 +39,7 @@ async function getSeasonalAnime() {
 // Components
 // ===================================
 
-async function HeroSection({ anime }: { anime: any[] }) {
+async function HeroSection({ anime }: { anime: Media[] }) {
   const featured = anime[0];
 
   if (!featured) return null;
@@ -137,7 +136,7 @@ async function HeroSection({ anime }: { anime: any[] }) {
   );
 }
 
-async function TrendingSection({ anime }: { anime: any[] }) {
+async function TrendingSection({ anime }: { anime: Media[] }) {
   return (
     <section className="mb-16">
       <div className="flex items-center justify-between mb-6">
@@ -154,7 +153,7 @@ async function TrendingSection({ anime }: { anime: any[] }) {
   );
 }
 
-async function PopularSection({ anime }: { anime: any[] }) {
+async function PopularSection({ anime }: { anime: Media[] }) {
   return (
     <section className="mb-16">
       <div className="flex items-center justify-between mb-6">

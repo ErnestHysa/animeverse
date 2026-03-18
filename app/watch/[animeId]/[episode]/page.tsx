@@ -285,7 +285,7 @@ export default async function WatchPage({ params }: PageProps) {
           <div className="text-center">
             <h1 className="text-2xl font-semibold mb-2">Anime Not Found</h1>
             <p className="text-muted-foreground mb-4">
-              The anime you're looking for doesn't exist.
+              The anime you&apos;re looking for doesn&apos;t exist.
             </p>
             <Button asChild>
               <Link href="/">Go Home</Link>
@@ -307,7 +307,7 @@ export default async function WatchPage({ params }: PageProps) {
           <div className="text-center">
             <h1 className="text-2xl font-semibold mb-2">Episode Not Found</h1>
             <p className="text-muted-foreground mb-4">
-              This episode doesn't exist or hasn't been released yet.
+              This episode doesn&apos;t exist or hasn&apos;t been released yet.
             </p>
             <Button asChild>
               <Link href={`/anime/${animeId}`}>Back to Anime</Link>

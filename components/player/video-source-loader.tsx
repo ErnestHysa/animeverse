@@ -156,10 +156,10 @@ export function VideoSourceLoader({
     }
   }, [animeId, episodeNumber, animeTitle, onError]);
 
-  // Initial fetch
+  // Initial fetch and re-fetch when language changes
   useEffect(() => {
     fetchSources(currentLanguage);
-  }, [fetchSources]); // fetchSources is memoized, currentLanguage is captured
+  }, [fetchSources, currentLanguage]);
 
   /**
    * Server change handler - switches video source within current quality options

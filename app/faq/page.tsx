@@ -6,12 +6,6 @@ import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { GlassCard } from "@/components/ui/glass-card";
 import { HelpCircle } from "lucide-react";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 
 export const metadata = {
   title: "FAQ",
@@ -94,7 +88,7 @@ export default function FAQPage() {
           <GlassCard className="p-8 mt-12 text-center">
             <h2 className="text-2xl font-semibold mb-3">Still have questions?</h2>
             <p className="text-muted-foreground mb-6">
-              We're here to help! Reach out to our community for support.
+              We&apos;re here to help! Reach out to our community for support.
             </p>
             <a
               href="https://anilist.co/forum"

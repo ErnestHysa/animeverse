@@ -16,17 +16,18 @@ import { Heart } from "lucide-react";
 import { anilist } from "@/lib/anilist";
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import type { Media } from "@/types/anilist";
 
 export default function FavoritesPage() {
   const { favorites } = useFavorites();
-  const [anime, setAnime] = useState<any[]>([]);
+  const [anime, setAnime] = useState<Media[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadFavorites() {
       if (favorites.length > 0) {
         const result = await anilist.getByIds(favorites);
-        const fetchedAnime = result.data?.Page.media.filter((m: any) =>
+        const fetchedAnime = result.data?.Page.media.filter((m: Media) =>
           favorites.includes(m.id)
         ) ?? [];
         setAnime(fetchedAnime);
