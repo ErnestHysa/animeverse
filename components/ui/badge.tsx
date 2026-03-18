@@ -1,93 +1,81 @@
 /**
  * Badge Component
- * For displaying status, tags, and labels
+ * Visual indicator badges for anime metadata
  */
 
-import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
-const badgeVariants = cva(
-  "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-all duration-200",
-  {
-    variants: {
-      variant: {
-        default: "bg-primary/20 text-primary border border-primary/20",
-        secondary: "bg-secondary/20 text-secondary border border-secondary/20",
-        success: "bg-green-500/20 text-green-400 border border-green-500/20",
-        warning: "bg-yellow-500/20 text-yellow-400 border border-yellow-500/20",
-        destructive: "bg-red-500/20 text-red-400 border border-red-500/20",
-        outline: "border border-white/20 bg-transparent text-foreground",
-        glass: "bg-white/5 backdrop-blur-sm border border-white/10",
-      },
-      size: {
-        sm: "px-2 py-0.5 text-xs",
-        default: "px-3 py-1 text-sm",
-        lg: "px-4 py-1.5 text-base",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-      size: "default",
-    },
-  }
-);
-
-export interface BadgeProps
-  extends React.HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof badgeVariants> {
-  dot?: boolean;
+export interface BadgeProps {
+  children: React.ReactNode;
+  variant?: "default" | "primary" | "secondary" | "success" | "warning" | "danger";
+  size?: "sm" | "md" | "lg";
+  className?: string;
 }
 
-export function Badge({ className, variant, size, dot, children, ...props }: BadgeProps) {
+export function Badge({ children, variant = "default", size = "md", className }: BadgeProps) {
+  const variants = {
+    default: "bg-white/10 text-foreground",
+    primary: "bg-primary/20 text-primary",
+    secondary: "bg-secondary/20 text-secondary",
+    success: "bg-green-500/20 text-green-400",
+    warning: "bg-yellow-500/20 text-yellow-400",
+    danger: "bg-red-500/20 text-red-400",
+  };
+
+  const sizes = {
+    sm: "px-2 py-0.5 text-xs",
+    md: "px-2.5 py-1 text-xs",
+    lg: "px-3 py-1.5 text-sm",
+  };
+
   return (
-    <div className={cn(badgeVariants({ variant, size }), className)} {...props}>
-      {dot && (
-        <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded-full font-medium",
+        variants[variant],
+        sizes[size],
+        className
       )}
+    >
       {children}
-    </div>
+    </span>
   );
 }
 
 /**
- * Status Badge Presets
+ * Language Badge - Shows Sub/Dub availability
  */
-export function AiringBadge() {
-  return (
-    <Badge variant="success" dot>
-      AIRING
-    </Badge>
-  );
+export interface LanguageBadgeProps {
+  sub?: boolean;
+  dub?: boolean;
+  size?: "sm" | "md" | "lg";
+  className?: string;
 }
 
-export function UpcomingBadge() {
-  return (
-    <Badge variant="secondary">
-      UPCOMING
-    </Badge>
-  );
-}
+export function LanguageBadge({ sub = true, dub = false, size = "sm", className }: LanguageBadgeProps) {
+  if (sub && dub) {
+    return (
+      <Badge variant="primary" size={size} className={className}>
+        Sub | Dub
+      </Badge>
+    );
+  }
 
-export function CompletedBadge() {
-  return (
-    <Badge variant="outline">
-      COMPLETED
-    </Badge>
-  );
-}
+  if (dub) {
+    return (
+      <Badge variant="secondary" size={size} className={className}>
+        Dub
+      </Badge>
+    );
+  }
 
-export function HdBadge() {
-  return (
-    <Badge variant="glass" size="sm">
-      HD
-    </Badge>
-  );
-}
+  if (sub) {
+    return (
+      <Badge variant="default" size={size} className={className}>
+        Sub
+      </Badge>
+    );
+  }
 
-export function NewBadge() {
-  return (
-    <Badge variant="destructive" size="sm">
-      NEW
-    </Badge>
-  );
+  return null;
 }

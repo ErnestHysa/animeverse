@@ -11,6 +11,7 @@ import { Star, Play, Clock } from "lucide-react";
 import type { Media } from "@/types/anilist";
 import { getAnimeTitle, getAnimeCover, formatEpisodeCount, getStarRating } from "@/lib/anilist";
 import { cn } from "@/lib/utils";
+import { LanguageBadge } from "@/components/ui/badge";
 
 export interface AnimeCardProps {
   anime: Media;
@@ -18,6 +19,8 @@ export interface AnimeCardProps {
   showProgress?: boolean;
   progress?: number;
   className?: string;
+  showLanguageBadge?: boolean;
+  hasDub?: boolean;
 }
 
 export function AnimeCard({
@@ -26,6 +29,8 @@ export function AnimeCard({
   showProgress = false,
   progress = 0,
   className,
+  showLanguageBadge = false,
+  hasDub = false,
 }: AnimeCardProps) {
   const title = getAnimeTitle(anime);
   const cover = getAnimeCover(anime);
@@ -61,6 +66,13 @@ export function AnimeCard({
         <div className="absolute top-2 right-2 px-2 py-1 bg-black/60 backdrop-blur-sm rounded-full text-xs font-medium text-white">
           {episodes}
         </div>
+
+        {/* Language Badge (bottom left) */}
+        {showLanguageBadge && (
+          <div className="absolute bottom-2 left-2">
+            <LanguageBadge sub={true} dub={hasDub} size="sm" />
+          </div>
+        )}
 
         {/* Play Button (on hover) */}
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
