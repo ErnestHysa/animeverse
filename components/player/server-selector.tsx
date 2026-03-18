@@ -132,6 +132,7 @@ export interface LanguageOption {
   id: string;
   label: string;
   type: "sub" | "dub" | "both";
+  available?: boolean;
 }
 
 interface LanguageSelectorProps {
@@ -179,22 +180,34 @@ export function LanguageSelector({
               <div className="py-1">
                 {languages.map((lang) => {
                   const isSelected = lang.id === currentLanguage;
+                  const isAvailable = lang.available !== false;
                   return (
                     <button
                       key={lang.id}
                       onClick={() => {
-                        onLanguageChange(lang.id);
-                        setIsOpen(false);
+                        if (isAvailable) {
+                          onLanguageChange(lang.id);
+                          setIsOpen(false);
+                        }
                       }}
                       className={cn(
-                        "w-full flex items-center justify-between px-3 py-2 text-left hover:bg-white/10 transition-colors",
+                        "w-full flex items-center justify-between px-3 py-2 text-left transition-colors",
+                        isAvailable && "hover:bg-white/10",
+                        !isAvailable && "opacity-50 cursor-not-allowed",
                         isSelected && "bg-primary/20"
                       )}
+                      disabled={!isAvailable}
+                      title={!isAvailable ? "Not available for this anime" : undefined}
                     >
                       <span className="text-sm">{lang.label}</span>
-                      {isSelected && (
-                        <Check className="w-4 h-4 text-primary" />
-                      )}
+                      <div className="flex items-center gap-2">
+                        {!isAvailable && (
+                          <span className="text-xs text-muted-foreground">(N/A)</span>
+                        )}
+                        {isSelected && (
+                          <Check className="w-4 h-4 text-primary" />
+                        )}
+                      </div>
                     </button>
                   );
                 })}

@@ -38,20 +38,41 @@ interface ConsumetSourcesResponse {
 
 /**
  * Search for anime ID on Gogoanime
+ * Supports both sub and dub versions
  */
-async function searchAnimeId(animeId: number, title: string) {
+async function searchAnimeId(
+  animeId: number,
+  title: string,
+  language: "sub" | "dub" = "sub"
+): Promise<string | null> {
   try {
-    // Try to find the anime by searching with the title
-    const searchUrl = `${PROVIDERS.gogoanime.baseUrl}/${encodeURIComponent(title.split(" ")[0])}?limit=10`;
+    const searchTitle = title.split(" ")[0];
+    const searchUrl = `${PROVIDERS.gogoanime.baseUrl}/${encodeURIComponent(searchTitle)}?limit=20`;
     const response = await fetch(searchUrl, {
-      signal: AbortSignal.timeout(10000), // 10 second timeout
+      signal: AbortSignal.timeout(10000),
     });
 
     if (!response.ok) return null;
 
     const data = await response.json();
-    // Find best match by comparing with original animeId
-    return data.results?.[0]?.id;
+    if (!data.results || data.results.length === 0) return null;
+
+    if (language === "dub") {
+      // Look for a result with "dub" in the title or ID
+      const dubResult = data.results.find(
+        (r: any) =>
+          r.id?.toLowerCase().includes("dub") ||
+          r.title?.toLowerCase().includes("dub") ||
+          r.otherName?.toLowerCase().includes("dub")
+      );
+      return dubResult?.id || data.results[0]?.id;
+    }
+
+    // For sub, prefer non-dub versions
+    const subResult = data.results.find(
+      (r: any) => !r.id?.toLowerCase().includes("dub")
+    );
+    return subResult?.id || data.results[0]?.id;
   } catch {
     return null;
   }
@@ -59,8 +80,13 @@ async function searchAnimeId(animeId: number, title: string) {
 
 /**
  * Get episode sources from Gogoanime via Consumet
+ * Supports both sub and dub versions
  */
-async function getGogoanimeSources(animeId: string, episodeNumber: number): Promise<{
+async function getGogoanimeSources(
+  animeId: string,
+  episodeNumber: number,
+  language: "sub" | "dub" = "sub"
+): Promise<{
   sources: Array<{
     url: string;
     quality: "360p" | "480p" | "720p" | "1080p" | "auto";
@@ -71,11 +97,27 @@ async function getGogoanimeSources(animeId: string, episodeNumber: number): Prom
   referer?: string;
 } | null> {
   try {
-    const episodeId = `${animeId}-episode-${episodeNumber}`;
+    // For dub, try to find the dubbed version ID
+    let effectiveAnimeId = animeId;
+
+    if (language === "dub") {
+      // Try common dub ID patterns
+      const dubPatterns = [
+        `${animeId}-dub`,
+        `${animeId}dub`,
+        animeId.replace(/-anime$/, "-dub-anime"),
+      ];
+
+      // Search for the dub version if the direct pattern doesn't work
+      // We'll try the first pattern and fall back if it fails
+      effectiveAnimeId = dubPatterns[0];
+    }
+
+    const episodeId = `${effectiveAnimeId}-episode-${episodeNumber}`;
     const url = `${PROVIDERS.gogoanime.baseUrl}/watch/${encodeURIComponent(episodeId)}`;
 
     const response = await fetch(url, {
-      signal: AbortSignal.timeout(15000), // 15 second timeout
+      signal: AbortSignal.timeout(15000),
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
       },
@@ -92,7 +134,7 @@ async function getGogoanimeSources(animeId: string, episodeNumber: number): Prom
         url: s.url,
         quality: mapQuality(s.quality),
         label: s.quality || "Auto",
-        provider: "Gogoanime",
+        provider: `Gogoanime (${language.toUpperCase()})`,
         type: (s.isM3U8 ? "hls" : "mp4") as "mp4" | "hls" | "webm",
       })),
       referer: data.headers?.Referer,
@@ -164,6 +206,9 @@ function mapQuality(quality: string | undefined): "360p" | "480p" | "720p" | "10
 /**
  * GET /api/video-sources/[animeId]/[episode]
  * Returns video sources for the requested episode
+ * Query params:
+ * - title: Anime title for searching
+ * - language: "sub" or "dub" (default: "sub")
  */
 export async function GET(
   request: NextRequest,
@@ -180,9 +225,10 @@ export async function GET(
       );
     }
 
-    // Get title from query param for searching
+    // Get query params
     const searchParams = request.nextUrl.searchParams;
     const title = searchParams.get("title");
+    const language = (searchParams.get("language") || "sub") as "sub" | "dub";
 
     let sources: Array<{
       url: string;
@@ -193,22 +239,37 @@ export async function GET(
     }> = [];
     let subtitles: any[] = [];
     let provider = "none";
+    let availableLanguages: Array<{ type: "sub" | "dub"; available: boolean }> = [
+      { type: "sub", available: true },
+      { type: "dub", available: false },
+    ];
 
     // Try Gogoanime first (most reliable)
     if (title) {
-      const gogoId = await searchAnimeId(parseInt(animeId), title);
+      const gogoId = await searchAnimeId(parseInt(animeId), title, language);
       if (gogoId) {
-        const gogoResult = await getGogoanimeSources(gogoId, episodeNumber);
+        const gogoResult = await getGogoanimeSources(gogoId, episodeNumber, language);
         if (gogoResult && gogoResult.sources && gogoResult.sources.length > 0) {
           sources = gogoResult.sources;
-          provider = "gogoanime";
+          provider = `gogoanime-${language}`;
+
+          // Check if dub is available by trying to search for it
+          if (language === "sub") {
+            const dubId = await searchAnimeId(parseInt(animeId), title, "dub");
+            if (dubId && dubId !== gogoId) {
+              availableLanguages.find((l) => l.type === "dub")!.available = true;
+            }
+          }
         }
       }
     }
 
-    // Fallback to Zoro
+    // Fallback to Zoro for the requested language
     if (sources.length === 0 && title) {
-      const zoroResult = await getZoroSources(title.toLowerCase().replace(/[^a-z0-9]/g, "-"), episodeNumber);
+      const zoroResult = await getZoroSources(
+        title.toLowerCase().replace(/[^a-z0-9]/g, "-"),
+        episodeNumber
+      );
       if (zoroResult && zoroResult.sources && zoroResult.sources.length > 0) {
         sources = zoroResult.sources;
         provider = "zoro";
@@ -217,7 +278,6 @@ export async function GET(
 
     // Return demo sources if nothing found
     if (sources.length === 0) {
-      // Return fallback demo source
       sources = [{
         url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
         quality: "auto" as const,
@@ -234,6 +294,8 @@ export async function GET(
       sources,
       subtitles,
       provider,
+      language,
+      availableLanguages,
       intro: null,
       outro: null,
     });
@@ -251,6 +313,6 @@ export async function GET(
       }],
       provider: "fallback",
       error: "Failed to load video sources",
-    }, { status: 200 }); // Return 200 with fallback to prevent player crashes
+    }, { status: 200 });
   }
 }
