@@ -167,11 +167,11 @@ export const VIDEO_QUALITIES = [
 // ===================================
 
 export const STORAGE_KEYS = {
-  WATCH_HISTORY: "yggdrasil_watch_history",
-  WATCHLIST: "yggdrasil_watchlist",
-  FAVORITES: "yggdrasil_favorites",
-  PREFERENCES: "yggdrasil_preferences",
-  LAST_WATCHED: "yggdrasil_last_watched_{mediaId}",
+  WATCH_HISTORY: "animeverse_watch_history",
+  WATCHLIST: "animeverse_watchlist",
+  FAVORITES: "animeverse_favorites",
+  PREFERENCES: "animeverse_preferences",
+  LAST_WATCHED: "animeverse_last_watched_{mediaId}",
 } as const;
 
 // ===================================

@@ -20,31 +20,31 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://yggdrasil.stream"),
   title: {
-    default: "Yggdrasil Stream - Anime Streaming",
-    template: "%s | Yggdrasil Stream",
+    default: "AnimeVerse Stream - Anime Streaming",
+    template: "%s | AnimeVerse Stream",
   },
   description: "Watch your favorite anime in HD quality. Stream thousands of anime episodes with advanced features like P2P streaming, offline support, and more.",
   keywords: ["anime", "streaming", "webtorrent", "p2p", "free anime", "watch anime", "anime online", "hd anime"],
-  authors: [{ name: "Yggdrasil Stream" }],
+  authors: [{ name: "AnimeVerse Stream" }],
   openGraph: {
     type: "website",
     locale: "en_US",
     url: "https://yggdrasil.stream",
-    siteName: "Yggdrasil Stream",
-    title: "Yggdrasil Stream - Anime Streaming",
+    siteName: "AnimeVerse Stream",
+    title: "AnimeVerse Stream - Anime Streaming",
     description: "Watch your favorite anime with free P2P streaming.",
     images: [
       {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "Yggdrasil Stream",
+        alt: "AnimeVerse Stream",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Yggdrasil Stream - Anime Streaming",
+    title: "AnimeVerse Stream - Anime Streaming",
     description: "Watch your favorite anime with free P2P streaming.",
     images: ["/og-image.png"],
   },
@@ -56,7 +56,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Yggdrasil Stream",
+    title: "AnimeVerse Stream",
   },
   icons: {
     icon: "/icons/icon-192x192.png",

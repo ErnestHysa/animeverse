@@ -3,9 +3,9 @@
  * Caches assets for offline access
  */
 
-const CACHE_NAME = "yggdrasil-v1";
-const STATIC_CACHE = "yggdrasil-static-v1";
-const DYNAMIC_CACHE = "yggdrasil-dynamic-v1";
+const CACHE_NAME = "animeverse-v1";
+const STATIC_CACHE = "animeverse-static-v1";
+const DYNAMIC_CACHE = "animeverse-dynamic-v1";
 
 // Assets to cache immediately
 const STATIC_ASSETS = [

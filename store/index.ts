@@ -216,7 +216,7 @@ export const useStore = create<StoreState>()(
       clearMediaCache: () => set({ mediaCache: {} }),
     }),
     {
-      name: "yggdrasil-stream-storage",
+      name: "animeverse-stream-storage",
       storage: createJSONStorage(() => ({
         getItem: (name) => {
           if (typeof window === "undefined") return null;

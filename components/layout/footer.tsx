@@ -19,7 +19,7 @@ export function Footer() {
                   <span className="text-white font-bold text-sm">Y</span>
                 </div>
               </div>
-              <span className="font-display font-bold">YggdrasilStream</span>
+              <span className="font-display font-bold">AnimeVerse</span>
             </Link>
             <p className="text-sm text-muted-foreground max-w-xs">
               Free anime streaming powered by P2P technology and community.
@@ -106,7 +106,7 @@ export function Footer() {
         {/* Bottom Bar */}
         <div className="mt-12 pt-8 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-sm text-muted-foreground">
-            © {new Date().getFullYear()} YggdrasilStream. All rights reserved.
+            © {new Date().getFullYear()} AnimeVerse. All rights reserved.
           </p>
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
             <span>Made with</span>

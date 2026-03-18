@@ -58,7 +58,7 @@ export function Header() {
                 </div>
               </div>
               <span className="font-display font-bold text-lg hidden sm:block">
-                Yggdrasil<span className="text-primary">Stream</span>
+                AnimeVerse<span className="text-primary">Stream</span>
               </span>
             </Link>
 

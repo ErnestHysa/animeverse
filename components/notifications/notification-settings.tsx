@@ -151,7 +151,7 @@ export function NotificationSettings() {
           variant="glass"
           onClick={() => {
             if (typeof window !== "undefined" && "Notification" in window) {
-              new Notification("Yggdrasil Stream", {
+              new Notification("AnimeVerse", {
                 body: "Test notification! You're all set up.",
                 icon: "/icon-192x192.png",
               });
