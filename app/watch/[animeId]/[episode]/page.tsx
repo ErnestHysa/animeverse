@@ -18,6 +18,20 @@ import Image from "next/image";
 import { Suspense } from "react";
 
 // ===================================
+// Link Button Wrappers
+// ===================================
+
+function LinkButton({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <Link href={href} className="no-underline">
+      <Button>
+        {children}
+      </Button>
+    </Link>
+  );
+}
+
+// ===================================
 // Data Fetching
 // ===================================
 
@@ -65,7 +79,6 @@ async function VideoSection({ anime, episodeNum }: { anime: any; episodeNum: num
         animeTitle={title}
         poster={anime.coverImage?.extraLarge || undefined}
         nextEpisodeUrl={hasNext ? `/watch/${anime.id}/${episodeNum + 1}` : undefined}
-        onError={(error) => console.error("Player error:", error)}
       />
 
       {/* Episode Info & Actions */}
@@ -287,9 +300,7 @@ export default async function WatchPage({ params }: PageProps) {
             <p className="text-muted-foreground mb-4">
               The anime you&apos;re looking for doesn&apos;t exist.
             </p>
-            <Button asChild>
-              <Link href="/">Go Home</Link>
-            </Button>
+            <LinkButton href="/">Go Home</LinkButton>
           </div>
         </main>
         <Footer />
@@ -309,9 +320,7 @@ export default async function WatchPage({ params }: PageProps) {
             <p className="text-muted-foreground mb-4">
               This episode doesn&apos;t exist or hasn&apos;t been released yet.
             </p>
-            <Button asChild>
-              <Link href={`/anime/${animeId}`}>Back to Anime</Link>
-            </Button>
+            <LinkButton href={`/anime/${animeId}`}>Back to Anime</LinkButton>
           </div>
         </main>
         <Footer />

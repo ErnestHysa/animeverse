@@ -55,12 +55,12 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Try Again
               </Button>
-              <Button asChild variant="glass">
-                <Link href="/">
+              <Link href="/" className="no-underline">
+                <Button variant="glass">
                   <Home className="w-4 h-4 mr-2" />
                   Go Home
-                </Link>
-              </Button>
+                </Button>
+              </Link>
             </div>
           </div>
         </div>

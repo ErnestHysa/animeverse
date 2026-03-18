@@ -19,6 +19,20 @@ import { CommentsSection } from "@/components/comments/comments-section";
 import type { Media } from "@/types/anilist";
 
 // ===================================
+// Link Button Wrappers
+// ===================================
+
+function WatchLinkButton({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <Link href={href} className="no-underline">
+      <Button size="lg">
+        {children}
+      </Button>
+    </Link>
+  );
+}
+
+// ===================================
 // Data Fetching
 // ===================================
 
@@ -166,14 +180,12 @@ async function HeroSection({ anime }: { anime: Media }) {
 
               {/* Actions */}
               <div className="flex flex-wrap gap-3 pt-2">
-                <Button size="lg" asChild>
-                  <Link href={`/watch/${anime.id}/1`}>
-                    <span className="flex items-center gap-2">
-                      <Play className="w-5 h-5" />
-                      Watch Now
-                    </span>
-                  </Link>
-                </Button>
+                <WatchLinkButton href={`/watch/${anime.id}/1`}>
+                  <span className="flex items-center gap-2">
+                    <Play className="w-5 h-5" />
+                    Watch Now
+                  </span>
+                </WatchLinkButton>
                 <AnimeActions animeId={anime.id} animeTitle={title} />
               </div>
 
@@ -470,9 +482,7 @@ export default async function AnimeDetailPage({ params }: PageProps) {
             <p className="text-muted-foreground mb-4">
               The anime you&apos;re looking for doesn&apos;t exist.
             </p>
-            <Button asChild>
-              <Link href="/">Go Home</Link>
-            </Button>
+            <WatchLinkButton href="/">Go Home</WatchLinkButton>
           </div>
         </main>
         <Footer />
