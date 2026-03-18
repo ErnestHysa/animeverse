@@ -31,6 +31,7 @@ import { cn, formatTime } from "@/lib/utils";
 import { usePreferences } from "@/store";
 import { toast } from "react-hot-toast";
 import { ServerSelector, LanguageSelector } from "@/components/player/server-selector";
+import { WatchPartyControls } from "@/components/player/watch-party";
 import { SimpleThumbnailPreview } from "@/components/player/episode-thumbnails";
 
 // ===================================
@@ -993,6 +994,24 @@ export function EnhancedVideoPlayer({
                 isLoading={isLoading}
               />
             )}
+
+            {/* Watch Party */}
+            <WatchPartyControls
+              animeId={animeId || 0}
+              episodeNumber={episodeNumber || 0}
+              onSync={(time, playing) => {
+                if (videoRef.current && Math.abs(videoRef.current.currentTime - time) > 2) {
+                  videoRef.current.currentTime = time;
+                }
+                if (playing && !isPlaying) {
+                  videoRef.current?.play();
+                } else if (!playing && isPlaying) {
+                  videoRef.current?.pause();
+                }
+              }}
+              currentTime={currentTime}
+              isPlaying={isPlaying}
+            />
 
             {/* P2P Stats (for WebTorrent) */}
             {source.type !== "direct" && (

@@ -1,0 +1,544 @@
+/**
+ * Watch Party Feature
+ * Real-time synchronized viewing with chat
+ */
+
+"use client";
+
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Users, Copy, Check, Send, X } from "lucide-react";
+import { GlassCard } from "@/components/ui/glass-card";
+import { Button } from "@/components/ui/button";
+import { toast } from "react-hot-toast";
+
+// ===================================
+// Types
+// ===================================
+
+export interface WatchPartyRoom {
+  id: string;
+  name: string;
+  host: string;
+  viewers: number;
+  animeId: number;
+  episodeNumber: number;
+  isPublic: boolean;
+  createdAt: number;
+}
+
+export interface ChatMessage {
+  id: string;
+  userId: string;
+  username: string;
+  message: string;
+  timestamp: number;
+}
+
+interface WatchPartyState {
+  roomId: string | null;
+  isHost: boolean;
+  currentTime: number;
+  isPlaying: boolean;
+  viewers: string[];
+  chat: ChatMessage[];
+}
+
+// ===================================
+// Watch Party Hook
+// ===================================
+
+const STORAGE_KEY = "animeverse-watchparty";
+
+export function useWatchParty(animeId: number, episodeNumber: number) {
+  const [state, setState] = useState<WatchPartyState>({
+    roomId: null,
+    isHost: false,
+    currentTime: 0,
+    isPlaying: false,
+    viewers: [],
+    chat: [],
+  });
+  const [userName] = useState(() => {
+    const saved = localStorage.getItem(`${STORAGE_KEY}-username`);
+    return saved || `User${Math.floor(Math.random() * 10000)}`;
+  });
+
+  // Generate room ID
+  const generateRoomId = useCallback(() => {
+    return Math.random().toString(36).substring(2, 8).toUpperCase();
+  }, []);
+
+  // Create a new watch party room
+  const createRoom = useCallback((roomName?: string) => {
+    const roomId = generateRoomId();
+    const room: WatchPartyRoom = {
+      id: roomId,
+      name: roomName || "Watch Party",
+      host: userName,
+      viewers: 1,
+      animeId,
+      episodeNumber,
+      isPublic: true,
+      createdAt: Date.now(),
+    };
+
+    // Store room in localStorage (in production, use backend)
+    localStorage.setItem(`${STORAGE_KEY}-room-${roomId}`, JSON.stringify(room));
+    localStorage.setItem(`${STORAGE_KEY}-current`, JSON.stringify({ roomId, isHost: true }));
+
+    setState({
+      roomId,
+      isHost: true,
+      currentTime: 0,
+      isPlaying: false,
+      viewers: [userName],
+      chat: [],
+    });
+
+    toast.success(`Room created: ${roomId}`);
+    return roomId;
+  }, [animeId, episodeNumber, generateRoomId, userName]);
+
+  // Join an existing room
+  const joinRoom = useCallback((roomId: string) => {
+    const roomData = localStorage.getItem(`${STORAGE_KEY}-room-${roomId}`);
+
+    if (!roomData) {
+      toast.error("Room not found");
+      return false;
+    }
+
+    const room: WatchPartyRoom = JSON.parse(roomData);
+
+    if (room.animeId !== animeId || room.episodeNumber !== episodeNumber) {
+      toast.error("This room is for a different episode");
+      return false;
+    }
+
+    localStorage.setItem(`${STORAGE_KEY}-current`, JSON.stringify({ roomId, isHost: false }));
+
+    // Add viewer to room
+    room.viewers++;
+    localStorage.setItem(`${STORAGE_KEY}-room-${roomId}`, JSON.stringify(room));
+
+    setState({
+      roomId,
+      isHost: false,
+      currentTime: 0,
+      isPlaying: false,
+      viewers: [],
+      chat: [],
+    });
+
+    toast.success(`Joined room: ${roomId}`);
+    return true;
+  }, [animeId, episodeNumber, userName]);
+
+  // Leave current room
+  const leaveRoom = useCallback(() => {
+    const { roomId } = state;
+    if (!roomId) return;
+
+    const roomData = localStorage.getItem(`${STORAGE_KEY}-room-${roomId}`);
+    if (roomData) {
+      const room: WatchPartyRoom = JSON.parse(roomData);
+
+      if (room.viewers > 0) {
+        room.viewers--;
+        localStorage.setItem(`${STORAGE_KEY}-room-${roomId}`, JSON.stringify(room));
+      }
+    }
+
+    localStorage.removeItem(`${STORAGE_KEY}-current`);
+    setState({
+      roomId: null,
+      isHost: false,
+      currentTime: 0,
+      isPlaying: false,
+      viewers: [],
+      chat: [],
+    });
+
+    toast.success("Left watch party");
+  }, [state]);
+
+  // Sync playback state
+  const syncPlayback = useCallback((currentTime: number, isPlaying: boolean) => {
+    const { roomId, isHost } = state;
+    if (!roomId || !isHost) return;
+
+    // Update room state (in production, broadcast to all viewers via WebSocket)
+    const roomData = localStorage.getItem(`${STORAGE_KEY}-room-${roomId}`);
+    if (roomData) {
+      const room: WatchPartyRoom = JSON.parse(roomData);
+      localStorage.setItem(`${STORAGE_KEY}-sync-${roomId}`, JSON.stringify({
+        currentTime,
+        isPlaying,
+        timestamp: Date.now(),
+      }));
+    }
+
+    setState((prev) => ({ ...prev, currentTime, isPlaying }));
+  }, [state]);
+
+  // Send chat message
+  const sendChat = useCallback((message: string) => {
+    const { roomId } = state;
+    if (!roomId) return;
+
+    const chatMessage: ChatMessage = {
+      id: Date.now().toString(),
+      userId: userName,
+      username: userName,
+      message,
+      timestamp: Date.now(),
+    };
+
+    setState((prev) => ({
+      ...prev,
+      chat: [...prev.chat, chatMessage],
+    }));
+
+    // Store in room chat (in production, send via WebSocket)
+    const chatKey = `${STORAGE_KEY}-chat-${roomId}`;
+    const existingChat = JSON.parse(localStorage.getItem(chatKey) || "[]");
+    existingChat.push(chatMessage);
+    localStorage.setItem(chatKey, JSON.stringify(existingChat.slice(-50))); // Keep last 50 messages
+  }, [state, userName]);
+
+  // Load room chat
+  useEffect(() => {
+    const { roomId } = state;
+    if (!roomId) return;
+
+    const chatKey = `${STORAGE_KEY}-chat-${roomId}`;
+    const loadChat = () => {
+      const chatData = localStorage.getItem(chatKey);
+      if (chatData) {
+        const messages: ChatMessage[] = JSON.parse(chatData);
+        setState((prev) => ({ ...prev, chat: messages }));
+      }
+    };
+
+    loadChat();
+
+    // Poll for new messages (in production, use WebSocket)
+    const interval = setInterval(loadChat, 2000);
+    return () => clearInterval(interval);
+  }, [state.roomId]);
+
+  // Sync state from host (poll for updates)
+  useEffect(() => {
+    const { roomId, isHost } = state;
+    if (!roomId || isHost) return;
+
+    const interval = setInterval(() => {
+      const syncKey = `${STORAGE_KEY}-sync-${roomId}`;
+      const syncData = localStorage.getItem(syncKey);
+      if (syncData) {
+        const sync = JSON.parse(syncData);
+        // Only sync if recent (within 5 seconds)
+        if (Date.now() - sync.timestamp < 5000) {
+          setState((prev) => ({
+            ...prev,
+            currentTime: sync.currentTime,
+            isPlaying: sync.isPlaying,
+          }));
+        }
+      }
+    }, 500);
+
+    return () => clearInterval(interval);
+  }, [state.roomId, state.isHost]);
+
+  return {
+    state,
+    userName,
+    setUserName: (name: string) => {
+      localStorage.setItem(`${STORAGE_KEY}-username`, name);
+      setState((prev) => ({ ...prev, viewers: [] })); // Trigger re-render
+    },
+    createRoom,
+    joinRoom,
+    leaveRoom,
+    syncPlayback,
+    sendChat,
+  };
+}
+
+// ===================================
+// Components
+// ===================================
+
+interface WatchPartyControlsProps {
+  animeId: number;
+  episodeNumber: number;
+  onSync?: (currentTime: number, isPlaying: boolean) => void;
+  currentTime?: number;
+  isPlaying?: boolean;
+}
+
+export function WatchPartyControls({
+  animeId,
+  episodeNumber,
+  onSync,
+  currentTime = 0,
+  isPlaying = false,
+}: WatchPartyControlsProps) {
+  const {
+    state,
+    userName,
+    setUserName,
+    createRoom,
+    joinRoom,
+    leaveRoom,
+    syncPlayback,
+    sendChat,
+  } = useWatchParty(animeId, episodeNumber);
+
+  const [showJoinModal, setShowJoinModal] = useState(false);
+  const [roomIdInput, setRoomIdInput] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [chatInput, setChatInput] = useState("");
+  const [showChat, setShowChat] = useState(true);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Sync playback when current time changes
+  useEffect(() => {
+    if (state.isHost && onSync) {
+      onSync(currentTime, isPlaying);
+    }
+  }, [currentTime, isPlaying, state.isHost, onSync]);
+
+  // Auto-scroll chat
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollTop = chatEndRef.current.scrollHeight;
+    }
+  }, [state.chat]);
+
+  const handleCopyRoomId = () => {
+    if (state.roomId) {
+      navigator.clipboard.writeText(state.roomId);
+      setCopied(true);
+      toast.success("Room ID copied!");
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleSendChat = () => {
+    if (chatInput.trim()) {
+      sendChat(chatInput);
+      setChatInput("");
+    }
+  };
+
+  if (!state.roomId) {
+    return (
+      <>
+        <Button
+          onClick={() => setShowJoinModal(true)}
+          variant="outline"
+          size="sm"
+          className="gap-2"
+        >
+          <Users className="w-4 h-4" />
+          Watch Party
+        </Button>
+
+        {showJoinModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <GlassCard className="max-w-md w-full p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-semibold">Watch Party</h2>
+                <button
+                  onClick={() => setShowJoinModal(false)}
+                  className="p-1 hover:bg-white/10 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4 mb-6">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Your Name</label>
+                  <input
+                    type="text"
+                    value={userName}
+                    onChange={(e) => setUserName(e.target.value)}
+                    placeholder="Enter your name"
+                    className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-primary"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Button
+                    onClick={() => {
+                      createRoom();
+                      setShowJoinModal(false);
+                    }}
+                    className="w-full"
+                  >
+                    Create Room
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      if (roomIdInput.trim()) {
+                        joinRoom(roomIdInput.trim());
+                        setShowJoinModal(false);
+                      }
+                    }}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    Join Room
+                  </Button>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Room ID</label>
+                  <input
+                    type="text"
+                    value={roomIdInput}
+                    onChange={(e) => setRoomIdInput(e.target.value.toUpperCase())}
+                    placeholder="Enter Room ID"
+                    className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-primary"
+                  />
+                </div>
+              </div>
+
+              <p className="text-xs text-muted-foreground text-center">
+                Watch together with friends in real-time sync
+              </p>
+            </GlassCard>
+          </div>
+        )}
+      </>
+    );
+  }
+
+  return (
+    <div className="relative">
+      {/* Chat Sidebar */}
+      {showChat && (
+        <div className="fixed right-0 top-0 bottom-0 w-80 bg-black/95 backdrop-blur-xl border-l border-white/10 z-40 flex flex-col">
+          <div className="p-4 border-b border-white/10 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Users className="w-5 h-5 text-primary" />
+              <div>
+                <h3 className="font-semibold">Watch Party</h3>
+                <p className="text-xs text-muted-foreground">Room: {state.roomId}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleCopyRoomId}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                title="Copy Room ID"
+              >
+                {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+              </button>
+              <button
+                onClick={() => setShowChat(false)}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Chat Messages */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-3" ref={chatEndRef}>
+            {state.chat.length === 0 ? (
+              <p className="text-center text-sm text-muted-foreground">
+                No messages yet. Say hi!
+              </p>
+            ) : (
+              state.chat.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`flex flex-col gap-1 ${msg.userId === userName ? "items-end" : "items-start"}`}
+                >
+                  <span className="text-xs text-muted-foreground px-1">
+                    {msg.username}
+                  </span>
+                  <div
+                    className={`max-w-[80%] px-3 py-2 rounded-lg ${
+                      msg.userId === userName
+                        ? "bg-primary text-white"
+                        : "bg-white/10"
+                    }`}
+                  >
+                    <p className="text-sm break-words">{msg.message}</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Chat Input */}
+          <div className="p-4 border-t border-white/10">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSendChat()}
+                placeholder="Type a message..."
+                className="flex-1 px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-primary"
+              />
+              <button
+                onClick={handleSendChat}
+                disabled={!chatInput.trim()}
+                className="p-2 bg-primary hover:bg-primary/90 rounded-lg transition-colors disabled:opacity-50"
+              >
+                <Send className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Controls */}
+      <div className="flex items-center gap-2">
+        {!showChat && (
+          <Button
+            onClick={() => setShowChat(true)}
+            variant="outline"
+            size="sm"
+            className="gap-2"
+          >
+            <Users className="w-4 h-4" />
+            Chat ({state.chat.length})
+          </Button>
+        )}
+
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/20 rounded-lg">
+          <Users className="w-4 h-4 text-primary" />
+          <span className="text-sm font-medium">{state.roomId}</span>
+          {state.isHost && (
+            <span className="text-xs bg-primary px-2 py-0.5 rounded">HOST</span>
+          )}
+        </div>
+
+        <Button
+          onClick={leaveRoom}
+          variant="outline"
+          size="sm"
+        >
+          Leave
+        </Button>
+      </div>
+
+      {/* Chat Toggle Button (when chat is hidden) */}
+      {!showChat && state.chat.length > 0 && (
+        <button
+          onClick={() => setShowChat(true)}
+          className="fixed bottom-24 right-4 p-3 bg-primary text-white rounded-full shadow-lg z-30"
+        >
+          <Users className="w-5 h-5" />
+        </button>
+      )}
+    </div>
+  );
+}
