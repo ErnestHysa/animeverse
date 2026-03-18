@@ -249,6 +249,7 @@ export function VideoSourceLoader({
     <EnhancedVideoPlayer
       source={sources}
       poster={poster}
+      animeTitle={animeTitle}
       animeId={animeId}
       episodeNumber={episodeNumber}
       nextEpisodeUrl={nextEpisodeUrl}

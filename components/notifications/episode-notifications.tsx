@@ -171,6 +171,33 @@ export function EpisodeNotifications({ airingSchedule = [] }: EpisodeNotificatio
   const [prefs, setPrefs] = useState<NotificationPreference[]>([]);
   const [showSettings, setShowSettings] = useState(false);
   const [enabledCount, setEnabledCount] = useState(0);
+  const [animeTitles, setAnimeTitles] = useState<Map<number, string>>(new Map());
+
+  // Fetch anime titles for tracked anime
+  useEffect(() => {
+    async function fetchAnimeTitles() {
+      const trackedAnime = [...new Set([...watchlist, ...favorites])];
+      if (trackedAnime.length === 0) return;
+
+      try {
+        const { anilist } = await import("@/lib/anilist");
+        const result = await anilist.getByIds(trackedAnime);
+
+        if (result.data?.Page?.media) {
+          const titleMap = new Map<number, string>();
+          result.data.Page.media.forEach((media) => {
+            const title = media.title?.userPreferred || media.title?.english || media.title?.romaji || "Unknown";
+            titleMap.set(media.id, title);
+          });
+          setAnimeTitles(titleMap);
+        }
+      } catch {
+        // Silently fail - titles will show as ID fallback
+      }
+    }
+
+    fetchAnimeTitles();
+  }, [watchlist, favorites]);
 
   // Initialize notification manager
   useEffect(() => {
@@ -312,7 +339,10 @@ export function EpisodeNotifications({ airingSchedule = [] }: EpisodeNotificatio
                       </p>
                     ) : (
                       trackedAnime.map((animeId) => {
-                        const anime = airingSchedule.find((a) => a.mediaId === animeId);
+                        // Get title from fetched map first, then airing schedule, then fallback
+                        const title = animeTitles.get(animeId) ||
+                                     airingSchedule.find((a) => a.mediaId === animeId)?.title ||
+                                     `Anime ${animeId}`;
                         const isEnabled = notificationManager.isEnabled(animeId);
 
                         return (
@@ -321,16 +351,14 @@ export function EpisodeNotifications({ airingSchedule = [] }: EpisodeNotificatio
                             className="flex items-center justify-between p-2 bg-white/5 rounded-lg"
                           >
                             <span className="text-sm truncate flex-1">
-                              {anime?.title || `Anime ${animeId}`}
+                              {title}
                             </span>
                             <button
                               onClick={() => {
                                 if (isEnabled) {
                                   disableForAnime(animeId);
                                 } else {
-                                  // Would need full anime data here
-                                  // For now, just toggle
-                                  notificationManager.enableNotification(animeId, anime?.title || "", 0);
+                                  notificationManager.enableNotification(animeId, title, 0);
                                   setPrefs(notificationManager.getPreferences());
                                   setEnabledCount((prev) => prev + 1);
                                 }
@@ -365,9 +393,26 @@ export function useAiringSchedule() {
   const [schedule, setSchedule] = useState<AiringAnime[]>([]);
 
   useEffect(() => {
-    // In production, fetch from API
-    // For now, return empty
-    setSchedule([]);
+    async function fetchAiringSchedule() {
+      try {
+        const { anilist } = await import("@/lib/anilist");
+        const result = await anilist.getAiring(1, 50);
+
+        if (result.data?.Page?.airingSchedules) {
+          const schedules: AiringAnime[] = result.data.Page.airingSchedules.map((item) => ({
+            mediaId: item.media.id,
+            title: item.media.title?.userPreferred || item.media.title?.english || item.media.title?.romaji || "Unknown",
+            nextEpisode: item.episode,
+            airingAt: item.airingAt,
+          }));
+          setSchedule(schedules);
+        }
+      } catch {
+        // Silently fail - notifications just won't work
+      }
+    }
+
+    fetchAiringSchedule();
   }, []);
 
   return schedule;

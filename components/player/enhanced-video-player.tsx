@@ -33,6 +33,7 @@ import { toast } from "react-hot-toast";
 import { ServerSelector, LanguageSelector } from "@/components/player/server-selector";
 import { WatchPartyControls } from "@/components/player/watch-party";
 import { SimpleThumbnailPreview } from "@/components/player/episode-thumbnails";
+import { DownloadButton } from "@/components/player/download-button";
 
 // ===================================
 // Types
@@ -45,6 +46,7 @@ interface VideoPlayerProps {
     qualities?: VideoQuality[];
   };
   poster?: string;
+  animeTitle?: string;
   className?: string;
   onEnd?: () => void;
   onError?: (error: Error) => void;
@@ -83,6 +85,7 @@ export interface VideoQuality {
 export function EnhancedVideoPlayer({
   source,
   poster,
+  animeTitle,
   className,
   onError,
   onEpisodeEnd,
@@ -1024,6 +1027,17 @@ export function EnhancedVideoPlayer({
                   <span>{peers} peers</span>
                 </div>
               </div>
+            )}
+
+            {/* Download Button */}
+            {source.type === "direct" && animeId && episodeNumber && animeTitle && (
+              <DownloadButton
+                animeId={animeId}
+                animeTitle={animeTitle}
+                episodeNumber={episodeNumber}
+                videoUrl={source.url}
+                thumbnailUrl={poster}
+              />
             )}
 
             {/* Settings */}

@@ -7,7 +7,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Star, Play, Clock } from "lucide-react";
+import { Star, Play, Clock, Sparkles } from "lucide-react";
 import type { Media } from "@/types/anilist";
 import { getAnimeTitle, getAnimeCover, formatEpisodeCount, getStarRating } from "@/lib/anilist";
 import { cn } from "@/lib/utils";
@@ -38,6 +38,11 @@ export function AnimeCard({
   const episodes = formatEpisodeCount(anime.episodes, anime.status);
   const isAiring = anime.status === "RELEASING";
 
+  // Check if simulcast (airs within 24 hours of Japan broadcast)
+  const isSimulcast = anime.nextAiringEpisode && (
+    anime.nextAiringEpisode.airingAt * 1000 - Date.now()
+  ) < 24 * 60 * 60 * 1000; // Less than 24 hours until airing
+
   return (
     <Link href={`/anime/${anime.id}`} className={cn("group block", className)}>
       <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-muted">
@@ -54,13 +59,24 @@ export function AnimeCard({
         {/* Gradient Overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover:opacity-80 transition-opacity" />
 
-        {/* Airing Badge */}
-        {isAiring && (
-          <div className="absolute top-2 left-2 px-2 py-1 bg-primary/80 backdrop-blur-sm rounded-full text-xs font-medium text-white flex items-center gap-1">
-            <span className="w-1.5 h-1 bg-green-400 rounded-full animate-pulse" />
-            AIRING
-          </div>
-        )}
+        {/* Badges Container */}
+        <div className="absolute top-2 left-2 flex flex-col gap-1">
+          {/* Simulcast Badge */}
+          {isSimulcast && (
+            <div className="px-2 py-1 bg-gradient-to-r from-purple-500/90 to-pink-500/90 backdrop-blur-sm rounded-full text-xs font-medium text-white flex items-center gap-1">
+              <Sparkles className="w-3 h-3" />
+              SIMULCAST
+            </div>
+          )}
+
+          {/* Airing Badge */}
+          {isAiring && !isSimulcast && (
+            <div className="px-2 py-1 bg-primary/80 backdrop-blur-sm rounded-full text-xs font-medium text-white flex items-center gap-1">
+              <span className="w-1.5 h-1 bg-green-400 rounded-full animate-pulse" />
+              AIRING
+            </div>
+          )}
+        </div>
 
         {/* Episode Badge */}
         <div className="absolute top-2 right-2 px-2 py-1 bg-black/60 backdrop-blur-sm rounded-full text-xs font-medium text-white">
