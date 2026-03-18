@@ -199,8 +199,6 @@ export async function reportBrokenVideo(data: {
   issue: string;
 }): Promise<void> {
   // In production, send to backend API or monitoring service
-  console.log("Broken video reported:", data);
-
   if (typeof window !== "undefined") {
     // Store reports locally for demo
     const reports = JSON.parse(localStorage.getItem("broken-reports") || "[]");

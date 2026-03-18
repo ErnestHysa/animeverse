@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { anilist } from "@/lib/anilist";
+import type { Media } from "@/types/anilist";
 
 // ===================================
 // Types
@@ -16,9 +17,27 @@ interface ScrapeRequest {
   maxResults?: number;
 }
 
+interface AnimeResult {
+  id: number;
+  title: {
+    romaji?: string;
+    english?: string | null;
+    native?: string | null;
+  };
+  coverImage: {
+    extraLarge: string;
+  };
+  description: string | null;
+  episodes: number | null;
+  status: string;
+  format: string;
+  seasonYear: number | null;
+  averageScore: number | null;
+}
+
 interface ScrapeResponse {
   success: boolean;
-  data?: any;
+  data?: { results: AnimeResult[] } | Media | null;
   error?: string;
 }
 
@@ -29,7 +48,11 @@ interface ScrapeResponse {
 /**
  * Search anime using AniList as the scraper
  */
-async function callScraper(query: string, type: string = "search", maxResults: number = 10): Promise<any> {
+async function callScraper(
+  query: string,
+  type: string = "search",
+  maxResults: number = 10
+): Promise<{ results: AnimeResult[] } | Media | null> {
   try {
     if (type === "search") {
       // Use AniList search functionality
@@ -37,20 +60,20 @@ async function callScraper(query: string, type: string = "search", maxResults: n
       const media = result.data?.Page?.media || [];
 
       return {
-        results: media.map((m: any) => ({
+        results: media.map((m: Media) => ({
           id: m.id,
           title: {
-            romaji: m.title?.romaji,
-            english: m.title?.english,
-            native: m.title?.native,
+            romaji: m.title.romaji,
+            english: m.title.english,
+            native: m.title.native,
           },
           coverImage: {
-            extraLarge: m.coverImage?.extraLarge || m.coverImage?.large || "/placeholder.jpg",
+            extraLarge: m.coverImage.extraLarge || m.coverImage.large || "/placeholder.jpg",
           },
           description: m.description,
           episodes: m.episodes,
           status: m.status,
-          format: m.format,
+          format: m.format || "UNKNOWN",
           seasonYear: m.seasonYear,
           averageScore: m.averageScore,
         })),

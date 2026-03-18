@@ -23,6 +23,7 @@ export function NotificationSettings() {
   useEffect(() => {
     setIsSupported(areNotificationsSupported());
     setPermission(getNotificationPermission());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleRequestPermission = async () => {

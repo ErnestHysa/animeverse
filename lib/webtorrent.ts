@@ -143,7 +143,7 @@ class WebTorrentManager {
           });
 
           torrent.on("done", () => {
-            console.log("Torrent download complete");
+            // Torrent download complete - callback will be triggered via events
           });
         }
       );

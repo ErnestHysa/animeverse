@@ -55,14 +55,17 @@ export function ServerSelector({
           isLoading && "opacity-50 cursor-not-allowed"
         )}
         disabled={isLoading}
+        aria-label="Select server"
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
       >
-        <Server className="w-4 h-4" />
+        <Server className="w-4 h-4" aria-hidden="true" />
         <span className="hidden sm:inline">{currentInfo.name}</span>
         <span className="text-muted-foreground">({currentInfo.quality})</span>
         <ChevronDown className={cn(
           "w-4 h-4 transition-transform",
           isOpen && "rotate-180"
-        )} />
+        )} aria-hidden="true" />
       </button>
 
       {isOpen && (
@@ -71,10 +74,11 @@ export function ServerSelector({
           <div
             className="fixed inset-0 z-40"
             onClick={() => setIsOpen(false)}
+            aria-hidden="true"
           />
 
           {/* Dropdown */}
-          <div className="absolute right-0 top-full mt-2 z-50 w-56">
+          <div className="absolute right-0 top-full mt-2 z-50 w-56" role="listbox" aria-label="Server options">
             <div className="bg-black/95 backdrop-blur-xl border border-white/10 rounded-lg overflow-hidden shadow-xl">
               <div className="px-3 py-2 border-b border-white/10">
                 <p className="text-xs font-medium text-muted-foreground">Select Server</p>
@@ -94,9 +98,12 @@ export function ServerSelector({
                         "w-full flex items-center justify-between px-3 py-2 text-left hover:bg-white/10 transition-colors",
                         isSelected && "bg-primary/20"
                       )}
+                      role="option"
+                      aria-selected={isSelected}
+                      aria-label={`${server.name} - ${server.quality} ${server.type.toUpperCase()}`}
                     >
                       <div className="flex items-center gap-2">
-                        <Server className="w-4 h-4 text-muted-foreground" />
+                        <Server className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
                         <div>
                           <p className="text-sm font-medium">{server.name}</p>
                           <p className="text-xs text-muted-foreground">
@@ -105,14 +112,14 @@ export function ServerSelector({
                         </div>
                       </div>
                       {isSelected && (
-                        <Check className="w-4 h-4 text-primary" />
+                        <Check className="w-4 h-4 text-primary" aria-hidden="true" />
                       )}
                     </button>
                   );
                 })}
 
                 {servers.length === 0 && (
-                  <div className="px-3 py-4 text-center text-sm text-muted-foreground">
+                  <div className="px-3 py-4 text-center text-sm text-muted-foreground" role="status">
                     No servers available
                   </div>
                 )}
@@ -155,13 +162,16 @@ export function LanguageSelector({
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg transition-colors text-sm"
+        aria-label="Select language"
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
       >
-        <Globe className="w-4 h-4" />
+        <Globe className="w-4 h-4" aria-hidden="true" />
         <span className="hidden sm:inline">{currentLang?.label || "Sub"}</span>
         <ChevronDown className={cn(
           "w-4 h-4 transition-transform",
           isOpen && "rotate-180"
-        )} />
+        )} aria-hidden="true" />
       </button>
 
       {isOpen && (
@@ -169,9 +179,10 @@ export function LanguageSelector({
           <div
             className="fixed inset-0 z-40"
             onClick={() => setIsOpen(false)}
+            aria-hidden="true"
           />
 
-          <div className="absolute right-0 top-full mt-2 z-50 w-48">
+          <div className="absolute right-0 top-full mt-2 z-50 w-48" role="listbox" aria-label="Language options">
             <div className="bg-black/95 backdrop-blur-xl border border-white/10 rounded-lg overflow-hidden shadow-xl">
               <div className="px-3 py-2 border-b border-white/10">
                 <p className="text-xs font-medium text-muted-foreground">Language</p>
@@ -197,7 +208,9 @@ export function LanguageSelector({
                         isSelected && "bg-primary/20"
                       )}
                       disabled={!isAvailable}
-                      title={!isAvailable ? "Not available for this anime" : undefined}
+                      role="option"
+                      aria-selected={isSelected}
+                      aria-label={`${lang.label}${!isAvailable ? " - Not available" : ""}`}
                     >
                       <span className="text-sm">{lang.label}</span>
                       <div className="flex items-center gap-2">
@@ -205,7 +218,7 @@ export function LanguageSelector({
                           <span className="text-xs text-muted-foreground">(N/A)</span>
                         )}
                         {isSelected && (
-                          <Check className="w-4 h-4 text-primary" />
+                          <Check className="w-4 h-4 text-primary" aria-hidden="true" />
                         )}
                       </div>
                     </button>

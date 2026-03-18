@@ -20,7 +20,7 @@ export function ServiceWorkerRegister() {
     navigator.serviceWorker
       .register("/sw.js")
       .then((registration) => {
-        console.log("Service Worker registered:", registration.scope);
+        // Service Worker registered successfully
 
         // Check for updates
         registration.addEventListener("updatefound", () => {

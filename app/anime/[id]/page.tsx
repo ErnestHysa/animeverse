@@ -10,12 +10,13 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
 import { EpisodeGridSkeleton } from "@/components/ui/skeleton";
 import { anilist, getAnimeTitle, getAnimeCover, getNextAiringTime } from "@/lib/anilist";
-import { Play, Star, Clock, Calendar, Tv, Film, Users, TrendingUp, Plus, Check, Heart, ExternalLink } from "lucide-react";
+import { Play, Star, Clock, Calendar, Tv, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { Suspense } from "react";
 import { AnimeActions } from "@/components/anime/anime-actions";
 import { CommentsSection } from "@/components/comments/comments-section";
+import type { Media } from "@/types/anilist";
 
 // ===================================
 // Data Fetching
@@ -36,7 +37,7 @@ async function getAnimeDetails(id: string) {
 // Components
 // ===================================
 
-async function HeroSection({ anime }: { anime: any }) {
+async function HeroSection({ anime }: { anime: Media }) {
   const title = getAnimeTitle(anime);
   const cover = getAnimeCover(anime);
   const banner = anime.bannerImage;
@@ -179,7 +180,7 @@ async function HeroSection({ anime }: { anime: any }) {
               {/* External Links */}
               {anime.externalLinks && anime.externalLinks.length > 0 && (
                 <div className="flex flex-wrap gap-2">
-                  {anime.externalLinks.map((link: any, i: number) => (
+                  {anime.externalLinks.map((link, i: number) => (
                     <a
                       key={i}
                       href={link.url}
@@ -201,7 +202,7 @@ async function HeroSection({ anime }: { anime: any }) {
   );
 }
 
-async function InfoSection({ anime }: { anime: any }) {
+async function InfoSection({ anime }: { anime: Media }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-12">
       {/* Main Content */}
@@ -247,7 +248,7 @@ async function InfoSection({ anime }: { anime: any }) {
           <GlassCard>
             <h2 className="text-xl font-semibold mb-4">Characters</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-              {anime.characters.edges.map((edge: any) => (
+              {anime.characters.edges.map((edge) => (
                 <div key={edge.node.id} className="text-center">
                   <div className="relative aspect-square rounded-lg overflow-hidden bg-muted mb-2">
                     <Image
@@ -339,7 +340,7 @@ async function InfoSection({ anime }: { anime: any }) {
             {anime.studios?.nodes && anime.studios.nodes.length > 0 && (
               <div>
                 <p className="text-muted-foreground">Studios</p>
-                <p className="font-medium">{anime.studios.nodes.map((s: any) => s.name).join(", ")}</p>
+                <p className="font-medium">{anime.studios.nodes.map((s) => s.name).join(", ")}</p>
               </div>
             )}
             {anime.source && (
@@ -380,7 +381,7 @@ async function InfoSection({ anime }: { anime: any }) {
           <GlassCard>
             <h3 className="font-semibold mb-4">Tags</h3>
             <div className="flex flex-wrap gap-2">
-              {anime.tags.slice(0, 10).map((tag: any) => (
+              {anime.tags.slice(0, 10).map((tag) => (
                 <span
                   key={tag.id}
                   className="px-3 py-1.5 bg-white/5 rounded-full text-xs"
@@ -398,9 +399,22 @@ async function InfoSection({ anime }: { anime: any }) {
 
 async function RecommendationsSection({ animeId }: { animeId: number }) {
   const result = await anilist.getRecommendations(animeId);
-  const recommendations = (result.data as any)?.Media?.recommendations?.nodes
-    ?.map((n: any) => n.mediaRecommendation)
-    .filter(Boolean);
+
+  interface RecommendationNode {
+    mediaRecommendation: Media | null;
+  }
+
+  interface RecommendationResponse {
+    Media: {
+      recommendations: {
+        nodes: RecommendationNode[];
+      } | null;
+    } | null;
+  }
+
+  const recommendations = (result.data as RecommendationResponse | null)?.Media?.recommendations?.nodes
+    ?.map((n) => n.mediaRecommendation)
+    .filter((media): media is Media => media !== null);
 
   if (!recommendations || recommendations.length === 0) {
     return null;
@@ -410,7 +424,7 @@ async function RecommendationsSection({ animeId }: { animeId: number }) {
     <div className="mt-12">
       <h2 className="text-2xl font-display font-semibold mb-6">You May Also Like</h2>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-        {recommendations.map((anime: any) => (
+        {recommendations.map((anime) => (
           <AnimeCardCompact key={anime.id} anime={anime} />
         ))}
       </div>
@@ -418,7 +432,7 @@ async function RecommendationsSection({ animeId }: { animeId: number }) {
   );
 }
 
-async function RelationsSection({ anime }: { anime: any }) {
+async function RelationsSection({ anime }: { anime: Media }) {
   if (!anime.relations?.edges || anime.relations.edges.length === 0) {
     return null;
   }
@@ -427,7 +441,7 @@ async function RelationsSection({ anime }: { anime: any }) {
     <div className="mt-12">
       <h2 className="text-2xl font-display font-semibold mb-6">Relations</h2>
       <div className="space-y-3">
-        {anime.relations.edges.map((edge: any, index: number) => (
+        {anime.relations.edges.map((edge, index: number) => (
           <AnimeCardCompact
             key={edge.node.id || index}
             anime={edge.node}

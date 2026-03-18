@@ -57,10 +57,17 @@ async function searchAnimeId(
     const data = await response.json();
     if (!data.results || data.results.length === 0) return null;
 
+    // Interface for Gogoanime search results
+    interface GogoAnimeResult {
+      id: string;
+      title?: string;
+      otherName?: string;
+    }
+
     if (language === "dub") {
       // Look for a result with "dub" in the title or ID
       const dubResult = data.results.find(
-        (r: any) =>
+        (r: GogoAnimeResult) =>
           r.id?.toLowerCase().includes("dub") ||
           r.title?.toLowerCase().includes("dub") ||
           r.otherName?.toLowerCase().includes("dub")
@@ -70,7 +77,7 @@ async function searchAnimeId(
 
     // For sub, prefer non-dub versions
     const subResult = data.results.find(
-      (r: any) => !r.id?.toLowerCase().includes("dub")
+      (r: GogoAnimeResult) => !r.id?.toLowerCase().includes("dub")
     );
     return subResult?.id || data.results[0]?.id;
   } catch {
@@ -237,9 +244,16 @@ export async function GET(
       provider: string;
       type: "mp4" | "hls" | "webm";
     }> = [];
-    let subtitles: any[] = [];
+
+    interface SubtitleTrack {
+      url: string;
+      lang: string;
+      label: string;
+    }
+
+    const subtitles: SubtitleTrack[] = [];
     let provider = "none";
-    let availableLanguages: Array<{ type: "sub" | "dub"; available: boolean }> = [
+    const availableLanguages: Array<{ type: "sub" | "dub"; available: boolean }> = [
       { type: "sub", available: true },
       { type: "dub", available: false },
     ];
