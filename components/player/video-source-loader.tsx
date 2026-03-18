@@ -35,8 +35,41 @@ export function VideoSourceLoader({
     url: string;
     qualities?: VideoQuality[];
   } | null>(null);
+  const [allServers, setAllServers] = useState<Array<{
+    id: string;
+    name: string;
+    url: string;
+    quality: string;
+    type: "mp4" | "hls" | "webm";
+  }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Language options (typically Sub/Dub)
+  const allLanguages = [
+    { id: "sub", label: "Subtitles", type: "sub" as const },
+    { id: "dub", label: "Dubbed", type: "dub" as const },
+  ];
+
+  // Server change handler
+  const handleServerChange = (serverId: string) => {
+    const server = allServers.find((s) => s.id === serverId);
+    if (server) {
+      // Reload video with new server
+      setSources({
+        type: "direct",
+        url: server.url,
+        qualities: sources?.qualities || [],
+      });
+    }
+  };
+
+  // Language change handler
+  const handleLanguageChange = (languageId: string) => {
+    // In production, this would fetch a different source for Dub/Sub
+    // For now, we show a toast message
+    console.log(`Language changed to: ${languageId}`);
+  };
 
   useEffect(() => {
     async function fetchSources() {
@@ -62,12 +95,7 @@ export function VideoSourceLoader({
           throw new Error("No video sources found");
         }
 
-        // Find the best quality source as the default
-        const defaultSource = data.sources.find((s: any) => s.quality === "1080p") ||
-                            data.sources.find((s: any) => s.quality === "720p") ||
-                            data.sources[0];
-
-        // Create qualities array for player
+        // Group sources by quality for quality selector
         const qualities: VideoQuality[] = data.sources.map((s: any) => ({
           url: s.url,
           quality: s.quality,
@@ -75,6 +103,36 @@ export function VideoSourceLoader({
           size: s.size,
         }));
 
+        // Create server options for server selector
+        const serverOptions: Array<{
+          id: string;
+          name: string;
+          url: string;
+          quality: string;
+          type: "mp4" | "hls" | "webm";
+        }> = [];
+
+        // Group by provider and quality to create server options
+        const uniqueQualities = [...new Set(data.sources.map((s: any) => s.quality))];
+        uniqueQualities.forEach((quality) => {
+          const sourceForQuality = data.sources.find((s: any) => s.quality === quality);
+          if (sourceForQuality) {
+            serverOptions.push({
+              id: `${data.provider}-${quality}`,
+              name: `${data.provider || "Server"} - ${quality}`,
+              url: sourceForQuality.url,
+              quality: sourceForQuality.quality,
+              type: sourceForQuality.type || "mp4",
+            });
+          }
+        });
+
+        // Find the best quality source as the default
+        const defaultSource = data.sources.find((s: any) => s.quality === "1080p") ||
+                            data.sources.find((s: any) => s.quality === "720p") ||
+                            data.sources[0];
+
+        setAllServers(serverOptions);
         setSources({
           type: "direct",
           url: defaultSource.url,
@@ -133,6 +191,10 @@ export function VideoSourceLoader({
       nextEpisodeUrl={nextEpisodeUrl}
       onError={onError}
       onEpisodeEnd={onEpisodeEnd}
+      allServers={allServers}
+      allLanguages={allLanguages}
+      onServerChange={handleServerChange}
+      onLanguageChange={handleLanguageChange}
     />
   );
 }

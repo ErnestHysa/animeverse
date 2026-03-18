@@ -25,10 +25,13 @@ import {
   FastForward,
   Pipette,
   X,
+  Globe,
 } from "lucide-react";
 import { cn, formatTime } from "@/lib/utils";
 import { usePreferences } from "@/store";
 import { toast } from "react-hot-toast";
+import { ServerSelector, LanguageSelector } from "@/components/player/server-selector";
+import { SimpleThumbnailPreview } from "@/components/player/episode-thumbnails";
 
 // ===================================
 // Types
@@ -48,6 +51,21 @@ interface VideoPlayerProps {
   animeId?: number;
   episodeNumber?: number;
   nextEpisodeUrl?: string;
+  // New props for server/language selection
+  allServers?: Array<{
+    id: string;
+    name: string;
+    url: string;
+    quality: string;
+    type: "mp4" | "hls" | "webm";
+  }>;
+  allLanguages?: Array<{
+    id: string;
+    label: string;
+    type: "sub" | "dub";
+  }>;
+  onServerChange?: (serverId: string) => void;
+  onLanguageChange?: (languageId: string) => void;
 }
 
 export interface VideoQuality {
@@ -70,6 +88,13 @@ export function EnhancedVideoPlayer({
   animeId,
   episodeNumber,
   nextEpisodeUrl,
+  allServers = [],
+  allLanguages = [
+    { id: "sub", label: "Subtitles", type: "sub" },
+    { id: "dub", label: "Dubbed", type: "dub" },
+  ],
+  onServerChange,
+  onLanguageChange,
 }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -85,6 +110,20 @@ export function EnhancedVideoPlayer({
   const [showControls, setShowControls] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [bufferProgress, setBufferProgress] = useState(0);
+
+  // Server and Language state
+  const [currentServer, setCurrentServer] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem(`preferred-server-${animeId}-${episodeNumber}`) || "default";
+    }
+    return "default";
+  });
+  const [currentLanguage, setCurrentLanguage] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("preferred-language") || "sub";
+    }
+    return "sub";
+  });
 
   // Settings
   const [showSettings, setShowSettings] = useState(false);
@@ -844,16 +883,20 @@ export function EnhancedVideoPlayer({
         )}
         onMouseMove={resetControlsTimeout}
       >
-        {/* Progress Bar */}
-        <div
-          className="relative h-1.5 bg-white/20 rounded-full mb-4 cursor-pointer group/progress hover:h-2 transition-all"
-          onClick={handleProgressClick}
-        >
-          <div className="absolute top-0 left-0 h-full bg-white/30 rounded-full" style={{ width: `${bufferProgress}%` }} />
-          <div className="absolute top-0 left-0 h-full bg-primary rounded-full transition-all" style={{ width: `${progress}%` }} />
-          {source.type !== "direct" && torrentProgress < 1 && (
-            <div className="absolute top-0 left-0 h-full bg-secondary/50 rounded-full" style={{ width: `${torrentProgress * 100}%` }} />
-          )}
+        {/* Progress Bar with Thumbnail Preview */}
+        <div className="relative mb-4">
+          <div
+            className="relative h-1.5 bg-white/20 rounded-full cursor-pointer group/progress hover:h-2 transition-all"
+            onClick={handleProgressClick}
+          >
+            <div className="absolute top-0 left-0 h-full bg-white/30 rounded-full" style={{ width: `${bufferProgress}%` }} />
+            <div className="absolute top-0 left-0 h-full bg-primary rounded-full transition-all" style={{ width: `${progress}%` }} />
+            {source.type !== "direct" && torrentProgress < 1 && (
+              <div className="absolute top-0 left-0 h-full bg-secondary/50 rounded-full" style={{ width: `${torrentProgress * 100}%` }} />
+            )}
+          </div>
+          {/* Time Tooltip Preview */}
+          <SimpleThumbnailPreview duration={duration || 0} currentTime={currentTime} />
         </div>
 
         {/* Controls Row */}
@@ -924,6 +967,33 @@ export function EnhancedVideoPlayer({
 
           {/* Right Controls */}
           <div className="flex items-center gap-1 sm:gap-2">
+            {/* Language Selector (Sub/Dub) */}
+            {allLanguages && allLanguages.length > 0 && (
+              <LanguageSelector
+                languages={allLanguages}
+                currentLanguage={currentLanguage}
+                onLanguageChange={(langId) => {
+                  setCurrentLanguage(langId);
+                  localStorage.setItem("preferred-language", langId);
+                  onLanguageChange?.(langId);
+                }}
+              />
+            )}
+
+            {/* Server Selector */}
+            {allServers && allServers.length > 0 && (
+              <ServerSelector
+                servers={allServers}
+                currentServer={currentServer}
+                onServerChange={(serverId) => {
+                  setCurrentServer(serverId);
+                  localStorage.setItem(`preferred-server-${animeId}-${episodeNumber}`, serverId);
+                  onServerChange?.(serverId);
+                }}
+                isLoading={isLoading}
+              />
+            )}
+
             {/* P2P Stats (for WebTorrent) */}
             {source.type !== "direct" && (
               <div className="hidden lg:flex items-center gap-3 text-xs text-muted-foreground">
