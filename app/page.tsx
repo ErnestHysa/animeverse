@@ -8,12 +8,14 @@ import { Footer } from "@/components/layout/footer";
 import { AnimeGrid } from "@/components/anime/anime-grid";
 import { AnimeCardCompact } from "@/components/anime/anime-card";
 import { ContinueWatching } from "@/components/continue-watching";
+import { AIRecommendationsSection } from "@/components/recommendations/ai-recommendations-section";
 import { anilist } from "@/lib/anilist";
 import { Button } from "@/components/ui/button";
-import { Play, TrendingUp, Star, Clock, Heart, Sparkles, Shuffle } from "lucide-react";
+import { Play, TrendingUp, Star, Clock } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { Suspense } from "react";
+import type { Media } from "@/types/anilist";
 
 // ===================================
 // Data Fetching
@@ -166,7 +168,7 @@ async function PopularSection({ anime }: { anime: any[] }) {
   );
 }
 
-async function SeasonalSection({ anime }: { anime: any[] }) {
+async function SeasonalSection({ anime }: { anime: Media[] }) {
   if (anime.length === 0) return null;
 
   return (
@@ -180,6 +182,15 @@ async function SeasonalSection({ anime }: { anime: any[] }) {
       <AnimeGrid anime={anime} />
     </section>
   );
+}
+
+// ===================================
+// AI Recommendations Wrapper
+// ===================================
+
+async function AIRecommendationsSectionWrapper({ allAnime }: { allAnime: Media[] }) {
+  // Pass data to client component
+  return <AIRecommendationsSection allAnime={allAnime} />;
 }
 
 // ===================================
@@ -205,6 +216,13 @@ export default async function HomePage() {
 
           {/* Continue Watching - Client Component */}
           <ContinueWatching />
+
+          {/* AI Recommendations - Personalized Picks */}
+          <Suspense fallback={<div className="h-64 bg-muted rounded-xl animate-pulse" />}>
+            <AIRecommendationsSectionWrapper
+              allAnime={[...trendingAnime, ...popularAnime, ...seasonalAnime]}
+            />
+          </Suspense>
 
           {/* Trending Section */}
           <TrendingSection anime={trendingAnime} />

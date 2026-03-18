@@ -1,0 +1,295 @@
+/**
+ * AI-Powered Anime Recommendation Engine
+ * Analyzes user watch history to provide personalized recommendations
+ */
+
+import type { Media } from "@/types/anilist";
+
+// ===================================
+// Types
+// ===================================
+
+interface WatchHistoryItem {
+  mediaId: number;
+  episodeNumber: number;
+  timestamp: number;
+  completed: boolean;
+}
+
+interface GenreScore {
+  genre: string;
+  score: number;
+  count: number;
+}
+
+interface UserPreferences {
+  favoriteGenres: GenreScore[];
+  preferredFormats: string[];
+  preferredStudios: string[];
+  averageScorePreference: number;
+  watchingPattern: "binge" | "casual" | "weekly";
+}
+
+interface RecommendationResult {
+  anime: Media;
+  score: number;
+  reasons: string[];
+  matchPercentage: number;
+}
+
+// ===================================
+// Recommendation Engine
+// ===================================
+
+class RecommendationEngine {
+  /**
+   * Analyze user's watch history to extract preferences
+   */
+  analyzeWatchHistory(watchHistory: WatchHistoryItem[], favorites: number[], ratedAnime: Map<number, number>): UserPreferences {
+    // Extract genres from completed anime (would need to fetch full details)
+    const genreCounts = new Map<string, number>();
+    const formatCounts = new Map<string, number>();
+    const studioCounts = new Map<string, number>();
+    let totalScore = 0;
+    let scoreCount = 0;
+
+    // In production, fetch full anime details to extract genres
+    // For now, use default preferences based on watch history size
+
+    const watchingPattern = this.determineWatchingPattern(watchHistory);
+
+    return {
+      favoriteGenres: Array.from(genreCounts.entries())
+        .map(([genre, count]) => ({ genre, score: count, count }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 5),
+      preferredFormats: Array.from(formatCounts.keys()),
+      preferredStudios: Array.from(studioCounts.keys()),
+      averageScorePreference: totalScore / Math.max(scoreCount, 1),
+      watchingPattern,
+    };
+  }
+
+  /**
+   * Determine user's watching pattern
+   */
+  private determineWatchingPattern(watchHistory: WatchHistoryItem[]): "binge" | "casual" | "weekly" {
+    if (watchHistory.length < 3) return "casual";
+
+    // Calculate time between watches
+    const intervals: number[] = [];
+    for (let i = 1; i < Math.min(watchHistory.length, 10); i++) {
+      intervals.push(watchHistory[i - 1].timestamp - watchHistory[i].timestamp);
+    }
+
+    const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+
+    // Less than a day between watches = binge
+    if (avgInterval < 86400000) return "binge";
+    // Less than a week = casual
+    if (avgInterval < 604800000) return "casual";
+    return "weekly";
+  }
+
+  /**
+   * Score an anime for recommendation based on user preferences
+   */
+  scoreAnime(
+    anime: Media,
+    preferences: UserPreferences,
+    recentlyWatched: Set<number>
+  ): RecommendationResult {
+    let score = 0;
+    const reasons: string[] = [];
+    const maxScore = 100;
+
+    // 1. Genre matching (up to 40 points)
+    if (anime.genres && preferences.favoriteGenres.length > 0) {
+      const genreMatch = anime.genres.filter((g) =>
+        preferences.favoriteGenres.some((fg) => fg.genre === g)
+      );
+      if (genreMatch.length > 0) {
+        const genreScore = Math.min(40, genreMatch.length * 10);
+        score += genreScore;
+        reasons.push(`Matches your favorite genres: ${genreMatch.slice(0, 2).join(", ")}`);
+      }
+    }
+
+    // 2. Studio matching (up to 15 points)
+    if (anime.studios?.nodes && preferences.preferredStudios.length > 0) {
+      const studioMatch = anime.studios.nodes.some((s) =>
+        preferences.preferredStudios.includes(s.name)
+      );
+      if (studioMatch) {
+        score += 15;
+        reasons.push(`From a studio you like`);
+      }
+    }
+
+    // 3. Quality score (up to 20 points)
+    if (anime.averageScore) {
+      const qualityScore = (anime.averageScore / 10) * 20;
+      score += qualityScore;
+      if (anime.averageScore >= 80) {
+        reasons.push(`Highly rated (${anime.averageScore}% score)`);
+      }
+    }
+
+    // 4. Popularity/Trending (up to 10 points)
+    if (anime.trending > 10000) {
+      score += 10;
+      reasons.push(`Trending now`);
+    } else if (anime.popularity > 50000) {
+      score += 5;
+    }
+
+    // 5. Format preference (up to 10 points)
+    if (anime.format && preferences.preferredFormats.includes(anime.format)) {
+      score += 10;
+      reasons.push(`Matches your preferred format`);
+    }
+
+    // 6. Currently airing bonus (up to 5 points)
+    if (anime.status === "RELEASING") {
+      score += 5;
+      reasons.push(`Currently airing`);
+    }
+
+    // Deductions:
+    // Already watched (exclude completely)
+    if (recentlyWatched.has(anime.id)) {
+      return {
+        anime,
+        score: 0,
+        reasons: ["Already watched"],
+        matchPercentage: 0,
+      };
+    }
+
+    // Not yet released
+    if (anime.status === "NOT_YET_RELEASED") {
+      score -= 10;
+    }
+
+    const matchPercentage = Math.min(100, Math.max(0, score));
+
+    return {
+      anime,
+      score,
+      reasons,
+      matchPercentage,
+    };
+  }
+
+  /**
+   * Get personalized recommendations
+   */
+  async getRecommendations(
+    candidates: Media[],
+    watchHistory: WatchHistoryItem[],
+    favorites: number[],
+    limit: number = 20
+  ): Promise<RecommendationResult[]> {
+    const preferences = this.analyzeWatchHistory(watchHistory, favorites, new Map());
+    const recentlyWatched = new Set(watchHistory.map((h) => h.mediaId));
+
+    // Score all candidates
+    const scored = candidates
+      .map((anime) => this.scoreAnime(anime, preferences, recentlyWatched))
+      .filter((r) => r.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
+
+    return scored;
+  }
+
+  /**
+   * Get "Because you watched X" recommendations
+   */
+  getSimilarRecommendations(
+    basedOnAnime: Media,
+    candidates: Media[],
+    limit: number = 10
+  ): RecommendationResult[] {
+    const recentlyWatched = new Set([basedOnAnime.id]);
+
+    // Score candidates based on similarity to base anime
+    const scored = candidates
+      .filter((a) => a.id !== basedOnAnime.id)
+      .map((anime) => {
+        let score = 0;
+        const reasons: string[] = [];
+
+        // Same genres (50 points)
+        if (basedOnAnime.genres && anime.genres) {
+          const sharedGenres = basedOnAnime.genres.filter((g) => anime.genres?.includes(g));
+          if (sharedGenres.length > 0) {
+            score += sharedGenres.length * 10;
+            reasons.push(`Similar genres: ${sharedGenres.slice(0, 2).join(", ")}`);
+          }
+        }
+
+        // Same studio (20 points)
+        if (basedOnAnime.studios?.nodes && anime.studios?.nodes) {
+          const sameStudio = basedOnAnime.studios.nodes.some((s1) =>
+            anime.studios?.nodes?.some((s2) => s1.name === s2.name)
+          );
+          if (sameStudio) {
+            score += 20;
+            reasons.push(`Same studio`);
+          }
+        }
+
+        // Same format (10 points)
+        if (basedOnAnime.format === anime.format) {
+          score += 10;
+          reasons.push(`Same format`);
+        }
+
+        // Same source material (10 points)
+        if (basedOnAnime.source === anime.source) {
+          score += 10;
+          reasons.push(`Same source material`);
+        }
+
+        return {
+          anime,
+          score,
+          reasons,
+          matchPercentage: Math.min(100, score),
+        };
+      })
+      .filter((r) => r.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
+
+    return scored;
+  }
+}
+
+// Singleton instance
+export const recommendationEngine = new RecommendationEngine();
+
+/**
+ * Helper to get "Because you watched" recommendations
+ */
+export async function getBecauseYouWatched(
+  animeId: number,
+  allAnime: Media[]
+): Promise<RecommendationResult[]> {
+  const basedOn = allAnime.find((a) => a.id === animeId);
+  if (!basedOn) return [];
+
+  return recommendationEngine.getSimilarRecommendations(basedOn, allAnime);
+}
+
+/**
+ * Helper to get personalized recommendations for user
+ */
+export async function getPersonalizedRecommendations(
+  allAnime: Media[],
+  watchHistory: WatchHistoryItem[],
+  favorites: number[]
+): Promise<RecommendationResult[]> {
+  return recommendationEngine.getRecommendations(allAnime, watchHistory, favorites);
+}
