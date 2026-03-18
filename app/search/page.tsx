@@ -53,8 +53,12 @@ async function searchAnime(params: SearchPageProps["searchParams"]) {
 // ===================================
 
 export default async function SearchPage({ searchParams }: SearchPageProps) {
-  const anime = await searchAnime(searchParams);
-  const query = searchParams.q || "";
+  // Await searchParams (Next.js 16 requires this)
+  const params = await searchParams;
+  const query = params.q || "";
+
+  // Fetch anime with the awaited params
+  const anime = await searchAnime(params);
 
   return (
     <>
@@ -82,11 +86,11 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
           {query && (
             <AnimeFilters
               currentFilters={{
-                genre: searchParams.genre,
-                year: searchParams.year,
-                format: searchParams.format,
-                status: searchParams.status,
-                sort: searchParams.sort,
+                genre: params.genre,
+                year: params.year,
+                format: params.format,
+                status: params.status,
+                sort: params.sort,
               }}
               query={query}
             />

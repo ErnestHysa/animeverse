@@ -5,7 +5,7 @@
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { GlassCard } from "@/components/ui/glass-card";
-import { Sparkles, Users, Zap, Shield } from "lucide-react";
+import { Star, Users, Zap, Shield } from "lucide-react";
 
 export const metadata = {
   title: "About Us",
@@ -30,7 +30,7 @@ export default function AboutPage() {
           <GlassCard className="p-8 mb-8">
             <div className="flex items-start gap-4">
               <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                <Sparkles className="w-6 h-6 text-primary" />
+                <Star className="w-6 h-6 text-primary" />
               </div>
               <div>
                 <h2 className="text-2xl font-semibold mb-3">Our Mission</h2>
@@ -77,7 +77,7 @@ export default function AboutPage() {
 
             <GlassCard className="p-6">
               <div className="w-12 h-12 rounded-full bg-pink-500/20 flex items-center justify-center mb-4">
-                <Sparkles className="w-6 h-6 text-pink-400" />
+                <Star className="w-6 h-6 text-pink-400" />
               </div>
               <h3 className="font-semibold mb-2">Always Updating</h3>
               <p className="text-sm text-muted-foreground">

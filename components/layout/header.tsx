@@ -16,7 +16,7 @@ import {
   Settings,
   Menu,
   X,
-  Sparkles,
+  Zap,
   TrendingUp,
   Tv,
   Calendar,
@@ -56,7 +56,7 @@ export function Header() {
               <div className="relative w-8 h-8">
                 <div className="absolute inset-0 bg-gradient-to-br from-primary to-secondary rounded-lg group-hover:scale-110 transition-transform" />
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 text-white" />
+                  <Zap className="w-5 h-5 text-white" />
                 </div>
               </div>
               <span className="font-display font-bold text-lg hidden sm:block">

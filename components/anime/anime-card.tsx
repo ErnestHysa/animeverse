@@ -7,7 +7,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Star, Play, Clock, Sparkles } from "lucide-react";
+import { Star, Play, Clock, Zap } from "lucide-react";
 import type { Media } from "@/types/anilist";
 import { getAnimeTitle, getAnimeCover, formatEpisodeCount, getStarRating } from "@/lib/anilist";
 import { cn } from "@/lib/utils";
@@ -64,7 +64,7 @@ export function AnimeCard({
           {/* Simulcast Badge */}
           {isSimulcast && (
             <div className="px-2 py-1 bg-gradient-to-r from-purple-500/90 to-pink-500/90 backdrop-blur-sm rounded-full text-xs font-medium text-white flex items-center gap-1">
-              <Sparkles className="w-3 h-3" />
+              <Zap className="w-3 h-3" />
               SIMULCAST
             </div>
           )}

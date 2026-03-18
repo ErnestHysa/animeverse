@@ -8,7 +8,7 @@
 import { useEffect, useState } from "react";
 import { AnimeCard } from "@/components/anime/anime-card";
 import { GlassCard } from "@/components/ui/glass-card";
-import { Sparkles, TrendingUp, Heart } from "lucide-react";
+import { Zap, TrendingUp, Heart } from "lucide-react";
 import type { Media } from "@/types/anilist";
 import type { WatchHistoryItem } from "@/types/anilist";
 
@@ -203,7 +203,7 @@ export function AIRecommendations({
     return (
       <GlassCard className="p-6">
         <div className="flex items-center gap-3 mb-6">
-          <Sparkles className="w-6 h-6 text-primary animate-pulse" />
+          <Zap className="w-6 h-6 text-primary animate-pulse" />
           <h2 className="text-xl font-display font-semibold">
             {title || (basedOnAnime ? "Because You Watched" : "AI Picks For You")}
           </h2>
@@ -225,7 +225,7 @@ export function AIRecommendations({
     <GlassCard className="p-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <Sparkles className="w-6 h-6 text-primary" />
+          <Zap className="w-6 h-6 text-primary" />
           <h2 className="text-xl font-display font-semibold">
             {title || (basedOnAnime ? `Because You Watched ${basedOnAnime.title?.romaji}` : "AI Picks For You")}
           </h2>

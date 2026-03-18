@@ -6,7 +6,7 @@
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { anilist } from "@/lib/anilist";
-import { Shuffle, Sparkles, RefreshCw } from "lucide-react";
+import { Shuffle, Zap, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AnimeCard } from "@/components/anime/anime-card";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -98,12 +98,12 @@ export default async function RandomPage() {
                 </p>
               </div>
             </div>
-            <Link href="/random">
-              <Button>
+            <Button asChild>
+              <Link href="/random">
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Try Another
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           </div>
 
           {/* Featured Random Anime */}
@@ -125,7 +125,7 @@ export default async function RandomPage() {
               <div className="absolute bottom-0 left-0 right-0 p-6 md:p-12">
                 <div className="flex items-center gap-2 mb-4">
                   <span className="px-3 py-1 bg-primary/20 text-primary rounded-full text-sm font-medium flex items-center gap-1">
-                    <Sparkles className="w-4 h-4" />
+                    <Zap className="w-4 h-4" />
                     Random Pick
                   </span>
                   {randomAnime.averageScore && (

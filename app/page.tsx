@@ -31,7 +31,11 @@ async function getPopularAnime() {
 }
 
 async function getSeasonalAnime() {
-  const result = await anilist.getSeasonal("WINTER" as const, 2026, 1, 6);
+  // Use current season and year from anilist helper
+  const { getCurrentSeason, getCurrentYear } = await import("@/lib/anilist");
+  const season = getCurrentSeason();
+  const year = getCurrentYear();
+  const result = await anilist.getSeasonal(season, year, 1, 6);
   return result.data?.Page.media ?? [];
 }
 
