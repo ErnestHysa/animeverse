@@ -12,6 +12,7 @@ import { ShareButton } from "@/components/player/share-dialog";
 import { ReportButton } from "@/components/player/report-dialog";
 import { KeyboardShortcutsButton } from "@/components/player/keyboard-shortcuts";
 import { anilist, getAnimeTitle } from "@/lib/anilist";
+import { sanitizeDescription } from "@/lib/html-sanitizer";
 import { Play, ChevronLeft, ChevronRight, Heart, Clock } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -211,7 +212,7 @@ async function AnimeInfo({ anime }: { anime: any }) {
             {title}
           </h3>
           <p className="text-sm text-muted-foreground mt-1 line-clamp-3">
-            {anime.description?.slice(0, 150)}...
+            {sanitizeDescription(anime.description?.slice(0, 150))}...
           </p>
           <div className="flex flex-wrap gap-2 mt-2">
             {anime.genres?.slice(0, 3).map((genre: string) => (

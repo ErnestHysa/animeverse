@@ -66,14 +66,28 @@ export function VideoSourceLoader({
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const [isRetrying, setIsRetrying] = useState(false);
+
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 2000; // 2 seconds
 
   /**
-   * Fetch video sources from API
+   * Sleep utility for retry delay
+   */
+  const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+  /**
+   * Fetch video sources from API with retry logic
    * Uses the current language preference
    */
-  const fetchSources = useCallback(async (language: "sub" | "dub") => {
-    setLoading(true);
-    setError(null);
+  const fetchSources = useCallback(async (language: "sub" | "dub", retryAttempt = 0) => {
+    if (retryAttempt === 0) {
+      setLoading(true);
+      setError(null);
+    } else {
+      setIsRetrying(true);
+    }
 
     try {
       const url = new URL(`/api/video-sources/${animeId}/${episodeNumber}`, window.location.origin);
@@ -161,12 +175,36 @@ export function VideoSourceLoader({
         url: defaultSource.url,
         qualities,
       });
+      setRetryCount(0); // Reset retry count on success
     } catch (err) {
+      const isRetryable = err instanceof Error && (
+        err.message.includes("fetch") ||
+        err.message.includes("network") ||
+        err.message.includes("timeout") ||
+        err.message.includes("503") ||
+        err.message.includes("502") ||
+        err.message.includes("API")
+      );
+
+      // Retry logic for retryable errors
+      if (isRetryable && retryAttempt < MAX_RETRIES) {
+        const delay = RETRY_DELAY * Math.pow(2, retryAttempt); // Exponential backoff
+        console.log(`Fetch failed (attempt ${retryAttempt + 1}/${MAX_RETRIES}), retrying in ${delay}ms...`);
+        await sleep(delay);
+        return fetchSources(language, retryAttempt + 1);
+      }
+
+      // Final error after all retries exhausted
       const message = err instanceof Error ? err.message : "Failed to load video sources";
-      setError(message);
-      onError?.(new Error(message));
+      const errorMessage = retryAttempt > 0
+        ? `${message} (Failed after ${MAX_RETRIES} retry attempts)`
+        : message;
+      setError(errorMessage);
+      onError?.(new Error(errorMessage));
+      setRetryCount(retryAttempt);
     } finally {
       setLoading(false);
+      setIsRetrying(false);
     }
   }, [animeId, episodeNumber, animeTitle, malId, onError]);
 
@@ -229,8 +267,16 @@ export function VideoSourceLoader({
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4" />
           <p className="text-muted-foreground">
-            Loading {currentLanguage === "dub" ? "Dubbed" : "Subtitled"} version...
+            {isRetrying
+              ? `Retrying... (Attempt ${retryCount + 1}/${MAX_RETRIES})`
+              : `Loading ${currentLanguage === "dub" ? "Dubbed" : "Subtitled"} version...`
+            }
           </p>
+          {isRetrying && (
+            <p className="text-xs text-muted-foreground mt-2">
+              This is taking longer than usual. The server might be busy.
+            </p>
+          )}
         </div>
       </GlassCard>
     );
@@ -239,6 +285,7 @@ export function VideoSourceLoader({
   // Error state
   if (error || !sources) {
     const isApiUnavailable = error?.includes("API") || error?.includes("unavailable") || error?.includes("Consumet");
+    const hasRetryFailed = error?.includes("Failed after") || retryCount >= MAX_RETRIES;
 
     return (
       <GlassCard className="aspect-video flex items-center justify-center">
@@ -247,23 +294,47 @@ export function VideoSourceLoader({
             <AlertCircle className="w-8 h-8 text-red-500" />
           </div>
           <h3 className="text-lg font-semibold mb-2">
-            {isApiUnavailable ? "Video Source API Unavailable" : "Failed to Load Video"}
+            {hasRetryFailed ? "Still Having Trouble" : isApiUnavailable ? "Video Source API Unavailable" : "Failed to Load Video"}
           </h3>
           <p className="text-muted-foreground mb-4 text-sm">
             {error || "No video sources available"}
           </p>
-          {isApiUnavailable && (
+          {hasRetryFailed && (
+            <div className="text-xs text-muted-foreground mb-4 p-3 bg-white/5 rounded-lg">
+              <p className="font-medium mb-2">Suggestions:</p>
+              <ul className="text-left space-y-1">
+                <li>• Check your internet connection</li>
+                <li>• Try switching between Sub/Dub versions</li>
+                <li>• The anime might not be available on this server</li>
+                <li>• Try again in a few minutes</li>
+              </ul>
+            </div>
+          )}
+          {isApiUnavailable && !hasRetryFailed && (
             <p className="text-xs text-muted-foreground mb-6">
-              The public video API is currently down. This is a known issue.
+              The public video API is currently down. This is usually temporary.
             </p>
           )}
-          <Button
-            onClick={() => fetchSources(currentLanguage)}
-            variant="default"
-          >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Try Again
-          </Button>
+          <div className="flex gap-2 justify-center">
+            <Button
+              onClick={() => {
+                setRetryCount(0);
+                fetchSources(currentLanguage);
+              }}
+              variant="default"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Try Again
+            </Button>
+            {allLanguages.find(l => l.id !== currentLanguage && l.available) && (
+              <Button
+                onClick={() => handleLanguageChange(currentLanguage === "sub" ? "dub" : "sub")}
+                variant="outline"
+              >
+                Switch to {currentLanguage === "sub" ? "Dub" : "Sub"}
+              </Button>
+            )}
+          </div>
         </div>
       </GlassCard>
     );

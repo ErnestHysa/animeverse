@@ -55,6 +55,8 @@ export function AnimeActions({ animeId, animeTitle }: AnimeActionsProps) {
         size="lg"
         onClick={() => toggleWatchlist(animeId)}
         className={inWatchlist ? "bg-primary/20 text-primary" : ""}
+        aria-label={inWatchlist ? "Remove from watchlist" : "Add to watchlist"}
+        aria-pressed={inWatchlist}
       >
         {inWatchlist ? (
           <Check className="w-5 h-5 mr-2" />
@@ -68,6 +70,8 @@ export function AnimeActions({ animeId, animeTitle }: AnimeActionsProps) {
         size="lg"
         onClick={() => toggleFavorite(animeId)}
         className={isFav ? "bg-red-500/20 text-red-400" : ""}
+        aria-label={isFav ? "Remove from favorites" : "Add to favorites"}
+        aria-pressed={isFav}
       >
         <Heart className={`w-5 h-5 mr-2 ${isFav ? "fill-red-400" : ""}`} />
         {isFav ? "Favorited" : "Favorite"}

@@ -31,9 +31,15 @@ import { cn, formatTime } from "@/lib/utils";
 import { usePreferences } from "@/store";
 import { toast } from "react-hot-toast";
 import { ServerSelector, LanguageSelector } from "@/components/player/server-selector";
-import { WatchPartyControls } from "@/components/player/watch-party";
+import dynamic from "next/dynamic";
 import { SimpleThumbnailPreview } from "@/components/player/episode-thumbnails";
 import { DownloadButton } from "@/components/player/download-button";
+
+// Dynamic import for watch party controls to reduce initial bundle
+const WatchPartyControls = dynamic(
+  () => import("@/components/player/watch-party").then(mod => ({ default: mod.WatchPartyControls })),
+  { ssr: false, loading: () => <div className="h-10" /> }
+);
 
 // ===================================
 // Types
@@ -197,6 +203,13 @@ export function EnhancedVideoPlayer({
   const [uploadSpeed, setUploadSpeed] = useState(0);
   const [peers, setPeers] = useState(0);
   const [torrentProgress, setTorrentProgress] = useState(0);
+
+  // Touch gestures
+  const [showLeftTapAnimation, setShowLeftTapAnimation] = useState(false);
+  const [showRightTapAnimation, setShowRightTapAnimation] = useState(false);
+  const [showMobileVolumeSlider, setShowMobileVolumeSlider] = useState(false);
+  const lastTapRef = useRef<{ time: number; x: number; side: 'left' | 'right' } | null>(null);
+  const tapAnimationTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   // User preferences
   const { preferences, updatePreferences } = usePreferences();
@@ -396,6 +409,74 @@ export function EnhancedVideoPlayer({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [preferences.autoplay, preferences.autoNext]);
+
+  // ===================================
+  // Touch Gestures (Double-tap to seek)
+  // ===================================
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const SEEK_AMOUNT = 10; // seconds to seek on double-tap
+    const DOUBLE_TAP_DELAY = 300; // ms between taps to count as double-tap
+
+    const handleTouchStart = (e: TouchEvent) => {
+      // Ignore if touching controls
+      const target = e.target as HTMLElement;
+      if (target.closest('[data-controls]')) return;
+
+      const touch = e.touches[0];
+      const rect = container.getBoundingClientRect();
+      const x = touch.clientX - rect.left;
+      const side = x < rect.width / 2 ? 'left' : 'right';
+
+      const now = Date.now();
+      const lastTap = lastTapRef.current;
+
+      if (lastTap &&
+          now - lastTap.time < DOUBLE_TAP_DELAY &&
+          lastTap.side === side) {
+        // Double-tap detected!
+        const video = videoRef.current;
+        if (!video) return;
+
+        if (side === 'left') {
+          // Seek backward
+          const newTime = Math.max(0, video.currentTime - SEEK_AMOUNT);
+          video.currentTime = newTime;
+          setShowLeftTapAnimation(true);
+          clearTimeout(tapAnimationTimeoutRef.current);
+          tapAnimationTimeoutRef.current = setTimeout(() => {
+            setShowLeftTapAnimation(false);
+          }, 500);
+          toast(`-${SEEK_AMOUNT}s`, { icon: '⏪', duration: 500 });
+        } else {
+          // Seek forward
+          const newTime = Math.min(duration, video.currentTime + SEEK_AMOUNT);
+          video.currentTime = newTime;
+          setShowRightTapAnimation(true);
+          clearTimeout(tapAnimationTimeoutRef.current);
+          tapAnimationTimeoutRef.current = setTimeout(() => {
+            setShowRightTapAnimation(false);
+          }, 500);
+          toast(`+${SEEK_AMOUNT}s`, { icon: '⏩', duration: 500 });
+        }
+
+        lastTapRef.current = null;
+      } else {
+        // First tap
+        lastTapRef.current = { time: now, x, side };
+      }
+    };
+
+    container.addEventListener('touchstart', handleTouchStart, { passive: true });
+
+    return () => {
+      container.removeEventListener('touchstart', handleTouchStart);
+      clearTimeout(tapAnimationTimeoutRef.current);
+    };
+  }, [duration]);
 
   // ===================================
   // Video Event Handlers
@@ -924,17 +1005,29 @@ export function EnhancedVideoPlayer({
       {isLoading && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="w-16 h-16 border-4 border-primary/30 border-t-primary rounded-full animate-spin mb-4" />
-          {bufferProgress > 0 && (
+          {bufferProgress > 0 ? (
             <div className="w-48 flex flex-col items-center gap-2">
               <div className="w-full h-2 bg-white/20 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-primary transition-all duration-300"
-                  style={{ width: `${bufferProgress}%` }}
+                  style={{ width: `${Math.min(bufferProgress, 100)}%` }}
                 />
               </div>
               <p className="text-sm text-muted-foreground">
                 Buffering... {Math.round(bufferProgress)}%
               </p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-3">
+              <p className="text-sm text-muted-foreground">
+                {source.url.includes('.m3u8') ? 'Loading stream...' : 'Loading video...'}
+              </p>
+              {/* Animated dots */}
+              <div className="flex gap-1">
+                <span className="w-2 h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '0ms' }} />
+                <span className="w-2 h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
+                <span className="w-2 h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
+              </div>
             </div>
           )}
         </div>
@@ -968,6 +1061,30 @@ export function EnhancedVideoPlayer({
         </div>
       )}
 
+      {/* Double-tap Zones for Mobile */}
+      <div className="absolute inset-0 flex pointer-events-none z-10">
+        {/* Left Zone - Seek Backward */}
+        <div className="w-1/3 h-full flex items-center justify-center">
+          {showLeftTapAnimation && (
+            <div className="flex items-center gap-2 animate-ping">
+              <SkipBack className="w-12 h-12 text-white/80" fill="currentColor" />
+              <span className="text-2xl font-bold text-white/80">-10s</span>
+            </div>
+          )}
+        </div>
+        {/* Center Zone - Empty for play/pause tap */}
+        <div className="w-1/3 h-full" />
+        {/* Right Zone - Seek Forward */}
+        <div className="w-1/3 h-full flex items-center justify-center">
+          {showRightTapAnimation && (
+            <div className="flex items-center gap-2 animate-ping">
+              <span className="text-2xl font-bold text-white/80">+10s</span>
+              <SkipForward className="w-12 h-12 text-white/80" fill="currentColor" />
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Controls */}
       <div
         className={cn(
@@ -979,7 +1096,7 @@ export function EnhancedVideoPlayer({
         {/* Progress Bar with Thumbnail Preview */}
         <div className="relative mb-4">
           <div
-            className="relative h-1.5 bg-white/20 rounded-full cursor-pointer group/progress hover:h-2 transition-all"
+            className="relative h-2 sm:h-1.5 bg-white/20 rounded-full cursor-pointer group/progress active:h-3 transition-all"
             onClick={handleProgressClick}
           >
             <div className="absolute top-0 left-0 h-full bg-white/30 rounded-full" style={{ width: `${bufferProgress}%` }} />
@@ -999,7 +1116,7 @@ export function EnhancedVideoPlayer({
             {/* Play/Pause */}
             <button
               onClick={togglePlay}
-              className="p-2 hover:bg-white/10 rounded-full transition-colors"
+              className="p-2 sm:p-2 hover:bg-white/10 rounded-full transition-colors min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0"
               aria-label={isPlaying ? "Pause" : "Play"}
             >
               {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
@@ -1029,7 +1146,7 @@ export function EnhancedVideoPlayer({
               </button>
             )}
 
-            {/* Volume */}
+            {/* Volume - Desktop */}
             <div className="hidden sm:flex items-center gap-1 group/volume">
               <button
                 onClick={toggleMute}
@@ -1048,6 +1165,38 @@ export function EnhancedVideoPlayer({
                 className="w-0 group-hover/volume:w-20 transition-all duration-200 accent-primary"
                 aria-label="Volume"
               />
+            </div>
+
+            {/* Volume - Mobile */}
+            <div className="sm:hidden relative">
+              <button
+                onClick={() => {
+                  toggleMute();
+                  setShowMobileVolumeSlider(!showMobileVolumeSlider);
+                }}
+                className="p-3 hover:bg-white/10 rounded-full transition-colors"
+                aria-label={isMuted ? "Unmute" : "Mute"}
+              >
+                {isMuted || volume === 0 ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
+              </button>
+              {showMobileVolumeSlider && (
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 p-3 bg-black/90 rounded-xl backdrop-blur-sm">
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={isMuted ? 0 : volume}
+                    onChange={(e) => {
+                      setVolume(parseFloat(e.target.value));
+                      setIsMuted(parseFloat(e.target.value) === 0);
+                    }}
+                    className="w-32 accent-primary"
+                    aria-label="Volume"
+                  />
+                  <p className="text-center text-xs mt-1">{Math.round((isMuted ? 0 : volume) * 100)}%</p>
+                </div>
+              )}
             </div>
 
             {/* Time Display */}
@@ -1118,8 +1267,8 @@ export function EnhancedVideoPlayer({
               </div>
             )}
 
-            {/* Download Button */}
-            {source.type === "direct" && !source.url.includes('.m3u8') && animeId && episodeNumber && animeTitle && (
+            {/* Download Button - now supports HLS downloads */}
+            {source.type === "direct" && animeId && episodeNumber && animeTitle && (
               <DownloadButton
                 animeId={animeId}
                 animeTitle={animeTitle}
@@ -1138,7 +1287,7 @@ export function EnhancedVideoPlayer({
                   setShowQualitySelector(false);
                   setShowSpeedSelector(false);
                 }}
-                className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                className="p-2 sm:p-2 hover:bg-white/10 rounded-full transition-colors min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0"
                 aria-label="Settings"
               >
                 <Settings className="w-5 h-5" />
@@ -1325,7 +1474,7 @@ export function EnhancedVideoPlayer({
             <button
               onClick={toggleTheaterMode}
               className={cn(
-                "p-2 hover:bg-white/10 rounded-full transition-colors hidden sm:block",
+                "p-2 sm:p-2 hover:bg-white/10 rounded-full transition-colors hidden sm:block min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0",
                 isTheaterMode && "bg-white/10"
               )}
               aria-label="Theater mode"
@@ -1336,7 +1485,7 @@ export function EnhancedVideoPlayer({
             {/* PIP */}
             <button
               onClick={togglePip}
-              className="p-2 hover:bg-white/10 rounded-full transition-colors"
+              className="p-2 sm:p-2 hover:bg-white/10 rounded-full transition-colors min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0"
               aria-label="Picture-in-Picture"
             >
               <Pipette className="w-5 h-5" />
@@ -1345,7 +1494,7 @@ export function EnhancedVideoPlayer({
             {/* Fullscreen */}
             <button
               onClick={toggleFullscreen}
-              className="p-2 hover:bg-white/10 rounded-full transition-colors"
+              className="p-2 sm:p-2 hover:bg-white/10 rounded-full transition-colors min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0"
               aria-label={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
             >
               {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
@@ -1358,7 +1507,7 @@ export function EnhancedVideoPlayer({
       {isTheaterMode && (
         <button
           onClick={toggleTheaterMode}
-          className="absolute top-4 right-4 p-2 bg-black/50 hover:bg-black/70 backdrop-blur-sm rounded-lg transition-colors z-50"
+          className="absolute top-4 right-4 p-3 sm:p-2 bg-black/50 hover:bg-black/70 backdrop-blur-sm rounded-lg transition-colors z-50 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0"
           aria-label="Exit theater mode"
         >
           <X className="w-5 h-5" />

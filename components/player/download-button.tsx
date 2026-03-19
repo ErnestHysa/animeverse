@@ -65,20 +65,56 @@ export function DownloadButton({
     setProgress(0);
 
     try {
-      await downloadManager.downloadVideo(
-        animeId,
-        animeTitle,
-        episodeNumber,
-        videoUrl,
-        thumbnailUrl,
-        (prog) => setProgress(prog)
-      );
+      // For HLS streams, use direct browser download for better progress
+      const isHLS = videoUrl.includes('.m3u8');
 
-      setIsDownloaded(true);
-      toast.success("Episode downloaded for offline viewing!");
-      await loadDownloads();
+      if (isHLS) {
+        // Use the proxy API and trigger browser download
+        const proxyUrl = new URL('/api/download-hls', window.location.origin);
+        proxyUrl.searchParams.set('url', videoUrl);
+        proxyUrl.searchParams.set('title', animeTitle);
+        proxyUrl.searchParams.set('episode', episodeNumber.toString());
+
+        // Create a direct download link
+        const link = document.createElement('a');
+        link.href = proxyUrl.toString();
+        link.download = `${animeTitle.replace(/[^a-z0-9]/gi, '_')}_EP${episodeNumber}.zip`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        toast.success("Download started! Check your browser's download manager.");
+
+        // Mark as "downloading" in background but don't wait
+        downloadManager.addDownload({
+          id: `${animeId}-${episodeNumber}`,
+          animeId,
+          animeTitle,
+          episodeNumber,
+          videoUrl,
+          thumbnailUrl,
+          size: 0,
+          downloadedAt: Date.now(),
+        }).catch(() => {});
+
+        setIsDownloaded(true); // Show as downloaded
+      } else {
+        // For direct videos, use the cache manager with progress
+        await downloadManager.downloadVideo(
+          animeId,
+          animeTitle,
+          episodeNumber,
+          videoUrl,
+          thumbnailUrl,
+          (prog) => setProgress(prog)
+        );
+
+        setIsDownloaded(true);
+        toast.success("Episode downloaded for offline viewing!");
+        await loadDownloads();
+      }
     } catch (error) {
-      toast.error("Failed to download episode");
+      toast.error(error instanceof Error ? error.message : "Failed to download episode");
       console.error(error);
     } finally {
       setIsDownloading(false);

@@ -239,18 +239,18 @@ async function InfoSection({ anime }: { anime: Media }) {
                   <Link
                     key={epNum}
                     href={`/watch/${anime.id}/${epNum}`}
-                    className="group relative aspect-video rounded-lg overflow-hidden bg-muted hover:ring-2 hover:ring-primary transition-all"
+                    className="group relative aspect-video rounded-lg overflow-hidden bg-gradient-to-br from-primary/20 to-secondary/20 hover:ring-2 hover:ring-primary transition-all"
                   >
-                    {/* Episode thumbnail fallback using anime banner */}
-                    {anime.bannerImage && (
+                    {/* Episode thumbnail - prefer banner, fallback to cover large, or use gradient background */}
+                    {(anime.bannerImage || anime.coverImage?.large) ? (
                       <Image
-                        src={anime.bannerImage}
+                        src={anime.bannerImage || anime.coverImage!.large!}
                         alt={`Episode ${epNum}`}
                         fill
-                        className="object-cover opacity-60 group-hover:opacity-40 transition-opacity"
+                        className="object-cover opacity-70 group-hover:opacity-50 transition-opacity"
                         sizes="(max-width: 768px) 50vw, 20vw"
                       />
-                    )}
+                    ) : null}
                     <div className="absolute inset-0 flex items-center justify-center">
                       <Play className="w-8 h-8 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
@@ -554,7 +554,7 @@ export async function generateMetadata({ params }: PageProps) {
   }
 
   const title = getAnimeTitle(anime);
-  const description = anime.description?.slice(0, 160) || `Watch ${title} online.`;
+  const description = sanitizeDescription(anime.description?.slice(0, 160)) || `Watch ${title} online.`;
 
   return {
     title,

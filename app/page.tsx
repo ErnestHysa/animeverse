@@ -8,6 +8,7 @@ import { Footer } from "@/components/layout/footer";
 import { AnimeGrid } from "@/components/anime/anime-grid";
 import { ContinueWatching } from "@/components/continue-watching";
 import { AIRecommendationsSection } from "@/components/recommendations/ai-recommendations-section";
+import { GlassCard } from "@/components/ui/glass-card";
 import { anilist } from "@/lib/anilist";
 import { Button } from "@/components/ui/button";
 import { Play, TrendingUp, Star, Clock } from "lucide-react";
@@ -48,6 +49,11 @@ async function getSeasonalAnime() {
   const year = getCurrentYear();
   const result = await anilist.getSeasonal(season, year, 1, 6);
   return result.data?.Page.media ?? [];
+}
+
+async function getAiringAnime() {
+  const result = await anilist.getAiring(1, 12);
+  return result.data?.Page.airingSchedules ?? [];
 }
 
 // ===================================
@@ -194,6 +200,77 @@ async function SeasonalSection({ anime }: { anime: Media[] }) {
   );
 }
 
+async function LatestEpisodesSection({ airingSchedules }: { airingSchedules: any[] }) {
+  if (airingSchedules.length === 0) return null;
+
+  // Group by anime and get latest episode info
+  const latestEpisodes = airingSchedules.slice(0, 12);
+
+  return (
+    <section className="mb-16">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center">
+            <Clock className="w-5 h-5 text-secondary" />
+          </div>
+          <h2 className="text-2xl font-display font-semibold">Latest Episodes</h2>
+        </div>
+        <Link href="/schedule" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+          View Schedule
+        </Link>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {latestEpisodes.map((item: any) => {
+          const anime = item.media;
+          if (!anime) return null;
+
+          const title = anime.title?.userPreferred || anime.title?.english || anime.title?.romaji || "Unknown";
+          const cover = anime.coverImage?.large || anime.coverImage?.medium || "";
+          const timeUntilAiring = item.timeUntilAiring;
+          const isAiringSoon = timeUntilAiring > 0 && timeUntilAiring < 3600; // Less than 1 hour
+
+          return (
+            <Link key={item.id} href={`/anime/${anime.id}`} className="group">
+              <GlassCard className="overflow-hidden">
+                <div className="flex gap-3 p-3">
+                  <div className="relative w-20 h-28 flex-shrink-0 rounded-lg overflow-hidden bg-muted">
+                    <Image
+                      src={cover}
+                      alt={title}
+                      fill
+                      className="object-cover transition-transform group-hover:scale-105"
+                      sizes="80px"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-medium text-sm line-clamp-2 group-hover:text-primary transition-colors">
+                      {title}
+                    </h3>
+                    <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                      <span className="px-2 py-0.5 bg-primary/20 text-primary rounded">
+                        EP {item.episode}
+                      </span>
+                      {isAiringSoon && (
+                        <span className="flex items-center gap-1 text-primary">
+                          <span className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
+                          Airing Soon
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {anime.format?.replace("_", " ")} • {anime.seasonYear}
+                    </p>
+                  </div>
+                </div>
+              </GlassCard>
+            </Link>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 // ===================================
 // AI Recommendations Wrapper
 // ===================================
@@ -208,10 +285,11 @@ async function AIRecommendationsSectionWrapper({ allAnime }: { allAnime: Media[]
 // ===================================
 
 export default async function HomePage() {
-  const [trendingAnime, popularAnime, seasonalAnime] = await Promise.all([
+  const [trendingAnime, popularAnime, seasonalAnime, airingAnime] = await Promise.all([
     getTrendingAnime(),
     getPopularAnime(),
     getSeasonalAnime(),
+    getAiringAnime(),
   ]);
 
   return (
@@ -226,6 +304,11 @@ export default async function HomePage() {
 
           {/* Continue Watching - Client Component */}
           <ContinueWatching />
+
+          {/* Latest Episodes - Recently Updated */}
+          <Suspense fallback={<div className="h-64 bg-muted rounded-xl animate-pulse" />}>
+            <LatestEpisodesSection airingSchedules={airingAnime} />
+          </Suspense>
 
           {/* AI Recommendations - Personalized Picks */}
           <Suspense fallback={<div className="h-64 bg-muted rounded-xl animate-pulse" />}>

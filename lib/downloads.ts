@@ -1,6 +1,7 @@
 /**
  * Download Manager
  * Handles offline video downloads using IndexedDB and Cache API
+ * Supports both direct video downloads and HLS (m3u8) streams
  */
 
 export interface DownloadItem {
@@ -24,6 +25,9 @@ const DB_VERSION = 1;
 const STORE_NAME = "downloads";
 const CACHE_NAME = "animeverse-videos";
 
+// Time after which a "downloading" download is considered stale (5 minutes)
+const STALE_DOWNLOAD_THRESHOLD = 5 * 60 * 1000;
+
 class DownloadManager {
   private db: IDBDatabase | null = null;
 
@@ -32,8 +36,10 @@ class DownloadManager {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
 
       request.onerror = () => reject(request.error);
-      request.onsuccess = () => {
+      request.onsuccess = async () => {
         this.db = request.result;
+        // Clean up stale downloads after opening
+        await this.cleanupStaleDownloads();
         resolve();
       };
 
@@ -46,6 +52,44 @@ class DownloadManager {
         }
       };
     });
+  }
+
+  /**
+   * Clean up stale downloads that are stuck in "downloading" state
+   */
+  async cleanupStaleDownloads(): Promise<void> {
+    if (!this.db) return;
+
+    try {
+      const downloads = await this.getAllDownloads();
+      const now = Date.now();
+      const staleIds: string[] = [];
+
+      for (const download of downloads) {
+        // Remove downloads that are "downloading" but haven't been updated recently
+        if (download.status === "downloading") {
+          const timeSinceUpdate = now - download.downloadedAt;
+          if (timeSinceUpdate > STALE_DOWNLOAD_THRESHOLD) {
+            staleIds.push(download.id);
+          }
+        }
+        // Also remove failed downloads
+        if (download.status === "error") {
+          staleIds.push(download.id);
+        }
+      }
+
+      // Delete stale entries
+      for (const id of staleIds) {
+        await this.deleteDownload(id);
+      }
+
+      if (staleIds.length > 0) {
+        console.log(`Cleaned up ${staleIds.length} stale downloads`);
+      }
+    } catch (error) {
+      console.error("Failed to cleanup stale downloads:", error);
+    }
   }
 
   async getAllDownloads(): Promise<DownloadItem[]> {
@@ -74,7 +118,7 @@ class DownloadManager {
 
   async addDownload(download: Omit<DownloadItem, "progress" | "status">): Promise<void> {
     if (!this.db) await this.init();
-    
+
     const item: DownloadItem = {
       ...download,
       progress: 0,
@@ -87,7 +131,15 @@ class DownloadManager {
       const request = store.add(item);
 
       request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
+      request.onerror = (event) => {
+        const target = event.target as IDBRequest;
+        // If key already exists, that's okay - we'll update it instead
+        if (target.error && target.error.name === 'ConstraintError') {
+          resolve();
+        } else {
+          reject(target.error);
+        }
+      };
     });
   }
 
@@ -157,11 +209,18 @@ class DownloadManager {
   ): Promise<string> {
     const id = `${animeId}-${episodeNumber}`;
 
+    // Check if already completed
     const existing = await this.getDownload(id);
     if (existing?.status === "completed") {
       return id;
     }
 
+    // If there's a stale or failed download, remove it first
+    if (existing && (existing.status === "downloading" || existing.status === "error")) {
+      await this.deleteDownload(id);
+    }
+
+    // Add new download entry
     await this.addDownload({
       id,
       animeId,
@@ -175,38 +234,28 @@ class DownloadManager {
 
     try {
       const cache = await caches.open(CACHE_NAME);
-      const response = await fetch(videoUrl);
-      
-      if (!response.ok) throw new Error("Failed to download video");
+      let blob: Blob;
+      let contentType = "video/mp4";
 
-      const contentLength = response.headers.get("content-length");
-      const total = contentLength ? parseInt(contentLength, 10) : 0;
-
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error("No response body");
-
-      const chunks: Uint8Array[] = [];
-      let receivedLength = 0;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        chunks.push(value);
-        receivedLength += value.length;
-
-        if (total > 0 && onProgress) {
-          onProgress(Math.round((receivedLength / total) * 100));
-        }
+      // Check if this is an HLS stream
+      if (videoUrl.includes('.m3u8')) {
+        // Download HLS through proxy
+        blob = await this.downloadHLSVideo(videoUrl, onProgress);
+        contentType = "video/mp2t"; // MPEG-TS
+      } else {
+        // Direct video download with progress tracking
+        blob = await this.downloadDirectVideo(videoUrl, onProgress);
+        contentType = "video/mp4";
       }
 
-      const blob = new Blob(chunks as BlobPart[], { type: "video/mp4" });
+      // Cache the blob
       const newResponse = new Response(blob, {
-        headers: { "Content-Type": "video/mp4" },
+        headers: { "Content-Type": contentType },
       });
 
       await cache.put(videoUrl, newResponse);
 
+      // Mark as completed
       await this.updateDownload(id, {
         status: "completed",
         progress: 100,
@@ -215,23 +264,112 @@ class DownloadManager {
 
       return id;
     } catch (error) {
+      // Mark as failed
       await this.updateDownload(id, {
         status: "error",
         progress: 0,
+      }).catch(() => {
+        // If update fails, at least try to delete the entry
+        return this.deleteDownload(id);
       });
       throw error;
+    }
+  }
+
+  /**
+   * Download direct video with progress tracking
+   */
+  private async downloadDirectVideo(
+    videoUrl: string,
+    onProgress?: (progress: number) => void
+  ): Promise<Blob> {
+    const response = await fetch(videoUrl);
+
+    if (!response.ok) {
+      throw new Error(`Failed to download video: ${response.statusText}`);
+    }
+
+    const contentLength = response.headers.get("content-length");
+    const total = contentLength ? parseInt(contentLength, 10) : 0;
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error("No response body");
+    }
+
+    const chunks: Uint8Array[] = [];
+    let receivedLength = 0;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      chunks.push(value);
+      receivedLength += value.length;
+
+      // Report progress every 10%
+      if (total > 0 && onProgress) {
+        const currentProgress = Math.round((receivedLength / total) * 100);
+        if (currentProgress % 10 === 0 || currentProgress === 100) {
+          onProgress(currentProgress);
+        }
+      }
+    }
+
+    return new Blob(chunks as BlobPart[], { type: "video/mp4" });
+  }
+
+  /**
+   * Download HLS video through server-side proxy
+   * Uses a progress endpoint to track segments
+   */
+  private async downloadHLSVideo(
+    manifestUrl: string,
+    onProgress?: (progress: number) => void
+  ): Promise<Blob> {
+    // Use the server-side proxy API to download HLS content
+    const proxyUrl = new URL('/api/download-hls', window.location.origin);
+    proxyUrl.searchParams.set('url', manifestUrl);
+
+    try {
+      const response = await fetch(proxyUrl.toString());
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || `Failed to download: ${response.statusText}`);
+      }
+
+      // For HLS, we don't have accurate progress, so we simulate it
+      // Start at 10%, update to 90% when done, then 100%
+      if (onProgress) {
+        onProgress(10);
+      }
+
+      // Get the response as a blob
+      const blob = await response.blob();
+
+      if (onProgress) {
+        onProgress(90);
+        // Small delay to show 90% before 100%
+        await new Promise(resolve => setTimeout(resolve, 100));
+        onProgress(100);
+      }
+
+      return blob;
+    } catch (error) {
+      throw new Error(`HLS download failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
   async getCachedVideo(videoUrl: string): Promise<string | null> {
     const cache = await caches.open(CACHE_NAME);
     const response = await cache.match(videoUrl);
-    
+
     if (response) {
       const blob = await response.blob();
       return URL.createObjectURL(blob);
     }
-    
+
     return null;
   }
 }
