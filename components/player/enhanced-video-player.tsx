@@ -1189,7 +1189,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
       ref={containerRef}
       className={cn(
         "relative bg-black rounded-xl overflow-hidden group",
-        isTheaterMode ? "fixed inset-0 z-50 rounded-none" : "aspect-video",
+        isTheaterMode ? "fixed inset-0 z-50 rounded-none" : "aspect-video max-h-[65vh] sm:max-h-[70vh]",
         className
       )}
     >
