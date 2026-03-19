@@ -84,6 +84,12 @@ export interface VideoQuality {
     size?: string;
 }
 
+export interface SubtitleTrack {
+  url: string;
+  lang: string;
+  label: string;
+}
+
 // ===================================
 // Main Component
 // ===================================
@@ -105,7 +111,8 @@ export function EnhancedVideoPlayer({
   ],
   onServerChange,
   onLanguageChange,
-}: VideoPlayerProps) {
+  subtitles = [], // NEW: Subtitle tracks from API
+}: VideoPlayerProps & { subtitles?: SubtitleTrack[] }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
@@ -147,6 +154,11 @@ export function EnhancedVideoPlayer({
   const [showSubtitleSettings, setShowSubtitleSettings] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [currentQuality, setCurrentQuality] = useState<string>("auto");
+
+  // NEW: Subtitle state
+  const [subtitleTracks, setSubtitleTracks] = useState<SubtitleTrack[]>([]);
+  const [subtitlesEnabled, setSubtitlesEnabled] = useState(true);
+  const [currentSubtitle, setCurrentSubtitle] = useState(0);
   const [settingsPosition, setSettingsPosition] = useState<'top' | 'bottom'>('top');
   const [portalDropdownStyle, setPortalDropdownStyle] = useState<React.CSSProperties>({});
 
@@ -294,6 +306,98 @@ export function EnhancedVideoPlayer({
   }, [source.qualities, source.url]);
 
   // ===================================
+  // Load Subtitles - CRITICAL FIX
+  // ===================================
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    // Hide existing text tracks (can't remove them from textTracks list)
+    for (let i = 0; i < video.textTracks.length; i++) {
+      video.textTracks[i].mode = "disabled";
+    }
+
+    // Add new subtitle tracks if available
+    if (subtitles && subtitles.length > 0) {
+      console.log("Loading subtitles:", subtitles);
+      setSubtitleTracks(subtitles);
+
+      // Add each subtitle as a track element
+      subtitles.forEach((sub, index) => {
+        const track = video.addTextTrack("captions", sub.label, sub.lang || `sub${index}`);
+
+        // Fetch and load the subtitle file
+        fetch(sub.url)
+          .then(res => {
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.text();
+          })
+          .then(vttContent => {
+            // Parse VTT content manually
+            const lines = vttContent.split('\n');
+            let currentCue: VTTCue | null = null;
+            let cueTime = 0;
+
+            lines.forEach(line => {
+              line = line.trim();
+              if (!line) return;
+
+              // Parse timestamp: 00:00:00.000 --> 00:00:05.000
+              if (line.includes('-->')) {
+                const [start, end] = line.split('-->').map(t => {
+                  const [hours, minutes, seconds] = t.trim().split(':');
+                  const h = parseInt(hours) || 0;
+                  const m = parseInt(minutes) || 0;
+                  const s = parseFloat(seconds) || 0;
+                  return h * 3600 + m * 60 + s;
+                });
+
+                if (currentCue) {
+                  track.addCue(currentCue);
+                }
+                currentCue = new VTTCue(start, end, "");
+                cueTime = start;
+              } else if (line.startsWith('NOTE') || line.startsWith('STYLE')) {
+                // Skip metadata
+                return;
+              } else if (currentCue && line && !line.startsWith('WEBVTT')) {
+                // This is subtitle text
+                currentCue.text = (currentCue.text || '') + line + '\n';
+              }
+            });
+
+            // Add the last cue
+            if (currentCue) {
+              track.addCue(currentCue);
+            }
+
+            // Enable English/first track by default
+            const isEnglish = sub.lang === "en" || sub.label.toLowerCase().includes("english");
+            if ((index === 0 || isEnglish) && subtitlesEnabled) {
+              track.mode = "showing";
+            } else {
+              track.mode = "hidden";
+            }
+          })
+          .catch(err => {
+            console.error("Failed to load subtitle:", sub.label, err);
+          });
+      });
+
+      // Show notification that subtitles are loaded
+      if (subtitles.length > 0) {
+        const englishSub = subtitles.find(s => s.lang === "en" || s.label.toLowerCase().includes("english"));
+        if (englishSub) {
+          toast.success(`Subtitles loaded: ${subtitles.map(s => s.label).join(", ")}`, { duration: 3000 });
+        }
+      }
+    } else {
+      setSubtitleTracks([]);
+    }
+  }, [subtitles, subtitlesEnabled]);
+
+  // ===================================
   // Update torrent stats
   // ===================================
 
@@ -339,16 +443,20 @@ export function EnhancedVideoPlayer({
         case "ArrowLeft":
           e.preventDefault();
           seek(video.currentTime - 5);
+          toast("-5s", { icon: "⏪", duration: 500 });
           break;
         case "ArrowRight":
           e.preventDefault();
           seek(video.currentTime + 5);
+          toast("+5s", { icon: "⏩", duration: 500 });
           break;
         case "j":
           seek(video.currentTime - 10);
+          toast("-10s", { icon: "⏪", duration: 500 });
           break;
         case "l":
           seek(video.currentTime + 10);
+          toast("+10s", { icon: "⏩", duration: 500 });
           break;
         case "ArrowUp":
           e.preventDefault();
@@ -360,6 +468,7 @@ export function EnhancedVideoPlayer({
           break;
         case "m":
           toggleMute();
+          toast(isMuted ? "Muted" : "Unmuted", { duration: 500 });
           break;
         case "f":
           toggleFullscreen();
@@ -373,7 +482,11 @@ export function EnhancedVideoPlayer({
         case "c":
           // Toggle captions
           if (video.textTracks.length > 0) {
-            video.textTracks[0].mode = video.textTracks[0].mode === "showing" ? "hidden" : "showing";
+            const newState = video.textTracks[0].mode === "showing" ? "hidden" : "showing";
+            video.textTracks[0].mode = newState;
+            toast(newState ? "Subtitles ON" : "Subtitles OFF", { duration: 500 });
+          } else {
+            toast("No subtitles available", { icon: "⚠️", duration: 2000 });
           }
           break;
         case "1":
@@ -387,12 +500,25 @@ export function EnhancedVideoPlayer({
         case "9":
           // Speed control
           setPlaybackRate(parseInt(e.key) * 0.25);
+          toast(`Speed: ${parseInt(e.key) * 0.25}x`, { duration: 500 });
+          break;
+        case "0":
+          setPlaybackRate(1);
+          toast("Speed: 1x (Normal)", { duration: 500 });
           break;
         case "n":
           // Next episode
           if (nextEpisodeUrl && preferences.autoNext) {
             goToNextEpisode();
           }
+          break;
+        case "?":
+          // Show keyboard shortcuts help
+          toast(`
+Keyboard Shortcuts:
+Space/K: Play/Pause | Arrow: ±5s | L/R: ±10s | M: Mute | F: Fullscreen
+C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
+          `, { duration: 5000, icon: "⌨️" });
           break;
         case "Escape":
           // Exit fullscreen
@@ -402,13 +528,14 @@ export function EnhancedVideoPlayer({
           setShowSettings(false);
           setShowQualitySelector(false);
           setShowSpeedSelector(false);
+          setShowSubtitleSettings(false);
           break;
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [preferences.autoplay, preferences.autoNext]);
+  }, [preferences.autoplay, preferences.autoNext, nextEpisodeUrl, isMuted, duration]);
 
   // ===================================
   // Touch Gestures (Double-tap to seek)
@@ -817,10 +944,28 @@ export function EnhancedVideoPlayer({
     if (!container) return;
 
     if (document.fullscreenElement) {
-      document.exitFullscreen();
+      // Exit fullscreen - try all vendor methods
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if ((document as any).webkitExitFullscreen) {
+        (document as any).webkitExitFullscreen();
+      } else if ((document as any).mozCancelFullScreen) {
+        (document as any).mozCancelFullScreen();
+      } else if ((document as any).msExitFullscreen) {
+        (document as any).msExitFullscreen();
+      }
       setIsFullscreen(false);
     } else {
-      container.requestFullscreen();
+      // Enter fullscreen - try all vendor methods
+      if (container.requestFullscreen) {
+        container.requestFullscreen();
+      } else if ((container as any).webkitRequestFullscreen) {
+        (container as any).webkitRequestFullscreen();
+      } else if ((container as any).mozRequestFullScreen) {
+        (container as any).mozRequestFullScreen();
+      } else if ((container as any).msRequestFullscreen) {
+        (container as any).msRequestFullscreen();
+      }
       setIsFullscreen(true);
     }
   };

@@ -69,6 +69,13 @@ export function VideoSourceLoader({
   const [retryCount, setRetryCount] = useState(0);
   const [isRetrying, setIsRetrying] = useState(false);
 
+  // NEW: Subtitle state
+  const [subtitleTracks, setSubtitleTracks] = useState<Array<{
+    url: string;
+    lang: string;
+    label: string;
+  }>>([]);
+
   const MAX_RETRIES = 3;
   const RETRY_DELAY = 2000; // 2 seconds
 
@@ -175,6 +182,15 @@ export function VideoSourceLoader({
         url: defaultSource.url,
         qualities,
       });
+
+      // CRITICAL: Extract and store subtitles
+      if (data.subtitles && data.subtitles.length > 0) {
+        console.log("Found subtitles:", data.subtitles);
+        setSubtitleTracks(data.subtitles);
+      } else {
+        setSubtitleTracks([]);
+      }
+
       setRetryCount(0); // Reset retry count on success
     } catch (err) {
       const isRetryable = err instanceof Error && (
@@ -355,6 +371,7 @@ export function VideoSourceLoader({
       allLanguages={allLanguages}
       onServerChange={handleServerChange}
       onLanguageChange={handleLanguageChange}
+      subtitles={subtitleTracks}
     />
   );
 }
