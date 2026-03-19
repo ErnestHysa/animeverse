@@ -1188,15 +1188,15 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
     <div
       ref={containerRef}
       className={cn(
-        "relative bg-black rounded-xl overflow-hidden group",
-        isTheaterMode ? "fixed inset-0 z-50 rounded-none" : "aspect-video max-h-[65vh] sm:max-h-[70vh]",
+        "relative bg-black rounded-xl overflow-hidden group w-full",
+        isTheaterMode ? "fixed inset-0 z-50 rounded-none" : "h-[50vh] sm:h-[55vh] lg:h-[60vh]",
         className
       )}
     >
       {/* Video Element */}
       <video
         ref={videoRef}
-        className="w-full h-full"
+        className="w-full h-full object-cover"
         poster={poster}
         onClick={togglePlay}
         playsInline
