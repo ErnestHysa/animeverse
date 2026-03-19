@@ -192,7 +192,12 @@ export function AIRecommendations({
           .slice(0, limit);
       }
 
-      setRecommendations(scored);
+      // Deduplicate by anime ID to avoid React key errors
+      const uniqueRecommendations = Array.from(
+        new Map(scored.map((r) => [r.anime.id, r])).values()
+      );
+
+      setRecommendations(uniqueRecommendations);
       setLoading(false);
     }
 

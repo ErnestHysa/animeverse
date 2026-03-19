@@ -139,6 +139,7 @@ export function EnhancedVideoPlayer({
   const [playbackRate, setPlaybackRate] = useState(1);
   const [currentQuality, setCurrentQuality] = useState<string>("auto");
   const [settingsPosition, setSettingsPosition] = useState<'top' | 'bottom'>('top');
+  const [settingsDropdownStyle, setSettingsDropdownStyle] = useState<React.CSSProperties>({});
 
   // Subtitle customization
   const [subtitleSize, setSubtitleSize] = useState<number>(() => {
@@ -598,10 +599,25 @@ export function EnhancedVideoPlayer({
       const spaceBelow = viewportHeight - buttonRect.bottom;
 
       // Position above if there's space, otherwise position below
-      return spaceAbove >= estimatedHeight ? 'top' : 'bottom';
+      const position = spaceAbove >= estimatedHeight ? 'top' : 'bottom';
+
+      // Calculate fixed position style
+      if (position === 'top') {
+        setSettingsDropdownStyle({
+          bottom: viewportHeight - buttonRect.top + 8,
+          right: window.innerWidth - buttonRect.right,
+        });
+      } else {
+        setSettingsDropdownStyle({
+          top: buttonRect.bottom + 4,
+          right: window.innerWidth - buttonRect.right,
+        });
+      }
+
+      return position;
     };
 
-    setSettingsPosition(calculatePosition());
+    calculatePosition();
   }, [showSettings, showSubtitleSettings]);
 
   // ===================================
@@ -1088,12 +1104,9 @@ export function EnhancedVideoPlayer({
                 <div
                   ref={settingsDropdownRef}
                   className={cn(
-                    "settings-dropdown absolute bg-[#1a1a1a] border border-white/10 rounded-lg overflow-hidden min-w-[200px] max-h-[60vh] overflow-y-auto z-30 shadow-xl",
-                    settingsPosition === 'top' ? 'bottom-full right-0 mb-2' : 'top-full right-0 mt-2'
+                    "settings-dropdown fixed bg-[#1a1a1a] border border-white/10 rounded-lg overflow-hidden min-w-[200px] max-h-[60vh] overflow-y-auto z-[9999] shadow-xl"
                   )}
-                  style={{
-                    maxHeight: settingsPosition === 'top' ? 'min(calc(100vh - 80px), 600px)' : 'min(calc(100vh - 150px), 600px)',
-                  }}
+                  style={settingsDropdownStyle}
                 >
                   {/* Quality Selector */}
                   <div className="p-2 border-b border-white/10">
