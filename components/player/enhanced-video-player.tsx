@@ -23,7 +23,7 @@ import {
   ChevronDown,
   ChevronUp,
   FastForward,
-  Pipette,
+  Copy,
   X,
   Globe,
 } from "lucide-react";
@@ -323,12 +323,18 @@ export function EnhancedVideoPlayer({
       console.log("Loading subtitles:", subtitles);
       setSubtitleTracks(subtitles);
 
+      // Track successful subtitle loads
+      let loadedCount = 0;
+
       // Add each subtitle as a track element
       subtitles.forEach((sub, index) => {
         const track = video.addTextTrack("captions", sub.label, sub.lang || `sub${index}`);
 
-        // Fetch and load the subtitle file
-        fetch(sub.url)
+        // Use proxy API to avoid CORS/403 errors from external servers
+        const proxyUrl = `/api/proxy-subtitle?url=${encodeURIComponent(sub.url)}`;
+
+        // Fetch and load the subtitle file through proxy
+        fetch(proxyUrl)
           .then(res => {
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             return res.text();
@@ -372,6 +378,9 @@ export function EnhancedVideoPlayer({
               track.addCue(currentCue);
             }
 
+            // Track successful load
+            loadedCount++;
+
             // Enable English/first track by default
             const isEnglish = sub.lang === "en" || sub.label.toLowerCase().includes("english");
             if ((index === 0 || isEnglish) && subtitlesEnabled) {
@@ -379,19 +388,20 @@ export function EnhancedVideoPlayer({
             } else {
               track.mode = "hidden";
             }
+
+            // Show success notification when first subtitle loads
+            if (loadedCount === 1) {
+              const englishLabel = subtitles.find(s => s.lang === "en" || s.label.toLowerCase().includes("english"))?.label;
+              if (englishLabel) {
+                toast.success(`Subtitles loaded: ${englishLabel}`, { duration: 2000 });
+              }
+            }
           })
           .catch(err => {
-            console.error("Failed to load subtitle:", sub.label, err);
+            // Silent fail - don't spam console for subtitles that can't be loaded
+            console.warn(`Could not load subtitle: ${sub.label}`);
           });
       });
-
-      // Show notification that subtitles are loaded
-      if (subtitles.length > 0) {
-        const englishSub = subtitles.find(s => s.lang === "en" || s.label.toLowerCase().includes("english"));
-        if (englishSub) {
-          toast.success(`Subtitles loaded: ${subtitles.map(s => s.label).join(", ")}`, { duration: 3000 });
-        }
-      }
     } else {
       setSubtitleTracks([]);
     }
@@ -1233,7 +1243,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
       {/* Controls */}
       <div
         className={cn(
-          "absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/90 via-black/60 to-transparent transition-opacity duration-300",
+          "absolute bottom-0 left-0 right-0 p-4 pb-6 bg-gradient-to-t from-black/90 via-black/60 to-transparent transition-opacity duration-300",
           showControls ? "opacity-100" : "opacity-0"
         )}
         onMouseMove={resetControlsTimeout}
@@ -1632,8 +1642,9 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
               onClick={togglePip}
               className="p-2 sm:p-2 hover:bg-white/10 rounded-full transition-colors min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0"
               aria-label="Picture-in-Picture"
+              title="Picture-in-Picture"
             >
-              <Pipette className="w-5 h-5" />
+              <Copy className="w-5 h-5" />
             </button>
 
             {/* Fullscreen */}
