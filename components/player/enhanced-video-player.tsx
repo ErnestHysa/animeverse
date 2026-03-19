@@ -117,6 +117,9 @@ export function EnhancedVideoPlayer({
   const [isLoading, setIsLoading] = useState(true);
   const [bufferProgress, setBufferProgress] = useState(0);
 
+  // Throttled time update to improve performance
+  const lastTimeUpdateRef = useRef(0);
+
   // Server and Language state
   const [currentServer, setCurrentServer] = useState(() => {
     if (typeof window !== "undefined") {
@@ -214,10 +217,16 @@ export function EnhancedVideoPlayer({
 
     setIsLoading(true);
 
+    // Timeout fallback to prevent infinite loading
+    const loadingTimeout = setTimeout(() => {
+      setIsLoading(false);
+    }, 30000); // 30 seconds max
+
     if (source.type === "direct") {
       video.src = sources[0].url;
 
       const handleLoad = () => {
+        clearTimeout(loadingTimeout);
         setIsLoading(false);
         // Auto-play based on preferences
         if (preferences.autoplay) {
@@ -226,6 +235,7 @@ export function EnhancedVideoPlayer({
       };
 
       const handleError = () => {
+        clearTimeout(loadingTimeout);
         setIsLoading(false);
         onError?.(new Error("Failed to load video"));
       };
@@ -234,6 +244,7 @@ export function EnhancedVideoPlayer({
       video.addEventListener("error", handleError, { once: true });
 
       return () => {
+        clearTimeout(loadingTimeout);
         video.removeEventListener("loadeddata", handleLoad);
         video.removeEventListener("error", handleError);
       };
@@ -242,10 +253,12 @@ export function EnhancedVideoPlayer({
       import("@/lib/webtorrent").then(({ webTorrentManager }) => {
         webTorrentManager.loadDirectVideo(source.url, video, {
           onReady: () => {
+            clearTimeout(loadingTimeout);
             setIsLoading(false);
             if (preferences.autoplay) play();
           },
           onError: (err: Error) => {
+            clearTimeout(loadingTimeout);
             setIsLoading(false);
             onError?.(err);
           },
@@ -392,7 +405,14 @@ export function EnhancedVideoPlayer({
     const video = videoRef.current;
     if (!video) return;
 
-    const handleTimeUpdate = () => setCurrentTime(video.currentTime);
+    const handleTimeUpdate = () => {
+      const now = Date.now();
+      // Throttle to update at most 4 times per second (250ms)
+      if (now - lastTimeUpdateRef.current >= 250) {
+        lastTimeUpdateRef.current = now;
+        setCurrentTime(video.currentTime);
+      }
+    };
     const handleDurationChange = () => setDuration(video.duration);
     const handleEnded = () => {
       setIsPlaying(false);
@@ -902,8 +922,21 @@ export function EnhancedVideoPlayer({
 
       {/* Loading Overlay */}
       {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="w-16 h-16 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="w-16 h-16 border-4 border-primary/30 border-t-primary rounded-full animate-spin mb-4" />
+          {bufferProgress > 0 && (
+            <div className="w-48 flex flex-col items-center gap-2">
+              <div className="w-full h-2 bg-white/20 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary transition-all duration-300"
+                  style={{ width: `${bufferProgress}%` }}
+                />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Buffering... {Math.round(bufferProgress)}%
+              </p>
+            </div>
+          )}
         </div>
       )}
 
@@ -1086,7 +1119,7 @@ export function EnhancedVideoPlayer({
             )}
 
             {/* Download Button */}
-            {source.type === "direct" && animeId && episodeNumber && animeTitle && (
+            {source.type === "direct" && !source.url.includes('.m3u8') && animeId && episodeNumber && animeTitle && (
               <DownloadButton
                 animeId={animeId}
                 animeTitle={animeTitle}

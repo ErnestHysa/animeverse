@@ -7,6 +7,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { memo } from "react";
 import { Star, Play, Clock, Zap } from "lucide-react";
 import type { Media } from "@/types/anilist";
 import { getAnimeTitle, getAnimeCover, formatEpisodeCount, getStarRating } from "@/lib/anilist";
@@ -23,7 +24,7 @@ export interface AnimeCardProps {
   hasDub?: boolean;
 }
 
-export function AnimeCard({
+export const AnimeCard = memo(function AnimeCard({
   anime,
   priority = false,
   showProgress = false,
@@ -128,7 +129,7 @@ export function AnimeCard({
       </div>
     </Link>
   );
-}
+});
 
 /**
  * Compact AnimeCard variant for horizontal lists
@@ -140,7 +141,7 @@ export interface AnimeCardCompactProps {
   className?: string;
 }
 
-export function AnimeCardCompact({ anime, showNumber = false, number, className }: AnimeCardCompactProps) {
+export const AnimeCardCompact = memo(function AnimeCardCompact({ anime, showNumber = false, number, className }: AnimeCardCompactProps) {
   const title = getAnimeTitle(anime);
   const cover = getAnimeCover(anime);
 
@@ -189,4 +190,4 @@ export function AnimeCardCompact({ anime, showNumber = false, number, className 
       </div>
     </Link>
   );
-}
+});

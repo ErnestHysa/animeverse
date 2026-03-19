@@ -10,6 +10,7 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
 import { EpisodeGridSkeleton } from "@/components/ui/skeleton";
 import { anilist, getAnimeTitle, getAnimeCover, getNextAiringTime } from "@/lib/anilist";
+import { sanitizeDescription } from "@/lib/html-sanitizer";
 import { Play, Star, Clock, Calendar, Tv, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -223,7 +224,7 @@ async function InfoSection({ anime }: { anime: Media }) {
         <GlassCard>
           <h2 className="text-xl font-semibold mb-4">Synopsis</h2>
           <p className="text-muted-foreground leading-relaxed whitespace-pre-line">
-            {anime.description || "No description available."}
+            {sanitizeDescription(anime.description) || "No description available."}
           </p>
         </GlassCard>
 
@@ -240,6 +241,16 @@ async function InfoSection({ anime }: { anime: Media }) {
                     href={`/watch/${anime.id}/${epNum}`}
                     className="group relative aspect-video rounded-lg overflow-hidden bg-muted hover:ring-2 hover:ring-primary transition-all"
                   >
+                    {/* Episode thumbnail fallback using anime banner */}
+                    {anime.bannerImage && (
+                      <Image
+                        src={anime.bannerImage}
+                        alt={`Episode ${epNum}`}
+                        fill
+                        className="object-cover opacity-60 group-hover:opacity-40 transition-opacity"
+                        sizes="(max-width: 768px) 50vw, 20vw"
+                      />
+                    )}
                     <div className="absolute inset-0 flex items-center justify-center">
                       <Play className="w-8 h-8 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
