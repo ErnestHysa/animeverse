@@ -1189,14 +1189,16 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
       ref={containerRef}
       className={cn(
         "relative bg-black rounded-xl overflow-hidden group w-full",
-        isTheaterMode ? "fixed inset-0 z-50 rounded-none" : "h-[50vh] sm:h-[55vh] lg:h-[60vh]",
+        isTheaterMode ? "fixed inset-0 z-50 rounded-none" : "",
+        !isTheaterMode && "max-w-full",
         className
       )}
+      style={!isTheaterMode ? { height: 'auto', aspectRatio: '16/9', maxHeight: 'calc(100vh - 300px)' } : {}}
     >
       {/* Video Element */}
       <video
         ref={videoRef}
-        className="w-full h-full object-cover"
+        className="w-full h-full"
         poster={poster}
         onClick={togglePlay}
         playsInline
