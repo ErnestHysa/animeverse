@@ -1289,15 +1289,15 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
       {/* Controls */}
       <div
         className={cn(
-          "absolute bottom-0 left-0 right-0 p-4 pb-6 bg-gradient-to-t from-black/90 via-black/60 to-transparent transition-opacity duration-300",
+          "absolute bottom-0 left-0 right-0 px-3 py-2 sm:p-4 sm:pb-6 bg-gradient-to-t from-black/90 via-black/60 to-transparent transition-opacity duration-300",
           showControls ? "opacity-100" : "opacity-0"
         )}
         onMouseMove={resetControlsTimeout}
       >
         {/* Progress Bar with Thumbnail Preview */}
-        <div className="relative mb-4">
+        <div className="relative mb-2 sm:mb-4">
           <div
-            className="relative h-2 sm:h-1.5 bg-white/20 rounded-full cursor-pointer group/progress active:h-3 transition-all"
+            className="relative h-1.5 sm:h-2 bg-white/20 rounded-full cursor-pointer group/progress active:h-2 sm:active:h-3 transition-all"
             onClick={handleProgressClick}
           >
             <div className="absolute top-0 left-0 h-full bg-white/30 rounded-full" style={{ width: `${bufferProgress}%` }} />
@@ -1311,16 +1311,16 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
         </div>
 
         {/* Controls Row */}
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center justify-between gap-2 sm:gap-4">
           {/* Left Controls */}
           <div className="flex items-center gap-1 sm:gap-2">
             {/* Play/Pause */}
             <button
               onClick={togglePlay}
-              className="p-2 sm:p-2 hover:bg-white/10 rounded-full transition-colors min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0"
+              className="p-1.5 sm:p-2 hover:bg-white/10 rounded-full transition-colors min-w-[40px] min-h-[40px] sm:min-w-0 sm:min-h-0"
               aria-label={isPlaying ? "Pause" : "Play"}
             >
-              {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
+              {isPlaying ? <Pause className="w-4 h-4 sm:w-5 sm:h-5" /> : <Play className="w-4 h-4 sm:w-5 sm:h-5 ml-0.5" />}
             </button>
 
             {/* Skip Buttons */}
@@ -1351,10 +1351,10 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
             <div className="hidden sm:flex items-center gap-1 group/volume">
               <button
                 onClick={toggleMute}
-                className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                className="p-1.5 sm:p-2 hover:bg-white/10 rounded-full transition-colors"
                 aria-label={isMuted ? "Unmute" : "Mute"}
               >
-                {isMuted || volume === 0 ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+                {isMuted || volume === 0 ? <VolumeX className="w-4 h-4 sm:w-5 sm:h-5" /> : <Volume2 className="w-4 h-4 sm:w-5 sm:h-5" />}
               </button>
               <input
                 type="range"
@@ -1733,31 +1733,33 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
             <button
               onClick={toggleTheaterMode}
               className={cn(
-                "p-2 sm:p-2 hover:bg-white/10 rounded-full transition-colors hidden sm:block min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0",
+                "p-1.5 sm:p-2 hover:bg-white/10 rounded-full transition-colors hidden sm:block min-w-[40px] min-h-[40px] sm:min-w-0 sm:min-h-0",
                 isTheaterMode && "bg-white/10"
               )}
-              aria-label="Theater mode"
+              aria-label={isTheaterMode ? "Exit theater mode" : "Theater mode"}
+              title={isTheaterMode ? "Exit theater mode" : "Theater mode"}
             >
-              <Monitor className="w-5 h-5" />
+              <Monitor className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
 
             {/* PIP */}
             <button
               onClick={togglePip}
-              className="p-2 sm:p-2 hover:bg-white/10 rounded-full transition-colors min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0"
+              className="p-1.5 sm:p-2 hover:bg-white/10 rounded-full transition-colors min-w-[40px] min-h-[40px] sm:min-w-0 sm:min-h-0"
               aria-label="Picture-in-Picture"
               title="Picture-in-Picture"
             >
-              <Copy className="w-5 h-5" />
+              <Copy className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
 
             {/* Fullscreen */}
             <button
               onClick={toggleFullscreen}
-              className="p-2 sm:p-2 hover:bg-white/10 rounded-full transition-colors min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0"
+              className="p-1.5 sm:p-2 hover:bg-white/10 rounded-full transition-colors min-w-[40px] min-h-[40px] sm:min-w-0 sm:min-h-0"
               aria-label={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+              title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
             >
-              {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
+              {isFullscreen ? <Minimize className="w-4 h-4 sm:w-5 sm:h-5" /> : <Maximize className="w-4 h-4 sm:w-5 sm:h-5" />}
             </button>
           </div>
         </div>
