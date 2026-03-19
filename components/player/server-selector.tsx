@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Server, ChevronDown, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +32,22 @@ export function ServerSelector({
   isLoading = false,
 }: ServerSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  // Calculate dropdown position when opening
+  useEffect(() => {
+    if (isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setDropdownStyle({
+        position: 'fixed',
+        top: rect.bottom + 4,
+        right: window.innerWidth - rect.right,
+      });
+    } else {
+      setDropdownStyle({});
+    }
+  }, [isOpen]);
 
   // Get server display info
   const getServerInfo = (serverId: string) => {
@@ -49,6 +65,7 @@ export function ServerSelector({
   return (
     <div className="relative">
       <button
+        ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
           "flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg transition-colors text-sm",
@@ -69,68 +86,64 @@ export function ServerSelector({
       </button>
 
       {isOpen && (
-        <>
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => setIsOpen(false)}
-            aria-hidden="true"
-          />
-
-          {/* Dropdown */}
-          <div
-            className="absolute top-full right-0 mt-2 z-[9999] w-56"
-            role="listbox"
-            aria-label="Server options"
-          >
-            <div className="bg-black/95 backdrop-blur-xl border border-white/10 rounded-lg overflow-hidden shadow-xl">
-              <div className="px-3 py-2 border-b border-white/10">
-                <p className="text-xs font-medium text-muted-foreground">Select Server</p>
-              </div>
-
-              <div className="max-h-64 overflow-y-auto py-1">
-                {servers.map((server) => {
-                  const isSelected = server.id === currentServer;
-                  return (
-                    <button
-                      key={server.id}
-                      onClick={() => {
-                        onServerChange(server.id);
-                        setIsOpen(false);
-                      }}
-                      className={cn(
-                        "w-full flex items-center justify-between px-3 py-2 text-left hover:bg-white/10 transition-colors",
-                        isSelected && "bg-primary/20"
-                      )}
-                      role="option"
-                      aria-selected={isSelected}
-                      aria-label={`${server.name} - ${server.quality} ${server.type.toUpperCase()}`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Server className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
-                        <div>
-                          <p className="text-sm font-medium">{server.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {server.quality} • {server.type.toUpperCase()}
-                          </p>
-                        </div>
-                      </div>
-                      {isSelected && (
-                        <Check className="w-4 h-4 text-primary" aria-hidden="true" />
-                      )}
-                    </button>
-                  );
-                })}
-
-                {servers.length === 0 && (
-                  <div className="px-3 py-4 text-center text-sm text-muted-foreground" role="status">
-                    No servers available
-                  </div>
-                )}
-              </div>
-            </div>
+        <div
+          className="fixed inset-0 z-[9998]"
+          onClick={() => setIsOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+      {isOpen && (
+        <div
+          className="fixed bg-black/95 backdrop-blur-xl border border-white/10 rounded-lg overflow-hidden shadow-xl z-[9999] w-56"
+          style={dropdownStyle}
+          role="listbox"
+          aria-label="Server options"
+        >
+          <div className="px-3 py-2 border-b border-white/10">
+            <p className="text-xs font-medium text-muted-foreground">Select Server</p>
           </div>
-        </>
+
+          <div className="max-h-64 overflow-y-auto py-1">
+            {servers.map((server) => {
+              const isSelected = server.id === currentServer;
+              return (
+                <button
+                  key={server.id}
+                  onClick={() => {
+                    onServerChange(server.id);
+                    setIsOpen(false);
+                  }}
+                  className={cn(
+                    "w-full flex items-center justify-between px-3 py-2 text-left hover:bg-white/10 transition-colors",
+                    isSelected && "bg-primary/20"
+                  )}
+                  role="option"
+                  aria-selected={isSelected}
+                  aria-label={`${server.name} - ${server.quality} ${server.type.toUpperCase()}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Server className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
+                    <div>
+                      <p className="text-sm font-medium">{server.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {server.quality} • {server.type.toUpperCase()}
+                      </p>
+                    </div>
+                    {isSelected && (
+                      <Check className="w-4 h-4 text-primary" aria-hidden="true" />
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+
+            {servers.length === 0 && (
+              <div className="px-3 py-4 text-center text-sm text-muted-foreground" role="status">
+                No servers available
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
@@ -158,12 +171,29 @@ export function LanguageSelector({
   onLanguageChange,
 }: LanguageSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  // Calculate dropdown position when opening
+  useEffect(() => {
+    if (isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setDropdownStyle({
+        position: 'fixed',
+        top: rect.bottom + 4,
+        right: window.innerWidth - rect.right,
+      });
+    } else {
+      setDropdownStyle({});
+    }
+  }, [isOpen]);
 
   const currentLang = languages.find((l) => l.id === currentLanguage);
 
   return (
     <div className="relative">
       <button
+        ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg transition-colors text-sm"
         aria-label="Select language"
@@ -179,46 +209,46 @@ export function LanguageSelector({
       </button>
 
       {isOpen && (
-        <>
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => setIsOpen(false)}
-            aria-hidden="true"
-          />
+        <div
+          className="fixed inset-0 z-[9998]"
+          onClick={() => setIsOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+      {isOpen && (
+        <div
+          className="fixed bg-black/95 backdrop-blur-xl border border-white/10 rounded-lg overflow-hidden shadow-xl z-[9999] w-48"
+          style={dropdownStyle}
+          role="listbox"
+          aria-label="Language options"
+        >
+          <div className="px-3 py-2 border-b border-white/10">
+            <p className="text-xs font-medium text-muted-foreground">Language</p>
+          </div>
 
-          <div
-            className="absolute top-full right-0 mt-2 z-[9999] w-48"
-            role="listbox"
-            aria-label="Language options"
-          >
-            <div className="bg-black/95 backdrop-blur-xl border border-white/10 rounded-lg overflow-hidden shadow-xl">
-              <div className="px-3 py-2 border-b border-white/10">
-                <p className="text-xs font-medium text-muted-foreground">Language</p>
-              </div>
-
-              <div className="py-1">
-                {languages.map((lang) => {
-                  const isSelected = lang.id === currentLanguage;
-                  const isAvailable = lang.available !== false;
-                  return (
-                    <button
-                      key={lang.id}
-                      onClick={() => {
-                        if (isAvailable) {
-                          onLanguageChange(lang.id);
-                          setIsOpen(false);
-                        }
-                      }}
-                      className={cn(
-                        "w-full flex items-center justify-between px-3 py-2 text-left transition-colors",
-                        isAvailable && "hover:bg-white/10",
-                        !isAvailable && "opacity-50 cursor-not-allowed",
-                        isSelected && "bg-primary/20"
-                      )}
-                      disabled={!isAvailable}
-                      role="option"
-                      aria-selected={isSelected}
-                      aria-label={`${lang.label}${!isAvailable ? " - Not available" : ""}`}
+          <div className="py-1">
+            {languages.map((lang) => {
+              const isSelected = lang.id === currentLanguage;
+              const isAvailable = lang.available !== false;
+              return (
+                <button
+                  key={lang.id}
+                  onClick={() => {
+                    if (isAvailable) {
+                      onLanguageChange(lang.id);
+                      setIsOpen(false);
+                    }
+                  }}
+                  className={cn(
+                    "w-full flex items-center justify-between px-3 py-2 text-left transition-colors",
+                    isAvailable && "hover:bg-white/10",
+                    !isAvailable && "opacity-50 cursor-not-allowed",
+                    isSelected && "bg-primary/20"
+                  )}
+                  disabled={!isAvailable}
+                  role="option"
+                  aria-selected={isSelected}
+                  aria-label={`${lang.label}${!isAvailable ? " - Not available" : ""}`}
                     >
                       <span className="text-sm">{lang.label}</span>
                       <div className="flex items-center gap-2">
@@ -234,10 +264,8 @@ export function LanguageSelector({
                 })}
               </div>
             </div>
-          </div>
-        </>
-      )}
-    </div>
+        )}
+      </div>
   );
 }
 

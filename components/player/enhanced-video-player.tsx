@@ -139,6 +139,7 @@ export function EnhancedVideoPlayer({
   const [playbackRate, setPlaybackRate] = useState(1);
   const [currentQuality, setCurrentQuality] = useState<string>("auto");
   const [settingsPosition, setSettingsPosition] = useState<'top' | 'bottom'>('top');
+  const [portalDropdownStyle, setPortalDropdownStyle] = useState<React.CSSProperties>({});
 
   // Subtitle customization
   const [subtitleSize, setSubtitleSize] = useState<number>(() => {
@@ -578,6 +579,58 @@ export function EnhancedVideoPlayer({
       video.playbackRate = playbackRate;
     }
   }, [playbackRate]);
+
+  // Calculate settings dropdown position for portal rendering
+  useEffect(() => {
+    if (!showSettings || !settingsButtonRef.current) {
+      setPortalDropdownStyle({});
+      return;
+    }
+
+    const updatePosition = () => {
+      const button = settingsButtonRef.current;
+      if (!button) return;
+
+      const rect = button.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const estimatedHeight = showSubtitleSettings ? 500 : 300;
+
+      // Determine if there's more space above or below
+      const spaceAbove = rect.top;
+      const spaceBelow = viewportHeight - rect.bottom;
+
+      // Position above if there's enough space, otherwise below
+      const positionTop = spaceAbove >= estimatedHeight;
+
+      setSettingsPosition(positionTop ? 'top' : 'bottom');
+
+      // Calculate fixed position for portal
+      if (positionTop) {
+        setPortalDropdownStyle({
+          position: 'fixed',
+          bottom: viewportHeight - rect.top + 8,
+          right: window.innerWidth - rect.right,
+        });
+      } else {
+        setPortalDropdownStyle({
+          position: 'fixed',
+          top: rect.bottom + 4,
+          right: window.innerWidth - rect.right,
+        });
+      }
+    };
+
+    updatePosition();
+
+    // Recalculate on scroll and resize
+    window.addEventListener('scroll', updatePosition, true);
+    window.addEventListener('resize', updatePosition);
+
+    return () => {
+      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener('resize', updatePosition);
+    };
+  }, [showSettings, showSubtitleSettings]);
 
   // ===================================
   // Helper Functions
@@ -1058,14 +1111,21 @@ export function EnhancedVideoPlayer({
                 <Settings className="w-5 h-5" />
               </button>
 
-              {/* Settings Dropdown */}
+              {/* Settings Dropdown - Fixed positioning to avoid overflow clipping */}
+              {/* Backdrop */}
+              {showSettings && (
+                <div
+                  className="fixed inset-0 z-[9998]"
+                  onClick={() => setShowSettings(false)}
+                  aria-hidden="true"
+                />
+              )}
+              {/* Dropdown */}
               {showSettings && (
                 <div
                   ref={settingsDropdownRef}
-                  className={cn(
-                    "settings-dropdown absolute bg-[#1a1a1a] border border-white/10 rounded-lg overflow-hidden min-w-[200px] max-h-[60vh] overflow-y-auto z-[9999] shadow-xl",
-                    "bottom-full right-0 mb-2"
-                  )}
+                  className="settings-dropdown fixed bg-[#1a1a1a] border border-white/10 rounded-lg overflow-hidden min-w-[200px] max-h-[60vh] overflow-y-auto z-[9999] shadow-xl"
+                  style={portalDropdownStyle}
                 >
                   {/* Quality Selector */}
                   <div className="p-2 border-b border-white/10">
@@ -1225,7 +1285,7 @@ export function EnhancedVideoPlayer({
                     )}
                   </div>
                 </div>
-              )}
+                )}
             </div>
 
             {/* Theater Mode */}
