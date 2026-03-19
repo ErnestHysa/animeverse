@@ -313,7 +313,7 @@ export function EnhancedVideoPlayer({
     const video = videoRef.current;
     if (!video) return;
 
-    // Hide existing text tracks (can't remove them from textTracks list)
+    // Disable all existing text tracks first
     for (let i = 0; i < video.textTracks.length; i++) {
       video.textTracks[i].mode = "disabled";
     }
@@ -323,85 +323,131 @@ export function EnhancedVideoPlayer({
       console.log("Loading subtitles:", subtitles);
       setSubtitleTracks(subtitles);
 
-      // Track successful subtitle loads
-      let loadedCount = 0;
+      // Load subtitles sequentially to avoid race conditions
+      const loadSubtitles = async () => {
+        let loadedCount = 0;
+        let firstTrack: TextTrack | null = null;
+        let englishTrack: TextTrack | null = null;
 
-      // Add each subtitle as a track element
-      subtitles.forEach((sub, index) => {
-        const track = video.addTextTrack("captions", sub.label, sub.lang || `sub${index}`);
+        for (let index = 0; index < subtitles.length; index++) {
+          const sub = subtitles[index];
 
-        // Use proxy API to avoid CORS/403 errors from external servers
-        const proxyUrl = `/api/proxy-subtitle?url=${encodeURIComponent(sub.url)}`;
+          try {
+            // Use proxy API to avoid CORS/403 errors
+            const proxyUrl = `/api/proxy-subtitle?url=${encodeURIComponent(sub.url)}`;
 
-        // Fetch and load the subtitle file through proxy
-        fetch(proxyUrl)
-          .then(res => {
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            return res.text();
-          })
-          .then(vttContent => {
-            // Parse VTT content manually
+            const response = await fetch(proxyUrl);
+            if (!response.ok) {
+              console.warn(`Failed to fetch subtitle: ${sub.label} (${response.status})`);
+              continue;
+            }
+
+            const vttContent = await response.text();
+
+            // Create a new track for this subtitle
+            const track = video.addTextTrack("captions", sub.label, sub.lang || `sub${index}`);
+
+            // Parse VTT content and add cues
             const lines = vttContent.split('\n');
-            let currentCue: VTTCue | null = null;
-            let cueTime = 0;
+            const cues: Array<{ start: number; end: number; text: string }> = [];
+            let currentCue: { start: number; end: number; text: string } | null = null;
 
-            lines.forEach(line => {
-              line = line.trim();
-              if (!line) return;
+            for (let i = 0; i < lines.length; i++) {
+              let line = lines[i].trim();
+              if (!line) continue;
 
-              // Parse timestamp: 00:00:00.000 --> 00:00:05.000
+              // Parse timestamp line: 00:00:00.000 --> 00:00:05.000
               if (line.includes('-->')) {
-                const [start, end] = line.split('-->').map(t => {
-                  const [hours, minutes, seconds] = t.trim().split(':');
-                  const h = parseInt(hours) || 0;
-                  const m = parseInt(minutes) || 0;
-                  const s = parseFloat(seconds) || 0;
-                  return h * 3600 + m * 60 + s;
-                });
-
-                if (currentCue) {
-                  track.addCue(currentCue);
+                // Save previous cue if exists
+                if (currentCue && currentCue.text) {
+                  cues.push(currentCue);
                 }
-                currentCue = new VTTCue(start, end, "");
-                cueTime = start;
-              } else if (line.startsWith('NOTE') || line.startsWith('STYLE')) {
-                // Skip metadata
-                return;
-              } else if (currentCue && line && !line.startsWith('WEBVTT')) {
-                // This is subtitle text
-                currentCue.text = (currentCue.text || '') + line + '\n';
+
+                const [startPart, endPart] = line.split('-->');
+                const parseTime = (t: string): number => {
+                  const parts = t.trim().split(':');
+                  if (parts.length === 3) {
+                    const h = parseFloat(parts[0]) || 0;
+                    const m = parseFloat(parts[1]) || 0;
+                    const s = parseFloat(parts[2]) || 0;
+                    return h * 3600 + m * 60 + s;
+                  } else if (parts.length === 2) {
+                    const m = parseFloat(parts[0]) || 0;
+                    const s = parseFloat(parts[1]) || 0;
+                    return m * 60 + s;
+                  }
+                  return parseFloat(t) || 0;
+                };
+
+                const start = parseTime(startPart);
+                const end = parseTime(endPart);
+                currentCue = { start, end, text: "" };
+              } else if (line.startsWith('WEBVTT') || line.startsWith('NOTE') || line.startsWith('STYLE') || line.startsWith('X-TIMESTAMP')) {
+                // Skip metadata lines
+                continue;
+              } else if (currentCue !== null) {
+                // This is subtitle text - append to current cue
+                if (currentCue.text) {
+                  currentCue.text += ' ' + line;
+                } else {
+                  currentCue.text = line;
+                }
               }
-            });
+            }
 
             // Add the last cue
-            if (currentCue) {
-              track.addCue(currentCue);
+            if (currentCue && currentCue.text) {
+              cues.push(currentCue);
             }
 
-            // Track successful load
-            loadedCount++;
-
-            // Enable English/first track by default
-            const isEnglish = sub.lang === "en" || sub.label.toLowerCase().includes("english");
-            if ((index === 0 || isEnglish) && subtitlesEnabled) {
-              track.mode = "showing";
-            } else {
-              track.mode = "hidden";
-            }
-
-            // Show success notification when first subtitle loads
-            if (loadedCount === 1) {
-              const englishLabel = subtitles.find(s => s.lang === "en" || s.label.toLowerCase().includes("english"))?.label;
-              if (englishLabel) {
-                toast.success(`Subtitles loaded: ${englishLabel}`, { duration: 2000 });
+            // Add all cues to the track
+            console.log(`Adding ${cues.length} cues for ${sub.label}`);
+            for (const cue of cues) {
+              try {
+                const vttCue = new VTTCue(cue.start, cue.end, cue.text);
+                track.addCue(vttCue);
+              } catch (e) {
+                console.warn(`Failed to add cue:`, e);
               }
             }
-          })
-          .catch(err => {
-            // Silent fail - don't spam console for subtitles that can't be loaded
-            console.warn(`Could not load subtitle: ${sub.label}`);
-          });
-      });
+
+            // Track references for enabling
+            if (index === 0) firstTrack = track;
+            if (sub.lang === "en" || sub.label.toLowerCase().includes("english")) {
+              englishTrack = track;
+            }
+
+            loadedCount++;
+            console.log(`Successfully loaded ${sub.label} with ${cues.length} cues`);
+
+          } catch (err) {
+            console.warn(`Could not load subtitle: ${sub.label}`, err);
+          }
+        }
+
+        // After all subtitles are loaded, enable the appropriate track
+        // Use setTimeout to ensure cues are fully processed
+        setTimeout(() => {
+          const trackToEnable = englishTrack || firstTrack;
+          if (trackToEnable && subtitlesEnabled) {
+            // Disable all tracks first
+            for (let i = 0; i < video.textTracks.length; i++) {
+              video.textTracks[i].mode = "disabled";
+            }
+            // Enable the selected track
+            trackToEnable.mode = "showing";
+            // Find the index of the enabled track
+            const enabledIndex = subtitles.findIndex(s =>
+              s.lang === trackToEnable.language || s.label === trackToEnable.label
+            );
+            setCurrentSubtitle(enabledIndex >= 0 ? enabledIndex : 0);
+            console.log(`Enabled subtitle track: ${trackToEnable.label} (${trackToEnable.cues?.length || 0} cues)`);
+            toast.success(`Subtitles loaded: ${trackToEnable.label}`, { duration: 2000 });
+          }
+        }, 100);
+      };
+
+      loadSubtitles();
     } else {
       setSubtitleTracks([]);
     }
@@ -1512,6 +1558,64 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
                         {showSubtitleSettings ? "Hide" : "Customize"}
                       </button>
                     </div>
+
+                    {/* Subtitle Language Selector */}
+                    {subtitleTracks.length > 0 && (
+                      <div className="mb-2">
+                        <p className="text-xs text-muted-foreground mb-1">Language</p>
+                        <div className="max-h-32 overflow-y-auto">
+                          <button
+                            onClick={() => {
+                              const video = videoRef.current;
+                              if (!video) return;
+                              // Disable all tracks
+                              for (let i = 0; i < video.textTracks.length; i++) {
+                                video.textTracks[i].mode = "disabled";
+                              }
+                              setSubtitlesEnabled(false);
+                              setCurrentSubtitle(-1);
+                            }}
+                            className={cn(
+                              "w-full flex items-center justify-between px-3 py-2 rounded hover:bg-white/10 transition-colors text-sm",
+                              !subtitlesEnabled && "bg-white/10"
+                            )}
+                          >
+                            <span>Off</span>
+                            {!subtitlesEnabled && <div className="w-2 h-2 bg-primary rounded-full" />}
+                          </button>
+                          {subtitleTracks.map((track, idx) => (
+                            <button
+                              key={`${track.lang}-${idx}`}
+                              onClick={() => {
+                                const video = videoRef.current;
+                                if (!video) return;
+                                // Disable all tracks
+                                for (let i = 0; i < video.textTracks.length; i++) {
+                                  video.textTracks[i].mode = "disabled";
+                                }
+                                // Find and enable the selected track
+                                for (let i = 0; i < video.textTracks.length; i++) {
+                                  const tt = video.textTracks[i];
+                                  if ((tt.language === track.lang || tt.label === track.label) && tt.kind === "captions") {
+                                    tt.mode = "showing";
+                                    setCurrentSubtitle(idx);
+                                    setSubtitlesEnabled(true);
+                                    break;
+                                  }
+                                }
+                              }}
+                              className={cn(
+                                "w-full flex items-center justify-between px-3 py-2 rounded hover:bg-white/10 transition-colors text-sm",
+                                subtitlesEnabled && currentSubtitle === idx && "bg-white/10"
+                              )}
+                            >
+                              <span>{track.label}</span>
+                              {subtitlesEnabled && currentSubtitle === idx && <div className="w-2 h-2 bg-primary rounded-full" />}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {showSubtitleSettings && (
                       <div className="space-y-3 mt-2">
