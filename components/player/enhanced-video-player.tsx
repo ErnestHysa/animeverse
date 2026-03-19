@@ -1411,7 +1411,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
           </div>
 
           {/* Right Controls */}
-          <div className="flex items-center gap-0.5 sm:gap-1 lg:gap-2">
+          <div className="flex items-center gap-0 sm:gap-0.5 lg:gap-2">
             {/* Language Selector (Sub/Dub) */}
             {allLanguages && allLanguages.length > 0 && (
               <LanguageSelector
@@ -1472,15 +1472,17 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
               </div>
             )}
 
-            {/* Download Button - now supports HLS downloads */}
+            {/* Download Button - hidden on smaller screens to prioritize fullscreen */}
             {source.type === "direct" && animeId && episodeNumber && animeTitle && (
-              <DownloadButton
-                animeId={animeId}
-                animeTitle={animeTitle}
-                episodeNumber={episodeNumber}
-                videoUrl={source.url}
-                thumbnailUrl={poster}
-              />
+              <div className="hidden md:block">
+                <DownloadButton
+                  animeId={animeId}
+                  animeTitle={animeTitle}
+                  episodeNumber={episodeNumber}
+                  videoUrl={source.url}
+                  thumbnailUrl={poster}
+                />
+              </div>
             )}
 
             {/* Settings */}
@@ -1492,10 +1494,10 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
                   setShowQualitySelector(false);
                   setShowSpeedSelector(false);
                 }}
-                className="p-2 sm:p-2 hover:bg-white/10 rounded-full transition-colors min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0"
+                className="p-1.5 sm:p-2 hover:bg-white/10 rounded-full transition-colors min-w-[36px] min-h-[36px] sm:min-w-0 sm:min-h-0"
                 aria-label="Settings"
               >
-                <Settings className="w-5 h-5" />
+                <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
 
               {/* Settings Dropdown - Fixed positioning to avoid overflow clipping */}
@@ -1737,33 +1739,33 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
             <button
               onClick={toggleTheaterMode}
               className={cn(
-                "p-1.5 sm:p-2 hover:bg-white/10 rounded-full transition-colors min-w-[40px] min-h-[40px] sm:min-w-0 sm:min-h-0",
+                "p-1 sm:p-1.5 hover:bg-white/10 rounded-full transition-colors min-w-[32px] min-h-[32px] sm:min-w-0 sm:min-h-0",
                 isTheaterMode && "bg-white/10"
               )}
               aria-label={isTheaterMode ? "Exit theater mode" : "Theater mode"}
               title={isTheaterMode ? "Exit theater mode" : "Theater mode"}
             >
-              <Monitor className="w-4 h-4 sm:w-5 sm:h-5" />
+              <Monitor className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>
 
             {/* PIP */}
             <button
               onClick={togglePip}
-              className="p-1.5 sm:p-2 hover:bg-white/10 rounded-full transition-colors min-w-[40px] min-h-[40px] sm:min-w-0 sm:min-h-0"
+              className="p-1 sm:p-1.5 hover:bg-white/10 rounded-full transition-colors min-w-[32px] min-h-[32px] sm:min-w-0 sm:min-h-0"
               aria-label="Picture-in-Picture"
               title="Picture-in-Picture"
             >
-              <Copy className="w-4 h-4 sm:w-5 sm:h-5" />
+              <Copy className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>
 
             {/* Fullscreen */}
             <button
               onClick={toggleFullscreen}
-              className="p-1.5 sm:p-2 hover:bg-white/10 rounded-full transition-colors min-w-[40px] min-h-[40px] sm:min-w-0 sm:min-h-0"
+              className="p-1 sm:p-1.5 hover:bg-white/10 rounded-full transition-colors min-w-[32px] min-h-[32px] sm:min-w-0 sm:min-h-0"
               aria-label={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
               title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
             >
-              {isFullscreen ? <Minimize className="w-4 h-4 sm:w-5 sm:h-5" /> : <Maximize className="w-4 h-4 sm:w-5 sm:h-5" />}
+              {isFullscreen ? <Minimize className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Maximize className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
             </button>
           </div>
         </div>

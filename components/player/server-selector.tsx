@@ -79,7 +79,7 @@ export function ServerSelector({
         ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg transition-colors text-sm",
+          "flex items-center gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 bg-white/5 hover:bg-white/10 rounded-lg transition-colors text-sm",
           isLoading && "opacity-50 cursor-not-allowed"
         )}
         disabled={isLoading}
@@ -89,7 +89,7 @@ export function ServerSelector({
       >
         <Server className="w-4 h-4" aria-hidden="true" />
         <span className="hidden sm:inline">{currentInfo.name}</span>
-        <span className="text-muted-foreground">({currentInfo.quality})</span>
+        <span className="text-muted-foreground hidden xs:inline">({currentInfo.quality})</span>
         <ChevronDown className={cn(
           "w-4 h-4 transition-transform",
           isOpen && "rotate-180"
@@ -217,13 +217,13 @@ export function LanguageSelector({
       <button
         ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg transition-colors text-sm"
+        className="flex items-center gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 bg-white/5 hover:bg-white/10 rounded-lg transition-colors text-sm"
         aria-label="Select language"
         aria-expanded={isOpen}
         aria-haspopup="listbox"
       >
         <Globe className="w-4 h-4" aria-hidden="true" />
-        <span className="hidden sm:inline">{currentLang?.label || "Sub"}</span>
+        <span className="hidden xs:inline">{currentLang?.label || "Sub"}</span>
         <ChevronDown className={cn(
           "w-4 h-4 transition-transform",
           isOpen && "rotate-180"
