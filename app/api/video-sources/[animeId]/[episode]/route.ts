@@ -1,6 +1,6 @@
 /**
  * Video Sources API Route
- * Fetches video sources from multiple providers
+ * Fetches video sources from the local Consumet API (AnimeKai provider)
  * Proxies requests to avoid CORS issues
  */
 
@@ -9,89 +9,193 @@ import { NextRequest, NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Multiple providers for fallback
-const PROVIDERS = {
-  consumet: {
-    baseUrl: "https://api.consumet.org/anime",
-  },
-  gogoanime: {
-    baseUrl: "https://api.consumet.org/anime/gogoanime",
-  },
-  zoro: {
-    baseUrl: "https://api.consumet.org/anime/zoro",
-  },
-};
+// Get API base URL from environment or use localhost
+const API_BASE_URL = process.env.VIDEO_API_BASE_URL || "http://localhost:3001";
 
-interface ConsumetEpisodeSource {
-  url: string;
-  quality: string;
-  isM3U8?: boolean;
-  size?: number;
+interface AnimeKaiEpisode {
+  id: string;
+  number: number;
+  title?: string;
 }
 
-interface ConsumetSourcesResponse {
+interface AnimeKaiInfo {
+  id: string;
+  title: string;
+  episodes?: AnimeKaiEpisode[];
+}
+
+interface AnimeKaiSourcesResponse {
   headers?: {
     Referer?: string;
   };
-  sources?: ConsumetEpisodeSource[];
+  sources?: Array<{
+    url: string;
+    isM3U8?: boolean;
+    quality?: string;
+  }>;
+  subtitles?: Array<{
+    url: string;
+    lang: string;
+    kind: string;
+  }>;
 }
 
 /**
- * Search for anime ID on Gogoanime
- * Supports both sub and dub versions
+ * Search for anime on AnimeKai by title
+ * Returns the anime ID if found
+ * AnimeKai indexes by English titles, so we need to try various strategies
  */
 async function searchAnimeId(
-  animeId: number,
   title: string,
-  language: "sub" | "dub" = "sub"
+  malId: number | null
 ): Promise<string | null> {
+  // Build search strategies - prioritize English-style titles
+  const searchStrategies: string[] = [];
+
+  // Strategy 1: Direct title (should be English if passed correctly)
+  if (title) {
+    // Keep most characters, only remove very special ones
+    const cleanTitle = title.toLowerCase().trim();
+    searchStrategies.push(cleanTitle);
+  }
+
+  // Strategy 2: Extract key words and try combinations
+  if (title) {
+    const words = title.split(" ").filter(w => w.length > 3);
+    // Try first 2 significant words
+    if (words.length >= 2) {
+      searchStrategies.push(`${words[0]} ${words[1]}`.toLowerCase());
+    }
+    // Try first 3 significant words
+    if (words.length >= 3) {
+      searchStrategies.push(`${words[0]} ${words[1]} ${words[2]}`.toLowerCase());
+    }
+  }
+
+  // Strategy 3: Remove common prefixes/suffixes and search
+  if (title) {
+    const cleanMainTitle = title
+      .toLowerCase()
+      .replace(/^(the|a|an)\s+/i, "")
+      .replace(/:\s*.*$/, "") // Remove subtitles
+      .replace(/[^\w\s]/g, "")
+      .trim();
+    if (cleanMainTitle && cleanMainTitle.length > 3) {
+      searchStrategies.push(cleanMainTitle);
+    }
+  }
+
+  // Strategy 4: First word only (if distinctive)
+  if (title) {
+    const firstWord = title.split(" ")[0];
+    if (firstWord.length > 4) {
+      searchStrategies.push(firstWord.toLowerCase());
+    }
+  }
+
+  // Remove duplicates while preserving order
+  const uniqueStrategies = [...new Set(searchStrategies)];
+
+  // Try each search strategy
+  for (const searchTerm of uniqueStrategies) {
+    try {
+      const searchUrl = `${API_BASE_URL}/anime/animekai/${encodeURIComponent(searchTerm)}`;
+      const response = await fetch(searchUrl, {
+        signal: AbortSignal.timeout(10000),
+      });
+
+      if (!response.ok) continue;
+
+      const data = await response.json();
+
+      if (data.results && data.results.length > 0) {
+        // Try to find the best match
+        const searchTermLower = searchTerm.toLowerCase();
+
+        // Look for exact or close title match
+        let bestMatch = data.results.find((r: any) => {
+          const titleLower = (r.title || "").toLowerCase();
+          return titleLower.includes(searchTermLower) ||
+                 searchTermLower.includes(titleLower.split(" ")[0]);
+        });
+
+        // Fallback to first result
+        if (!bestMatch) {
+          bestMatch = data.results[0];
+        }
+
+        console.log(`[AnimeKai Search] Found "${bestMatch.title}" for search "${searchTerm}"`);
+        return bestMatch.id;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  // Strategy 5: Fallback - try using MAL ID via Jikan API to get better title matching
+  if (malId) {
+    try {
+      console.log(`[AnimeKai Search] Trying Jikan API for MAL ID ${malId}`);
+      const jikanUrl = `https://api.jikan.moe/v4/anime/${malId}`;
+      const jikanResponse = await fetch(jikanUrl, {
+        signal: AbortSignal.timeout(10000),
+      });
+
+      if (jikanResponse.ok) {
+        const jikanData = await jikanResponse.json();
+        const jikanTitle = jikanData.data?.title;
+        const jikanTitles = jikanData.data?.titles || [];
+
+        // Try with Jikan's main title
+        if (jikanTitle) {
+          for (const titleData of jikanTitles) {
+            const searchTerm = titleData.title?.toLowerCase().replace(/[^\w\s]/g, " ").trim();
+            if (searchTerm && searchTerm.length > 3) {
+              const searchUrl = `${API_BASE_URL}/anime/animekai/${encodeURIComponent(searchTerm)}`;
+              const response = await fetch(searchUrl, { signal: AbortSignal.timeout(5000) });
+              if (response.ok) {
+                const data = await response.json();
+                if (data.results && data.results.length > 0) {
+                  console.log(`[AnimeKai Search] Found via Jikan: "${data.results[0].title}"`);
+                  return data.results[0].id;
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch {
+      console.log(`[AnimeKai Search] Jikan API fallback failed`);
+    }
+  }
+
+  console.log(`[AnimeKai Search] No results found for "${title}" (tried ${uniqueStrategies.length} strategies)`);
+  return null;
+}
+
+/**
+ * Get anime info including episode list
+ */
+async function getAnimeInfo(animeId: string): Promise<AnimeKaiInfo | null> {
   try {
-    const searchTitle = title.split(" ")[0];
-    const searchUrl = `${PROVIDERS.gogoanime.baseUrl}/${encodeURIComponent(searchTitle)}?limit=20`;
-    const response = await fetch(searchUrl, {
+    const url = `${API_BASE_URL}/anime/animekai/info?id=${encodeURIComponent(animeId)}`;
+    const response = await fetch(url, {
       signal: AbortSignal.timeout(10000),
     });
 
     if (!response.ok) return null;
 
-    const data = await response.json();
-    if (!data.results || data.results.length === 0) return null;
-
-    // Interface for Gogoanime search results
-    interface GogoAnimeResult {
-      id: string;
-      title?: string;
-      otherName?: string;
-    }
-
-    if (language === "dub") {
-      // Look for a result with "dub" in the title or ID
-      const dubResult = data.results.find(
-        (r: GogoAnimeResult) =>
-          r.id?.toLowerCase().includes("dub") ||
-          r.title?.toLowerCase().includes("dub") ||
-          r.otherName?.toLowerCase().includes("dub")
-      );
-      return dubResult?.id || data.results[0]?.id;
-    }
-
-    // For sub, prefer non-dub versions
-    const subResult = data.results.find(
-      (r: GogoAnimeResult) => !r.id?.toLowerCase().includes("dub")
-    );
-    return subResult?.id || data.results[0]?.id;
+    return await response.json();
   } catch {
     return null;
   }
 }
 
 /**
- * Get episode sources from Gogoanime via Consumet
- * Supports both sub and dub versions
+ * Get episode sources from AnimeKai
  */
-async function getGogoanimeSources(
-  animeId: string,
-  episodeNumber: number,
+async function getEpisodeSources(
+  episodeId: string,
   language: "sub" | "dub" = "sub"
 ): Promise<{
   sources: Array<{
@@ -101,94 +205,48 @@ async function getGogoanimeSources(
     provider: string;
     type: "mp4" | "hls" | "webm";
   }>;
-  referer?: string;
-} | null> {
-  try {
-    // For dub, try to find the dubbed version ID
-    let effectiveAnimeId = animeId;
-
-    if (language === "dub") {
-      // Try common dub ID patterns
-      const dubPatterns = [
-        `${animeId}-dub`,
-        `${animeId}dub`,
-        animeId.replace(/-anime$/, "-dub-anime"),
-      ];
-
-      // Search for the dub version if the direct pattern doesn't work
-      // We'll try the first pattern and fall back if it fails
-      effectiveAnimeId = dubPatterns[0];
-    }
-
-    const episodeId = `${effectiveAnimeId}-episode-${episodeNumber}`;
-    const url = `${PROVIDERS.gogoanime.baseUrl}/watch/${encodeURIComponent(episodeId)}`;
-
-    const response = await fetch(url, {
-      signal: AbortSignal.timeout(15000),
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-      },
-    });
-
-    if (!response.ok) return null;
-
-    const data: ConsumetSourcesResponse = await response.json();
-
-    if (!data.sources || data.sources.length === 0) return null;
-
-    return {
-      sources: data.sources.map((s) => ({
-        url: s.url,
-        quality: mapQuality(s.quality),
-        label: s.quality || "Auto",
-        provider: `Gogoanime (${language.toUpperCase()})`,
-        type: (s.isM3U8 ? "hls" : "mp4") as "mp4" | "hls" | "webm",
-      })),
-      referer: data.headers?.Referer,
-    };
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Get episode sources from Zoro via Consumet
- */
-async function getZoroSources(animeId: string, episodeNumber: number): Promise<{
-  sources: Array<{
+  subtitles: Array<{
     url: string;
-    quality: "360p" | "480p" | "720p" | "1080p" | "auto";
+    lang: string;
     label: string;
-    provider: string;
-    type: "mp4" | "hls" | "webm";
   }>;
   referer?: string;
 } | null> {
   try {
-    const episodeId = `${animeId}$${episodeNumber}`;
-    const url = `${PROVIDERS.zoro.baseUrl}/watch/${encodeURIComponent(episodeId)}`;
+    const dubParam = language === "dub" ? "?dub=true" : "";
+    const url = `${API_BASE_URL}/anime/animekai/watch/${encodeURIComponent(episodeId)}${dubParam}`;
 
     const response = await fetch(url, {
       signal: AbortSignal.timeout(15000),
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-      },
     });
 
     if (!response.ok) return null;
 
-    const data: ConsumetSourcesResponse = await response.json();
+    const data: AnimeKaiSourcesResponse = await response.json();
 
     if (!data.sources || data.sources.length === 0) return null;
 
+    // Map sources to our format
+    const sources = data.sources.map((s) => ({
+      url: s.url,
+      quality: mapQuality(s.quality),
+      label: s.quality || "Auto",
+      provider: `AnimeKai (${language.toUpperCase()})`,
+      type: (s.isM3U8 ? "hls" : "mp4") as "mp4" | "hls" | "webm",
+    }));
+
+    // Map subtitles
+    const subtitles = (data.subtitles || [])
+      .filter((sub) => sub.kind === "captions")
+      .map((sub) => ({
+        url: sub.url,
+        lang: sub.lang.split(" ")[0].toLowerCase(), // Take first part of language
+        label: sub.lang,
+      }));
+
     return {
-      sources: data.sources.map((s) => ({
-        url: s.url,
-        quality: mapQuality(s.quality),
-        label: s.quality || "Auto",
-        provider: "Zoro",
-        type: (s.isM3U8 ? "hls" : "mp4") as "mp4" | "hls" | "webm",
-      })),
+      sources,
+      subtitles,
       referer: data.headers?.Referer,
     };
   } catch {
@@ -215,6 +273,7 @@ function mapQuality(quality: string | undefined): "360p" | "480p" | "720p" | "10
  * Returns video sources for the requested episode
  * Query params:
  * - title: Anime title for searching
+ * - malId: MyAnimeList ID for better matching
  * - language: "sub" or "dub" (default: "sub")
  */
 export async function GET(
@@ -235,6 +294,7 @@ export async function GET(
     // Get query params
     const searchParams = request.nextUrl.searchParams;
     const title = searchParams.get("title");
+    const malId = searchParams.get("malId");
     const language = (searchParams.get("language") || "sub") as "sub" | "dub";
 
     let sources: Array<{
@@ -253,53 +313,73 @@ export async function GET(
 
     const subtitles: SubtitleTrack[] = [];
     let provider = "none";
+    let referer: string | undefined;
+
     const availableLanguages: Array<{ type: "sub" | "dub"; available: boolean }> = [
       { type: "sub", available: true },
       { type: "dub", available: false },
     ];
 
-    // Try Gogoanime first (most reliable)
+    // Search for the anime on AnimeKai
     if (title) {
-      const gogoId = await searchAnimeId(parseInt(animeId), title, language);
-      if (gogoId) {
-        const gogoResult = await getGogoanimeSources(gogoId, episodeNumber, language);
-        if (gogoResult && gogoResult.sources && gogoResult.sources.length > 0) {
-          sources = gogoResult.sources;
-          provider = `gogoanime-${language}`;
+      const animeKaiId = await searchAnimeId(
+        title,
+        malId ? parseInt(malId) : null
+      );
 
-          // Check if dub is available by trying to search for it
-          if (language === "sub") {
-            const dubId = await searchAnimeId(parseInt(animeId), title, "dub");
-            if (dubId && dubId !== gogoId) {
-              availableLanguages.find((l) => l.type === "dub")!.available = true;
+      if (animeKaiId) {
+        // Get anime info to find the episode ID
+        const animeInfo = await getAnimeInfo(animeKaiId);
+
+        if (animeInfo?.episodes) {
+          const episodeData = animeInfo.episodes.find(
+            (ep) => ep.number === episodeNumber
+          );
+
+          if (episodeData) {
+            // Get sources for this episode
+            const sourcesData = await getEpisodeSources(
+              episodeData.id,
+              language
+            );
+
+            if (sourcesData && sourcesData.sources.length > 0) {
+              sources = sourcesData.sources;
+              subtitles.push(...sourcesData.subtitles);
+              referer = sourcesData.referer;
+              provider = `animekai-${language}`;
+
+              // Check if dub is available
+              if (language === "sub") {
+                // Try to get dub sources to check availability
+                const dubSources = await getEpisodeSources(episodeData.id, "dub");
+                availableLanguages.find((l) => l.type === "dub")!.available =
+                  !!dubSources && dubSources.sources.length > 0;
+              }
             }
           }
         }
       }
     }
 
-    // Fallback to Zoro for the requested language
-    if (sources.length === 0 && title) {
-      const zoroResult = await getZoroSources(
-        title.toLowerCase().replace(/[^a-z0-9]/g, "-"),
-        episodeNumber
-      );
-      if (zoroResult && zoroResult.sources && zoroResult.sources.length > 0) {
-        sources = zoroResult.sources;
-        provider = "zoro";
-      }
-    }
-
-    // Return demo sources if nothing found
+    // Return error if no sources found
     if (sources.length === 0) {
-      sources = [{
-        url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-        quality: "auto" as const,
-        label: "Demo (No Source)",
-        provider: "Fallback",
-        type: "mp4" as const,
-      }];
-      provider = "demo";
+      return NextResponse.json(
+        {
+          animeId: parseInt(animeId),
+          episodeNumber,
+          sources: [],
+          subtitles,
+          provider: "none",
+          language,
+          availableLanguages,
+          intro: null,
+          outro: null,
+          error: "NO_SOURCES",
+          message: `No video sources found for episode ${episodeNumber}. The anime might not be available on AnimeKai.`,
+        },
+        { status: 404 }
+      );
     }
 
     return NextResponse.json({
@@ -312,21 +392,20 @@ export async function GET(
       availableLanguages,
       intro: null,
       outro: null,
+      referer,
     });
   } catch (error) {
     console.error("Error fetching video sources:", error);
 
     // Return fallback on error
-    return NextResponse.json({
-      sources: [{
-        url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-        quality: "auto" as const,
-        label: "Demo (Error)",
-        provider: "Fallback",
-        type: "mp4" as const,
-      }],
-      provider: "fallback",
-      error: "Failed to load video sources",
-    }, { status: 200 });
+    return NextResponse.json(
+      {
+        sources: [],
+        provider: "none",
+        error: "FETCH_ERROR",
+        message: "Failed to load video sources. The API might be unavailable.",
+      },
+      { status: 503 }
+    );
   }
 }

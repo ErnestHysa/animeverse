@@ -102,6 +102,8 @@ export function EnhancedVideoPlayer({
 }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const settingsButtonRef = useRef<HTMLButtonElement>(null);
+  const settingsDropdownRef = useRef<HTMLDivElement>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   // State
@@ -136,6 +138,7 @@ export function EnhancedVideoPlayer({
   const [showSubtitleSettings, setShowSubtitleSettings] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [currentQuality, setCurrentQuality] = useState<string>("auto");
+  const [settingsPosition, setSettingsPosition] = useState<'top' | 'bottom'>('top');
 
   // Subtitle customization
   const [subtitleSize, setSubtitleSize] = useState<number>(() => {
@@ -575,6 +578,31 @@ export function EnhancedVideoPlayer({
       video.playbackRate = playbackRate;
     }
   }, [playbackRate]);
+
+  // Calculate settings dropdown position
+  useEffect(() => {
+    if (!showSettings) return;
+
+    const calculatePosition = () => {
+      const button = settingsButtonRef.current;
+      if (!button) return 'top';
+
+      const buttonRect = button.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+
+      // Estimate dropdown height (expanded subtitle settings can be tall)
+      const estimatedHeight = showSubtitleSettings ? 500 : 300;
+
+      // Check if there's enough space above the button
+      const spaceAbove = buttonRect.top;
+      const spaceBelow = viewportHeight - buttonRect.bottom;
+
+      // Position above if there's space, otherwise position below
+      return spaceAbove >= estimatedHeight ? 'top' : 'bottom';
+    };
+
+    setSettingsPosition(calculatePosition());
+  }, [showSettings, showSubtitleSettings]);
 
   // ===================================
   // Helper Functions
@@ -1043,6 +1071,7 @@ export function EnhancedVideoPlayer({
             {/* Settings */}
             <div className="relative">
               <button
+                ref={settingsButtonRef}
                 onClick={() => {
                   setShowSettings(!showSettings);
                   setShowQualitySelector(false);
@@ -1056,7 +1085,16 @@ export function EnhancedVideoPlayer({
 
               {/* Settings Dropdown */}
               {showSettings && (
-                <div className="absolute bottom-full right-0 mb-2 bg-[#1a1a1a] border border-white/10 rounded-lg overflow-hidden min-w-[200px] z-30">
+                <div
+                  ref={settingsDropdownRef}
+                  className={cn(
+                    "settings-dropdown absolute bg-[#1a1a1a] border border-white/10 rounded-lg overflow-hidden min-w-[200px] max-h-[60vh] overflow-y-auto z-30 shadow-xl",
+                    settingsPosition === 'top' ? 'bottom-full right-0 mb-2' : 'top-full right-0 mt-2'
+                  )}
+                  style={{
+                    maxHeight: settingsPosition === 'top' ? 'min(calc(100vh - 80px), 600px)' : 'min(calc(100vh - 150px), 600px)',
+                  }}
+                >
                   {/* Quality Selector */}
                   <div className="p-2 border-b border-white/10">
                     <p className="text-xs text-muted-foreground mb-2">Quality</p>

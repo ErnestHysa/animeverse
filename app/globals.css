@@ -199,6 +199,24 @@ p {
   background: hsl(var(--primary));
 }
 
+/* Settings dropdown scrollbar (thinner) */
+.settings-dropdown::-webkit-scrollbar {
+  width: 6px;
+}
+
+.settings-dropdown::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.settings-dropdown::-webkit-scrollbar-thumb {
+  background: hsl(var(--primary) / 0.3);
+  border-radius: var(--radius-full);
+}
+
+.settings-dropdown::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--primary) / 0.6);
+}
+
 /* ===================================
    Selection
    =================================== */
