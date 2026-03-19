@@ -53,6 +53,8 @@ async function getAnimeData(id: string) {
 
 async function VideoSection({ anime, episodeNum }: { anime: any; episodeNum: number }) {
   const title = getAnimeTitle(anime);
+  // Use English title for video API since AnimeKai indexes by English titles
+  const englishTitle = anime.title?.english || anime.title?.romaji || title;
   const totalEpisodes = anime.episodes || 12;
   const hasNext = episodeNum < totalEpisodes;
   const hasPrev = episodeNum > 1;
@@ -76,7 +78,8 @@ async function VideoSection({ anime, episodeNum }: { anime: any; episodeNum: num
       <VideoSourceLoader
         animeId={anime.id}
         episodeNumber={episodeNum}
-        animeTitle={title}
+        animeTitle={englishTitle}
+        malId={anime.idMal || null}
         poster={anime.coverImage?.extraLarge || undefined}
         nextEpisodeUrl={hasNext ? `/watch/${anime.id}/${episodeNum + 1}` : undefined}
       />

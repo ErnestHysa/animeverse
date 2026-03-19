@@ -17,6 +17,7 @@ interface VideoSourceLoaderProps {
   animeId: number;
   episodeNumber: number;
   animeTitle?: string;
+  malId?: number | null;
   poster?: string;
   nextEpisodeUrl?: string;
   onError?: (error: Error) => void;
@@ -34,6 +35,7 @@ export function VideoSourceLoader({
   animeId,
   episodeNumber,
   animeTitle,
+  malId,
   poster,
   nextEpisodeUrl,
   onError,
@@ -79,18 +81,30 @@ export function VideoSourceLoader({
       if (animeTitle) {
         url.searchParams.set("title", animeTitle);
       }
+      if (malId) {
+        url.searchParams.set("malId", malId.toString());
+      }
       url.searchParams.set("language", language);
 
       const response = await fetch(url.toString());
 
       if (!response.ok) {
+        if (response.status === 503) {
+          // API unavailable error
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(
+            errorData.message || "The video source API is currently unavailable. Please try again later."
+          );
+        }
         throw new Error(`Failed to fetch sources: ${response.statusText}`);
       }
 
       const data = await response.json();
 
-      if (!data.sources || data.sources.length === 0) {
-        throw new Error("No video sources found");
+      // Check for API unavailable error
+      if (data.error === "API_UNAVAILABLE" || (!data.sources || data.sources.length === 0)) {
+        const errorMessage = data.message || "No video sources found. The video API may be unavailable.";
+        throw new Error(errorMessage);
       }
 
       // Update available languages based on API response
@@ -154,7 +168,7 @@ export function VideoSourceLoader({
     } finally {
       setLoading(false);
     }
-  }, [animeId, episodeNumber, animeTitle, onError]);
+  }, [animeId, episodeNumber, animeTitle, malId, onError]);
 
   // Initial fetch and re-fetch when language changes
   useEffect(() => {
@@ -224,14 +238,25 @@ export function VideoSourceLoader({
 
   // Error state
   if (error || !sources) {
+    const isApiUnavailable = error?.includes("API") || error?.includes("unavailable") || error?.includes("Consumet");
+
     return (
       <GlassCard className="aspect-video flex items-center justify-center">
         <div className="text-center max-w-md px-6">
           <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
             <AlertCircle className="w-8 h-8 text-red-500" />
           </div>
-          <h3 className="text-lg font-semibold mb-2">Failed to Load Video</h3>
-          <p className="text-muted-foreground mb-6">{error || "No video sources available"}</p>
+          <h3 className="text-lg font-semibold mb-2">
+            {isApiUnavailable ? "Video Source API Unavailable" : "Failed to Load Video"}
+          </h3>
+          <p className="text-muted-foreground mb-4 text-sm">
+            {error || "No video sources available"}
+          </p>
+          {isApiUnavailable && (
+            <p className="text-xs text-muted-foreground mb-6">
+              The public video API is currently down. This is a known issue.
+            </p>
+          )}
           <Button
             onClick={() => fetchSources(currentLanguage)}
             variant="default"
