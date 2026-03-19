@@ -1313,9 +1313,9 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
         </div>
 
         {/* Controls Row */}
-        <div className="flex items-center justify-between gap-2 sm:gap-4">
+        <div className="flex items-center justify-between gap-1 sm:gap-2 lg:gap-4">
           {/* Left Controls */}
-          <div className="flex items-center gap-1 sm:gap-2">
+          <div className="flex items-center gap-0.5 sm:gap-1">
             {/* Play/Pause */}
             <button
               onClick={togglePlay}
@@ -1402,8 +1402,8 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
               )}
             </div>
 
-            {/* Time Display */}
-            <div className="text-sm font-medium">
+            {/* Time Display - hidden on very small screens */}
+            <div className="text-sm font-medium hidden xs:block">
               <span>{formatTime(currentTime)}</span>
               <span className="mx-1">/</span>
               <span>{formatTime(duration)}</span>
@@ -1411,7 +1411,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
           </div>
 
           {/* Right Controls */}
-          <div className="flex items-center gap-1 sm:gap-2">
+          <div className="flex items-center gap-0.5 sm:gap-1 lg:gap-2">
             {/* Language Selector (Sub/Dub) */}
             {allLanguages && allLanguages.length > 0 && (
               <LanguageSelector
@@ -1439,8 +1439,9 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
               />
             )}
 
-            {/* Watch Party */}
-            <WatchPartyControls
+            {/* Watch Party - hidden on smaller screens to save space */}
+            <div className="hidden lg:block">
+              <WatchPartyControls
               animeId={animeId || 0}
               episodeNumber={episodeNumber || 0}
               onSync={(time, playing) => {
@@ -1456,6 +1457,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
               currentTime={currentTime}
               isPlaying={isPlaying}
             />
+            </div>
 
             {/* P2P Stats (for WebTorrent) */}
             {source.type !== "direct" && (
@@ -1731,11 +1733,11 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
                 )}
             </div>
 
-            {/* Theater Mode */}
+            {/* Theater Mode - now visible on all screens */}
             <button
               onClick={toggleTheaterMode}
               className={cn(
-                "p-1.5 sm:p-2 hover:bg-white/10 rounded-full transition-colors hidden sm:block min-w-[40px] min-h-[40px] sm:min-w-0 sm:min-h-0",
+                "p-1.5 sm:p-2 hover:bg-white/10 rounded-full transition-colors min-w-[40px] min-h-[40px] sm:min-w-0 sm:min-h-0",
                 isTheaterMode && "bg-white/10"
               )}
               aria-label={isTheaterMode ? "Exit theater mode" : "Theater mode"}
