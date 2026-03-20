@@ -100,6 +100,18 @@ export default function RootLayout({
               document.addEventListener('DOMContentLoaded', () => {
                 document.body.classList.add('loaded');
               });
+
+              // Global unhandled promise rejection handler
+              window.addEventListener('unhandledrejection', (event) => {
+                console.error('Unhandled promise rejection:', event.reason);
+                // Prevent default browser error logging in production
+                event.preventDefault();
+              });
+
+              // Global error handler
+              window.addEventListener('error', (event) => {
+                console.error('Global error:', event.error);
+              });
             `,
           }}
         />

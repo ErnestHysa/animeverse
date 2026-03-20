@@ -219,17 +219,31 @@ export const useStore = create<StoreState>()(
       name: "animeverse-stream-storage",
       storage: createJSONStorage(() => ({
         getItem: (name) => {
-          if (typeof window === "undefined") return null;
-          const item = localStorage.getItem(name);
-          return item ? JSON.parse(item) : null;
+          try {
+            if (typeof window === "undefined") return null;
+            const item = localStorage.getItem(name);
+            return item ? JSON.parse(item) : null;
+          } catch (error) {
+            console.warn(`Failed to get ${name} from localStorage:`, error);
+            return null;
+          }
         },
         setItem: (name, value) => {
-          if (typeof window === "undefined") return;
-          localStorage.setItem(name, JSON.stringify(value));
+          try {
+            if (typeof window === "undefined") return;
+            localStorage.setItem(name, JSON.stringify(value));
+          } catch (error) {
+            console.warn(`Failed to set ${name} in localStorage:`, error);
+            // Silently fail - app will work without persistence
+          }
         },
         removeItem: (name) => {
-          if (typeof window === "undefined") return;
-          localStorage.removeItem(name);
+          try {
+            if (typeof window === "undefined") return;
+            localStorage.removeItem(name);
+          } catch (error) {
+            console.warn(`Failed to remove ${name} from localStorage:`, error);
+          }
         },
       })),
       // Only persist certain fields

@@ -293,7 +293,7 @@ async function RecommendedSection({ animeId }: { animeId: number }) {
 export default async function WatchPage({ params }: PageProps) {
   const { animeId, episode } = await params;
   const anime = await getAnimeData(animeId);
-  const episodeNum = parseInt(episode);
+  const episodeNum = parseInt(episode, 10);
 
   if (!anime) {
     return (
@@ -315,7 +315,8 @@ export default async function WatchPage({ params }: PageProps) {
 
   const totalEpisodes = anime.episodes || 12;
 
-  if (episodeNum < 1 || episodeNum > totalEpisodes) {
+  // Validate episode number is a valid integer
+  if (isNaN(episodeNum) || episodeNum < 1 || episodeNum > totalEpisodes) {
     return (
       <>
         <Header />

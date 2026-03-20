@@ -1270,6 +1270,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
             <button
               onClick={cancelAutoplay}
               className="mt-4 px-6 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
+              aria-label="Cancel autoplay"
             >
               Cancel
             </button>
@@ -1314,6 +1315,28 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
           <div
             className="relative h-1.5 sm:h-2 bg-white/20 rounded-full cursor-pointer group/progress active:h-2 sm:active:h-3 transition-all"
             onClick={handleProgressClick}
+            role="slider"
+            aria-label="Video progress"
+            aria-valuemin={0}
+            aria-valuemax={Math.round(duration || 0)}
+            aria-valuenow={Math.round(currentTime)}
+            aria-valuetext={`${formatTime(currentTime)} of ${formatTime(duration || 0)}`}
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowLeft') {
+                const video = videoRef.current;
+                if (video) {
+                  video.currentTime = Math.max(0, video.currentTime - 5);
+                  e.preventDefault();
+                }
+              } else if (e.key === 'ArrowRight') {
+                const video = videoRef.current;
+                if (video) {
+                  video.currentTime = Math.min(duration || 0, video.currentTime + 5);
+                  e.preventDefault();
+                }
+              }
+            }}
           >
             <div className="absolute top-0 left-0 h-full bg-white/30 rounded-full" style={{ width: `${bufferProgress}%` }} />
             <div className="absolute top-0 left-0 h-full bg-primary rounded-full transition-all" style={{ width: `${progress}%` }} />
@@ -1380,6 +1403,10 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
                 onChange={(e) => setVolume(parseFloat(e.target.value))}
                 className="w-0 group-hover/volume:w-20 transition-all duration-200 accent-primary"
                 aria-label="Volume"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round((isMuted ? 0 : volume) * 100)}
+                aria-valuetext={`${Math.round((isMuted ? 0 : volume) * 100)}%`}
               />
             </div>
 
@@ -1409,6 +1436,10 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
                     }}
                     className="w-32 accent-primary"
                     aria-label="Volume"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={Math.round((isMuted ? 0 : volume) * 100)}
+                    aria-valuetext={`${Math.round((isMuted ? 0 : volume) * 100)}%`}
                   />
                   <p className="text-center text-xs mt-1">{Math.round((isMuted ? 0 : volume) * 100)}%</p>
                 </div>

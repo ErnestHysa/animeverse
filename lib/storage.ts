@@ -1,0 +1,100 @@
+/**
+ * Safe Local Storage Utilities
+ * Handles localStorage errors gracefully for private mode, quota exceeded, etc.
+ */
+
+type StorageResult<T> = {
+  success: boolean;
+  data?: T;
+  error?: string;
+};
+
+/**
+ * Safely get item from localStorage
+ */
+export function safeGetItem<T = string>(key: string): StorageResult<T> {
+  try {
+    if (typeof window === 'undefined') {
+      return { success: false, error: 'Window not defined' };
+    }
+
+    const item = localStorage.getItem(key);
+    if (item === null) {
+      return { success: false, error: 'Item not found' };
+    }
+
+    try {
+      const parsed = JSON.parse(item) as T;
+      return { success: true, data: parsed };
+    } catch {
+      // Return as string if JSON parse fails
+      return { success: true, data: item as T };
+    }
+  } catch (error) {
+    // Private mode, quota exceeded, or other error
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Safely set item in localStorage
+ */
+export function safeSetItem<T>(key: string, value: T): StorageResult<void> {
+  try {
+    if (typeof window === 'undefined') {
+      return { success: false, error: 'Window not defined' };
+    }
+
+    const serialized = JSON.stringify(value);
+    localStorage.setItem(key, serialized);
+    return { success: true };
+  } catch (error) {
+    // Quota exceeded or other error
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Safely remove item from localStorage
+ */
+export function safeRemoveItem(key: string): StorageResult<void> {
+  try {
+    if (typeof window === 'undefined') {
+      return { success: false, error: 'Window not defined' };
+    }
+
+    localStorage.removeItem(key);
+    return { success: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Check if localStorage is available
+ */
+export function isStorageAvailable(): boolean {
+  try {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    const testKey = '__storage_test__';
+    localStorage.setItem(testKey, 'test');
+    localStorage.removeItem(testKey);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Get item with fallback
+ */
+export function getItemWithFallback<T>(key: string, fallback: T): T {
+  const result = safeGetItem<T>(key);
+  return result.success ? (result.data ?? fallback) : fallback;
+}
