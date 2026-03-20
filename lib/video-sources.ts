@@ -152,42 +152,6 @@ export async function saveIntroOutro(
   }
 }
 
-/**
- * Search for anime on external sources
- * In production, integrate with multiple providers
- */
-export async function searchExternalSources(query: string): Promise<any[]> {
-  // Placeholder for external source search
-  // Would integrate with:
-  // - TMDB API
-  // - Anilist API (already integrated)
-  // - Kitsu API
-
-  return [];
-}
-
-/**
- * Get all episodes for an anime with metadata
- */
-export async function getAnimeEpisodes(animeId: number): Promise<{
-  episodes: Array<{
-    number: number;
-    title?: string;
-    airedAt?: string;
-    thumbnail?: string;
-    filler: boolean;
-  }>;
-}> {
-  // In production, fetch from actual source
-  // For now, generate placeholder data
-  return {
-    episodes: Array.from({ length: 12 }, (_, i) => ({
-      number: i + 1,
-      title: `Episode ${i + 1}`,
-      filler: false,
-    })),
-  };
-}
 
 /**
  * Report a broken video
