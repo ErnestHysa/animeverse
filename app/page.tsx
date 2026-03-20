@@ -9,11 +9,11 @@ import { AnimeGrid } from "@/components/anime/anime-grid";
 import { ContinueWatching } from "@/components/continue-watching";
 import { AIRecommendationsSection } from "@/components/recommendations/ai-recommendations-section";
 import { GlassCard } from "@/components/ui/glass-card";
+import { ImageWithFallback } from "@/components/ui/image-with-fallback";
 import { anilist } from "@/lib/anilist";
 import { Button } from "@/components/ui/button";
 import { Play, TrendingUp, Star, Clock, Eye } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
 import { Suspense } from "react";
 import type { Media } from "@/types/anilist";
 import {
@@ -106,7 +106,7 @@ async function HeroSection({ anime }: { anime: Media[] }) {
       {/* Background Image */}
       {cover && (
         <div className="absolute inset-0">
-          <Image
+          <ImageWithFallback
             src={cover}
             alt={title}
             fill
@@ -284,7 +284,7 @@ async function LatestEpisodesSection({ airingSchedules }: { airingSchedules: Air
               <GlassCard className="overflow-hidden">
                 <div className="flex gap-3 p-3">
                   <div className="relative w-20 h-28 flex-shrink-0 rounded-lg overflow-hidden bg-muted">
-                    <Image
+                    <ImageWithFallback
                       src={cover}
                       alt={title}
                       fill

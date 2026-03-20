@@ -11,11 +11,11 @@ import { Button } from "@/components/ui/button";
 import { ShareButton } from "@/components/player/share-dialog";
 import { ReportButton } from "@/components/player/report-dialog";
 import { KeyboardShortcutsButton } from "@/components/player/keyboard-shortcuts";
+import { ImageWithFallback } from "@/components/ui/image-with-fallback";
 import { anilist, getAnimeTitle } from "@/lib/anilist";
 import { sanitizeDescription } from "@/lib/html-sanitizer";
 import { Play, ChevronLeft, ChevronRight, Heart, Clock } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
 import { Suspense } from "react";
 import { VideoPlayerSkeleton, EpisodeListSkeleton, AnimeGridSkeleton } from "@/components/ui/skeleton";
 
@@ -200,7 +200,7 @@ async function AnimeInfo({ anime }: { anime: any }) {
     <GlassCard className="p-4">
       <Link href={`/anime/${anime.id}`} className="flex gap-4 group">
         <div className="relative w-20 h-28 flex-shrink-0 rounded-lg overflow-hidden bg-muted">
-          <Image
+          <ImageWithFallback
             src={anime.coverImage?.large || ""}
             alt={title}
             fill
@@ -268,7 +268,7 @@ async function RecommendedSection({ animeId }: { animeId: number }) {
             className="group"
           >
             <div className="relative aspect-[3/4] rounded-lg overflow-hidden bg-muted mb-2">
-              <Image
+              <ImageWithFallback
                 src={rec.coverImage?.large || ""}
                 alt={rec.title?.romaji || rec.title?.english || "Unknown"}
                 fill

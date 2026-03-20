@@ -139,6 +139,9 @@ export function EpisodeThumbnails({ duration, videoRef, thumbnails }: EpisodeThu
             src={thumbnail}
             alt="Thumbnail preview"
             className="w-40 h-auto block"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+            }}
           />
           <div className="px-2 py-1 bg-black/80 text-xs text-white text-center">
             {formatTime(hoverTime)}

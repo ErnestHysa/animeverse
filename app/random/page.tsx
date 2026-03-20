@@ -12,8 +12,8 @@ import { Shuffle, Zap, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AnimeCard } from "@/components/anime/anime-card";
 import { GlassCard } from "@/components/ui/glass-card";
+import { ImageWithFallback } from "@/components/ui/image-with-fallback";
 import Link from "next/link";
-import Image from "next/image";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import type { Media } from "@/types/anilist";
@@ -177,7 +177,7 @@ export default function RandomPage() {
           <GlassCard className="mb-8 overflow-hidden">
             <div className="relative h-[400px] md:h-[500px]">
               {cover && (
-                <Image
+                <ImageWithFallback
                   src={cover}
                   alt={title}
                   fill

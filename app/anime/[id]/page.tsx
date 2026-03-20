@@ -9,11 +9,11 @@ import { AnimeCardCompact } from "@/components/anime/anime-card";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
 import { EpisodeGridSkeleton, AnimeDetailHeroSkeleton, AnimeDetailInfoSkeleton, CompactCardSkeleton, AnimeGridSkeleton } from "@/components/ui/skeleton";
+import { ImageWithFallback } from "@/components/ui/image-with-fallback";
 import { anilist, getAnimeTitle, getAnimeCover, getNextAiringTime } from "@/lib/anilist";
 import { sanitizeDescription } from "@/lib/html-sanitizer";
 import { Play, Star, Clock, Calendar, Tv, ExternalLink } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
 import { Suspense } from "react";
 import { AnimeActions } from "@/components/anime/anime-actions";
 import { CommentsSection } from "@/components/comments/comments-section";
@@ -63,7 +63,7 @@ async function HeroSection({ anime }: { anime: Media }) {
       {/* Banner */}
       {banner && (
         <div className="relative h-[40vh] min-h-[300px]">
-          <Image
+          <ImageWithFallback
             src={banner}
             alt={title}
             fill
@@ -82,7 +82,7 @@ async function HeroSection({ anime }: { anime: Media }) {
             {/* Cover Image */}
             <div className="flex-shrink-0">
               <div className="relative w-48 md:w-64 aspect-[3/4] rounded-xl overflow-hidden shadow-2xl">
-                <Image
+                <ImageWithFallback
                   src={cover}
                   alt={title}
                   fill
@@ -243,7 +243,7 @@ async function InfoSection({ anime }: { anime: Media }) {
                   >
                     {/* Episode thumbnail - prefer banner, fallback to cover large, or use gradient background */}
                     {(anime.bannerImage || anime.coverImage?.large) ? (
-                      <Image
+                      <ImageWithFallback
                         src={anime.bannerImage || anime.coverImage!.large!}
                         alt={`Episode ${epNum}`}
                         fill
@@ -274,7 +274,7 @@ async function InfoSection({ anime }: { anime: Media }) {
               {anime.characters.edges.map((edge) => (
                 <div key={edge.node.id} className="text-center">
                   <div className="relative aspect-square rounded-lg overflow-hidden bg-muted mb-2">
-                    <Image
+                    <ImageWithFallback
                       src={edge.node.image.large}
                       alt={edge.node.name.full}
                       fill
