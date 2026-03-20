@@ -1332,7 +1332,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
             {/* Play/Pause */}
             <button
               onClick={togglePlay}
-              className="p-1.5 sm:p-2 hover:bg-white/10 rounded-full transition-colors min-w-[40px] min-h-[40px] sm:min-w-0 sm:min-h-0"
+              className="p-2.5 hover:bg-white/10 rounded-full transition-colors min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 sm:p-2"
               aria-label={isPlaying ? "Pause" : "Play"}
             >
               {isPlaying ? <Pause className="w-4 h-4 sm:w-5 sm:h-5" /> : <Play className="w-4 h-4 sm:w-5 sm:h-5 ml-0.5" />}
@@ -1342,7 +1342,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
             {showSkipIntro && (
               <button
                 onClick={skipIntro}
-                className="px-3 py-2 bg-primary/80 hover:bg-primary text-white rounded-full transition-colors text-sm font-medium flex items-center gap-1"
+                className="px-4 py-3 sm:px-3 sm:py-2 bg-primary/80 hover:bg-primary text-white rounded-full transition-colors text-sm font-medium flex items-center gap-1 min-h-[44px] sm:min-h-0"
                 aria-label="Skip intro"
                 title="Skip Intro"
               >
@@ -1353,7 +1353,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
             {showSkipOutro && (
               <button
                 onClick={skipOutro}
-                className="px-3 py-2 bg-primary/80 hover:bg-primary text-white rounded-full transition-colors text-sm font-medium flex items-center gap-1"
+                className="px-4 py-3 sm:px-3 sm:py-2 bg-primary/80 hover:bg-primary text-white rounded-full transition-colors text-sm font-medium flex items-center gap-1 min-h-[44px] sm:min-h-0"
                 aria-label="Skip outro"
                 title="Skip Outro"
               >
@@ -1366,7 +1366,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
             <div className="hidden sm:flex items-center gap-1 group/volume">
               <button
                 onClick={toggleMute}
-                className="p-1.5 sm:p-2 hover:bg-white/10 rounded-full transition-colors"
+                className="p-2.5 hover:bg-white/10 rounded-full transition-colors min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 sm:p-2"
                 aria-label={isMuted ? "Unmute" : "Mute"}
               >
                 {isMuted || volume === 0 ? <VolumeX className="w-4 h-4 sm:w-5 sm:h-5" /> : <Volume2 className="w-4 h-4 sm:w-5 sm:h-5" />}
@@ -1507,7 +1507,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
                   setShowQualitySelector(false);
                   setShowSpeedSelector(false);
                 }}
-                className="p-1.5 sm:p-2 hover:bg-white/10 rounded-full transition-colors min-w-[36px] min-h-[36px] sm:min-w-0 sm:min-h-0"
+                className="p-2.5 hover:bg-white/10 rounded-full transition-colors min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 sm:p-2"
                 aria-label="Settings"
               >
                 <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -1764,7 +1764,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
             {/* PIP */}
             <button
               onClick={togglePip}
-              className="p-1 sm:p-1.5 hover:bg-white/10 rounded-full transition-colors min-w-[32px] min-h-[32px] sm:min-w-0 sm:min-h-0"
+              className="p-2.5 hover:bg-white/10 rounded-full transition-colors min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 sm:p-1.5"
               aria-label="Picture-in-Picture"
               title="Picture-in-Picture"
             >
@@ -1774,7 +1774,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
             {/* Fullscreen */}
             <button
               onClick={toggleFullscreen}
-              className="p-1 sm:p-1.5 hover:bg-white/10 rounded-full transition-colors min-w-[32px] min-h-[32px] sm:min-w-0 sm:min-h-0"
+              className="p-2.5 hover:bg-white/10 rounded-full transition-colors min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 sm:p-1.5"
               aria-label={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
               title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
             >
