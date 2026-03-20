@@ -17,6 +17,7 @@ import { Play, ChevronLeft, ChevronRight, Heart, Clock } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { Suspense } from "react";
+import { VideoPlayerSkeleton, EpisodeListSkeleton, AnimeGridSkeleton } from "@/components/ui/skeleton";
 
 // ===================================
 // Link Button Wrappers
@@ -340,22 +341,22 @@ export default async function WatchPage({ params }: PageProps) {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Main Content */}
             <div className="lg:col-span-2 space-y-6">
-              <Suspense fallback={<div className="aspect-video bg-muted rounded-xl animate-pulse" />}>
+              <Suspense fallback={<VideoPlayerSkeleton />}>
                 <VideoSection anime={anime} episodeNum={episodeNum} />
               </Suspense>
 
-              <Suspense fallback={<div className="h-64 bg-muted rounded-xl animate-pulse" />}>
+              <Suspense fallback={<AnimeGridSkeleton count={8} />}>
                 <RecommendedSection animeId={anime.id} />
               </Suspense>
             </div>
 
             {/* Sidebar */}
             <div className="space-y-6">
-              <Suspense fallback={<div className="h-64 bg-muted rounded-xl animate-pulse" />}>
+              <Suspense fallback={<EpisodeListSkeleton />}>
                 <EpisodesList anime={anime} currentEpisode={episodeNum} />
               </Suspense>
 
-              <Suspense fallback={<div className="h-48 bg-muted rounded-xl animate-pulse" />}>
+              <Suspense fallback={<div className="rounded-xl p-4 bg-muted/30 animate-pulse h-48" />}>
                 <AnimeInfo anime={anime} />
               </Suspense>
             </div>

@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, memo, useMemo } from "react";
 import { Filter, X, ChevronDown, ChevronUp } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
@@ -48,10 +48,44 @@ interface AnimeFiltersProps {
   query: string;
 }
 
-export function AnimeFilters({ currentFilters, query }: AnimeFiltersProps) {
+// Memoized filter button to prevent unnecessary re-renders
+const FilterButton = memo(function FilterButton({
+  value,
+  isActive,
+  onClick,
+  children,
+  className = "",
+}: {
+  value: string;
+  isActive: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-3 py-1 rounded-full text-sm transition-colors ${className} ${
+        isActive
+          ? "bg-primary text-primary-foreground"
+          : "bg-white/5 hover:bg-white/10"
+      }`}
+    >
+      {children}
+    </button>
+  );
+});
+
+export const AnimeFilters = memo(function AnimeFilters({ currentFilters, query }: AnimeFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isExpanded, setIsExpanded] = useState(false);
+
+  // Memoize hasActiveFilters to prevent recalculation
+  const hasActiveFilters = useMemo(
+    () => Object.values(currentFilters).some(Boolean),
+    [currentFilters]
+  );
 
   const updateFilter = useCallback((key: keyof FilterOptions, value: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -60,7 +94,7 @@ export function AnimeFilters({ currentFilters, query }: AnimeFiltersProps) {
     } else {
       params.delete(key);
     }
-    router.push(`/?${params.toString()}`);
+    router.push(`/search?${params.toString()}`);
   }, [router, searchParams]);
 
   const clearAllFilters = useCallback(() => {
@@ -68,8 +102,6 @@ export function AnimeFilters({ currentFilters, query }: AnimeFiltersProps) {
     if (query) params.set("q", query);
     router.push(`/search?${params.toString()}`);
   }, [router, query]);
-
-  const hasActiveFilters = Object.values(currentFilters).some(Boolean);
 
   return (
     <GlassCard className="mb-6">
@@ -115,28 +147,22 @@ export function AnimeFilters({ currentFilters, query }: AnimeFiltersProps) {
           <div>
             <label className="text-sm font-medium mb-2 block">Genre</label>
             <div className="flex flex-wrap gap-2">
-              <button
+              <FilterButton
+                value=""
+                isActive={!currentFilters.genre}
                 onClick={() => updateFilter("genre", "")}
-                className={`px-3 py-1 rounded-full text-sm transition-colors ${
-                  !currentFilters.genre
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-white/5 hover:bg-white/10"
-                }`}
               >
                 All
-              </button>
+              </FilterButton>
               {GENRES.map((genre) => (
-                <button
+                <FilterButton
                   key={genre}
+                  value={genre}
+                  isActive={currentFilters.genre === genre}
                   onClick={() => updateFilter("genre", genre)}
-                  className={`px-3 py-1 rounded-full text-sm transition-colors ${
-                    currentFilters.genre === genre
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-white/5 hover:bg-white/10"
-                  }`}
                 >
                   {genre}
-                </button>
+                </FilterButton>
               ))}
             </div>
           </div>
@@ -145,28 +171,22 @@ export function AnimeFilters({ currentFilters, query }: AnimeFiltersProps) {
           <div>
             <label className="text-sm font-medium mb-2 block">Format</label>
             <div className="flex flex-wrap gap-2">
-              <button
+              <FilterButton
+                value=""
+                isActive={!currentFilters.format}
                 onClick={() => updateFilter("format", "")}
-                className={`px-3 py-1 rounded-full text-sm transition-colors ${
-                  !currentFilters.format
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-white/5 hover:bg-white/10"
-                }`}
               >
                 All
-              </button>
+              </FilterButton>
               {FORMATS.map((format) => (
-                <button
+                <FilterButton
                   key={format}
+                  value={format}
+                  isActive={currentFilters.format === format}
                   onClick={() => updateFilter("format", format)}
-                  className={`px-3 py-1 rounded-full text-sm transition-colors ${
-                    currentFilters.format === format
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-white/5 hover:bg-white/10"
-                  }`}
                 >
                   {format.replace("_", " ")}
-                </button>
+                </FilterButton>
               ))}
             </div>
           </div>
@@ -175,28 +195,22 @@ export function AnimeFilters({ currentFilters, query }: AnimeFiltersProps) {
           <div>
             <label className="text-sm font-medium mb-2 block">Status</label>
             <div className="flex flex-wrap gap-2">
-              <button
+              <FilterButton
+                value=""
+                isActive={!currentFilters.status}
                 onClick={() => updateFilter("status", "")}
-                className={`px-3 py-1 rounded-full text-sm transition-colors ${
-                  !currentFilters.status
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-white/5 hover:bg-white/10"
-                }`}
               >
                 All
-              </button>
+              </FilterButton>
               {STATUSES.map((status) => (
-                <button
+                <FilterButton
                   key={status}
+                  value={status}
+                  isActive={currentFilters.status === status}
                   onClick={() => updateFilter("status", status)}
-                  className={`px-3 py-1 rounded-full text-sm transition-colors ${
-                    currentFilters.status === status
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-white/5 hover:bg-white/10"
-                  }`}
                 >
                   {status.toLowerCase().replace("_", " ")}
-                </button>
+                </FilterButton>
               ))}
             </div>
           </div>
@@ -235,4 +249,4 @@ export function AnimeFilters({ currentFilters, query }: AnimeFiltersProps) {
       )}
     </GlassCard>
   );
-}
+});

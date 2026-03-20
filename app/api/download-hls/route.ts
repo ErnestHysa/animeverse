@@ -188,7 +188,9 @@ export async function GET(request: NextRequest) {
     const archiveFinished = new Promise<void>((resolve, reject) => {
       archive.on('end', () => resolve());
       archive.on('error', (err: Error) => reject(err));
-      archive.on('warning', (err: Error) => console.warn('Archive warning:', err));
+      archive.on('warning', (err: Error) => {
+        // Silently handle archive warnings
+      });
     });
 
     // Add video file (concatenated segments)
@@ -199,7 +201,7 @@ export async function GET(request: NextRequest) {
         const buffer = await streamToBuffer(segmentStream);
         videoBuffers.push(buffer);
       } catch (error) {
-        console.warn(`Failed to fetch video segment:`, error);
+        // Silently skip failed segments
       }
     }
 
@@ -218,7 +220,7 @@ export async function GET(request: NextRequest) {
           const buffer = await streamToBuffer(segmentStream);
           subBuffers.push(buffer);
         } catch (error) {
-          console.warn(`Failed to fetch subtitle segment (${lang}):`, error);
+          // Silently skip failed subtitle segments
         }
       }
 

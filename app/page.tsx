@@ -16,6 +16,12 @@ import Link from "next/link";
 import Image from "next/image";
 import { Suspense } from "react";
 import type { Media } from "@/types/anilist";
+import {
+  HeroSkeleton,
+  AnimeGridSkeleton,
+  ContinueWatchingSkeleton,
+  LatestEpisodesSkeleton,
+} from "@/components/ui/skeleton";
 
 interface AiringSchedule {
   id: number;
@@ -318,20 +324,22 @@ export default async function HomePage() {
       <main className="min-h-screen">
         <div className="container mx-auto px-4 pt-24 pb-12">
           {/* Hero Section */}
-          <Suspense fallback={<div className="h-[50vh] bg-muted rounded-xl animate-pulse" />}>
+          <Suspense fallback={<HeroSkeleton />}>
             <HeroSection anime={trendingAnime} />
           </Suspense>
 
           {/* Continue Watching - Client Component */}
-          <ContinueWatching />
+          <Suspense fallback={<ContinueWatchingSkeleton />}>
+            <ContinueWatching />
+          </Suspense>
 
           {/* Latest Episodes - Recently Updated */}
-          <Suspense fallback={<div className="h-64 bg-muted rounded-xl animate-pulse" />}>
+          <Suspense fallback={<LatestEpisodesSkeleton />}>
             <LatestEpisodesSection airingSchedules={airingAnime} />
           </Suspense>
 
           {/* AI Recommendations - Personalized Picks */}
-          <Suspense fallback={<div className="h-64 bg-muted rounded-xl animate-pulse" />}>
+          <Suspense fallback={<AnimeGridSkeleton count={6} />}>
             <AIRecommendationsSectionWrapper
               allAnime={[...trendingAnime, ...popularAnime, ...seasonalAnime]}
             />

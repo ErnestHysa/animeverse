@@ -10,6 +10,7 @@ import { AnimeFilters } from "@/components/search/anime-filters";
 import { anilist } from "@/lib/anilist";
 import { Search } from "lucide-react";
 import { Suspense } from "react";
+import { AnimeGridSkeleton, SearchResultsSkeleton } from "@/components/ui/skeleton";
 
 // ===================================
 // Data Fetching
@@ -57,9 +58,6 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const params = await searchParams;
   const query = params.q || "";
 
-  // Fetch anime with the awaited params
-  const anime = await searchAnime(params);
-
   return (
     <>
       <Header />
@@ -73,10 +71,8 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
                 {query ? `Search: "${query}"` : "Search Anime"}
               </h1>
               <p className="text-muted-foreground">
-                {query && anime.length > 0
-                  ? `Found ${anime.length} results`
-                  : query
-                  ? "No results found - try adjusting your filters"
+                {query
+                  ? "Search results"
                   : "Enter a search term to find anime"}
               </p>
             </div>
@@ -97,22 +93,42 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
           )}
 
           {/* Anime Grid */}
-          {query ? (
-            <AnimeGrid anime={anime} />
-          ) : (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
-                <Search className="w-8 h-8 text-muted-foreground" />
-              </div>
-              <h3 className="text-lg font-medium mb-2">Search for Anime</h3>
-              <p className="text-muted-foreground max-w-sm">
-                Use the search bar in the header to find your favorite anime.
-              </p>
-            </div>
-          )}
+          <Suspense fallback={<AnimeGridSkeleton count={24} />}>
+            <SearchResults query={query} params={params} />
+          </Suspense>
         </div>
       </main>
       <Footer />
+    </>
+  );
+}
+
+// Separate component for search results with Suspense
+async function SearchResults({ query, params }: { query: string; params: SearchPageProps["searchParams"] }) {
+  const anime = await searchAnime(params);
+
+  if (!query) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+          <Search className="w-8 h-8 text-muted-foreground" />
+        </div>
+        <h3 className="text-lg font-medium mb-2">Search for Anime</h3>
+        <p className="text-muted-foreground max-w-sm">
+          Use the search bar in the header to find your favorite anime.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="mb-4 text-muted-foreground">
+        {anime.length > 0
+          ? `Found ${anime.length} results`
+          : "No results found - try adjusting your filters"}
+      </div>
+      <AnimeGrid anime={anime} />
     </>
   );
 }

@@ -133,9 +133,8 @@
   box-sizing: border-box;
 }
 
-html {
-  scroll-behavior: smooth;
-}
+/* Remove scroll-behavior: smooth to avoid Playwright warnings.
+   The app handles scrolling programmatically where needed. */
 
 body {
   background: hsl(var(--background));

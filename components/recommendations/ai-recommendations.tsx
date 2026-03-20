@@ -5,10 +5,11 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, memo } from "react";
 import { AnimeCard } from "@/components/anime/anime-card";
 import { GlassCard } from "@/components/ui/glass-card";
-import { Zap, TrendingUp, Heart } from "lucide-react";
+import { SectionErrorFallback } from "@/components/error/error-fallback";
+import { Zap, TrendingUp, Heart, AlertCircle } from "lucide-react";
 import type { Media } from "@/types/anilist";
 import type { WatchHistoryItem } from "@/types/anilist";
 
@@ -38,9 +39,11 @@ export function AIRecommendations({
 }: AIRecommendationsProps) {
   const [recommendations, setRecommendations] = useState<RecommendationResult[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function loadRecommendations() {
+  const loadRecommendations = useCallback(async () => {
+    try {
+      setError(null);
       setLoading(true);
 
       // Simulate AI processing
@@ -198,11 +201,17 @@ export function AIRecommendations({
       );
 
       setRecommendations(uniqueRecommendations);
+    } catch (err) {
+      console.error("Error loading recommendations:", err);
+      setError("Failed to load recommendations");
+    } finally {
       setLoading(false);
     }
-
-    loadRecommendations();
   }, [allAnime, watchHistory, favorites, basedOnAnime, limit]);
+
+  useEffect(() => {
+    loadRecommendations();
+  }, [loadRecommendations]);
 
   if (loading) {
     return (
@@ -219,6 +228,14 @@ export function AIRecommendations({
           ))}
         </div>
       </GlassCard>
+    );
+  }
+
+  if (error) {
+    return (
+      <SectionErrorFallback
+        title="Recommendations unavailable"
+      />
     );
   }
 

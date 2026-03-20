@@ -124,7 +124,6 @@ async function searchAnimeId(
           bestMatch = data.results[0];
         }
 
-        console.log(`[AnimeKai Search] Found "${bestMatch.title}" for search "${searchTerm}"`);
         return bestMatch.id;
       }
     } catch {
@@ -135,7 +134,6 @@ async function searchAnimeId(
   // Strategy 5: Fallback - try using MAL ID via Jikan API to get better title matching
   if (malId) {
     try {
-      console.log(`[AnimeKai Search] Trying Jikan API for MAL ID ${malId}`);
       const jikanUrl = `https://api.jikan.moe/v4/anime/${malId}`;
       const jikanResponse = await fetch(jikanUrl, {
         signal: AbortSignal.timeout(10000),
@@ -156,7 +154,6 @@ async function searchAnimeId(
               if (response.ok) {
                 const data = await response.json();
                 if (data.results && data.results.length > 0) {
-                  console.log(`[AnimeKai Search] Found via Jikan: "${data.results[0].title}"`);
                   return data.results[0].id;
                 }
               }
@@ -165,11 +162,10 @@ async function searchAnimeId(
         }
       }
     } catch {
-      console.log(`[AnimeKai Search] Jikan API fallback failed`);
+      // Silently skip Jikan fallback failures
     }
   }
 
-  console.log(`[AnimeKai Search] No results found for "${title}" (tried ${uniqueStrategies.length} strategies)`);
   return null;
 }
 

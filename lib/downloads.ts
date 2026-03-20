@@ -83,12 +83,8 @@ class DownloadManager {
       for (const id of staleIds) {
         await this.deleteDownload(id);
       }
-
-      if (staleIds.length > 0) {
-        console.log(`Cleaned up ${staleIds.length} stale downloads`);
-      }
     } catch (error) {
-      console.error("Failed to cleanup stale downloads:", error);
+      // Silently handle cleanup errors
     }
   }
 

@@ -8,7 +8,7 @@ import { Footer } from "@/components/layout/footer";
 import { AnimeCardCompact } from "@/components/anime/anime-card";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
-import { EpisodeGridSkeleton } from "@/components/ui/skeleton";
+import { EpisodeGridSkeleton, AnimeDetailHeroSkeleton, AnimeDetailInfoSkeleton, CompactCardSkeleton, AnimeGridSkeleton } from "@/components/ui/skeleton";
 import { anilist, getAnimeTitle, getAnimeCover, getNextAiringTime } from "@/lib/anilist";
 import { sanitizeDescription } from "@/lib/html-sanitizer";
 import { Play, Star, Clock, Calendar, Tv, ExternalLink } from "lucide-react";
@@ -506,23 +506,23 @@ export default async function AnimeDetailPage({ params }: PageProps) {
       <Header />
       <main className="min-h-screen">
         {/* Hero Section */}
-        <Suspense fallback={<div className="h-[50vh] animate-pulse bg-muted" />}>
+        <Suspense fallback={<AnimeDetailHeroSkeleton />}>
           <HeroSection anime={anime} />
         </Suspense>
 
         <div className="container mx-auto px-4 pb-12">
           {/* Info Section */}
-          <Suspense fallback={<EpisodeGridSkeleton count={12} />}>
+          <Suspense fallback={<AnimeDetailInfoSkeleton />}>
             <InfoSection anime={anime} />
           </Suspense>
 
           {/* Relations */}
-          <Suspense>
+          <Suspense fallback={<CompactCardSkeleton count={4} />}>
             <RelationsSection anime={anime} />
           </Suspense>
 
           {/* Recommendations */}
-          <Suspense>
+          <Suspense fallback={<AnimeGridSkeleton count={6} />}>
             <RecommendationsSection animeId={anime.id} />
           </Suspense>
 

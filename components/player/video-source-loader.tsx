@@ -185,7 +185,6 @@ export function VideoSourceLoader({
 
       // CRITICAL: Extract and store subtitles
       if (data.subtitles && data.subtitles.length > 0) {
-        console.log("Found subtitles:", data.subtitles);
         setSubtitleTracks(data.subtitles);
       } else {
         setSubtitleTracks([]);
@@ -205,7 +204,6 @@ export function VideoSourceLoader({
       // Retry logic for retryable errors
       if (isRetryable && retryAttempt < MAX_RETRIES) {
         const delay = RETRY_DELAY * Math.pow(2, retryAttempt); // Exponential backoff
-        console.log(`Fetch failed (attempt ${retryAttempt + 1}/${MAX_RETRIES}), retrying in ${delay}ms...`);
         await sleep(delay);
         return fetchSources(language, retryAttempt + 1);
       }

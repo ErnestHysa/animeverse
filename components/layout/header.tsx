@@ -5,10 +5,9 @@
 
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, memo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import {
   Search,
   Heart,
@@ -27,7 +26,38 @@ import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/ui/glass-card";
 import { EpisodeNotifications } from "@/components/notifications/episode-notifications";
 
-export function Header() {
+interface NavLinkProps {
+  href: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}
+
+// Memoized navigation link components (must be defined before Header)
+const NavLink = memo(function NavLink({ href, icon, children }: NavLinkProps) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
+    >
+      {icon}
+      <span>{children}</span>
+    </Link>
+  );
+});
+
+const MobileNavLink = memo(function MobileNavLink({ href, icon, children }: NavLinkProps) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
+    >
+      {icon}
+      <span>{children}</span>
+    </Link>
+  );
+});
+
+export const Header = memo(function Header() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -44,6 +74,18 @@ export function Header() {
     },
     [searchQuery, router]
   );
+
+  const toggleSearch = useCallback(() => {
+    setSearchOpen((prev) => !prev);
+  }, []);
+
+  const toggleMobileMenu = useCallback(() => {
+    setMobileMenuOpen((prev) => !prev);
+  }, []);
+
+  const closeMobileMenu = useCallback(() => {
+    setMobileMenuOpen(false);
+  }, []);
 
   return (
     <>
@@ -92,7 +134,7 @@ export function Header() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setSearchOpen(!searchOpen)}
+                onClick={toggleSearch}
                 aria-label="Search"
               >
                 <Search className="w-5 h-5" />
@@ -127,7 +169,7 @@ export function Header() {
                 variant="ghost"
                 size="icon"
                 className="md:hidden"
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                onClick={toggleMobileMenu}
                 aria-label="Menu"
               >
                 {mobileMenuOpen ? (
@@ -163,7 +205,7 @@ export function Header() {
                 </Button>
                 <button
                   type="button"
-                  onClick={() => setSearchOpen(false)}
+                  onClick={toggleSearch}
                   className="shrink-0 p-3 text-muted-foreground hover:text-foreground transition-colors"
                   aria-label="Close search"
                 >
@@ -180,7 +222,7 @@ export function Header() {
         <div className="fixed inset-0 z-40 md:hidden animate-fadeIn">
           <div
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={() => setMobileMenuOpen(false)}
+            onClick={closeMobileMenu}
           />
           <GlassCard className="absolute top-16 right-4 left-4 p-4 animate-slideDown">
             <nav className="flex flex-col gap-2">
@@ -211,34 +253,4 @@ export function Header() {
       )}
     </>
   );
-}
-
-interface NavLinkProps {
-  href: string;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}
-
-function NavLink({ href, icon, children }: NavLinkProps) {
-  return (
-    <Link
-      href={href}
-      className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
-    >
-      {icon}
-      <span>{children}</span>
-    </Link>
-  );
-}
-
-function MobileNavLink({ href, icon, children }: NavLinkProps) {
-  return (
-    <Link
-      href={href}
-      className="flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
-    >
-      {icon}
-      <span>{children}</span>
-    </Link>
-  );
-}
+});

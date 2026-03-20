@@ -51,7 +51,7 @@ export function DownloadButton({
       const size = await downloadManager.getStorageSize();
       setStorageSize(size);
     } catch (error) {
-      console.error("Failed to load downloads:", error);
+      // Silently handle load errors
     }
   };
 
@@ -115,7 +115,6 @@ export function DownloadButton({
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to download episode");
-      console.error(error);
     } finally {
       setIsDownloading(false);
     }

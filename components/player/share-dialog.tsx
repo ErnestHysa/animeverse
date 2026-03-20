@@ -89,7 +89,7 @@ export function ShareDialog({ isOpen, onClose, title, url, episode }: ShareDialo
         });
         onClose();
       } catch (error) {
-        console.error("Error sharing:", error);
+        // Silently handle share errors - browser may not support sharing
       }
     }
   };

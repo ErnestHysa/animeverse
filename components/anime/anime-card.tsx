@@ -7,7 +7,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { memo } from "react";
+import { memo, useState } from "react";
 import { Star, Play, Clock, Zap } from "lucide-react";
 import type { Media } from "@/types/anilist";
 import { getAnimeTitle, getAnimeCover, formatEpisodeCount, getStarRating } from "@/lib/anilist";
@@ -38,6 +38,8 @@ export const AnimeCard = memo(function AnimeCard({
   const rating = getStarRating(anime.averageScore);
   const episodes = formatEpisodeCount(anime.episodes, anime.status);
   const isAiring = anime.status === "RELEASING";
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   // Check if simulcast (airs within 24 hours of Japan broadcast)
   const isSimulcast = anime.nextAiringEpisode && (
@@ -47,14 +49,37 @@ export const AnimeCard = memo(function AnimeCard({
   return (
     <Link href={`/anime/${anime.id}`} className={cn("group block", className)}>
       <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-muted">
+        {/* Loading skeleton */}
+        {!imageLoaded && !imageError && (
+          <div className="absolute inset-0 bg-muted animate-shimmer" />
+        )}
+
+        {/* Error placeholder */}
+        {imageError && (
+          <div className="absolute inset-0 bg-muted flex items-center justify-center">
+            <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center">
+              <Play className="w-5 h-5 text-muted-foreground" />
+            </div>
+          </div>
+        )}
+
         {/* Cover Image */}
         <Image
           src={cover}
           alt={title}
           fill
           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
-          className="object-cover transition-transform duration-300 group-hover:scale-105"
+          className={cn(
+            "object-cover transition-transform duration-300 group-hover:scale-105",
+            !imageLoaded && "opacity-0"
+          )}
           priority={priority}
+          loading={priority ? undefined : "lazy"}
+          onLoad={() => setImageLoaded(true)}
+          onError={() => {
+            setImageError(true);
+            setImageLoaded(true);
+          }}
         />
 
         {/* Gradient Overlay */}
@@ -144,6 +169,8 @@ export interface AnimeCardCompactProps {
 export const AnimeCardCompact = memo(function AnimeCardCompact({ anime, showNumber = false, number, className }: AnimeCardCompactProps) {
   const title = getAnimeTitle(anime);
   const cover = getAnimeCover(anime);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   return (
     <Link href={`/anime/${anime.id}`} className={cn("flex gap-3 group", className)}>
@@ -156,12 +183,33 @@ export const AnimeCardCompact = memo(function AnimeCardCompact({ anime, showNumb
 
       {/* Cover Image */}
       <div className="relative w-16 h-24 flex-shrink-0 rounded-lg overflow-hidden bg-muted">
+        {/* Loading skeleton */}
+        {!imageLoaded && !imageError && (
+          <div className="absolute inset-0 bg-muted animate-shimmer" />
+        )}
+
+        {/* Error placeholder */}
+        {imageError && (
+          <div className="absolute inset-0 bg-muted flex items-center justify-center">
+            <div className="w-6 h-6 rounded-full bg-white/5" />
+          </div>
+        )}
+
         <Image
           src={cover}
           alt={title}
           fill
           sizes="64px"
-          className="object-cover transition-transform duration-300 group-hover:scale-105"
+          className={cn(
+            "object-cover transition-transform duration-300 group-hover:scale-105",
+            !imageLoaded && "opacity-0"
+          )}
+          loading="lazy"
+          onLoad={() => setImageLoaded(true)}
+          onError={() => {
+            setImageError(true);
+            setImageLoaded(true);
+          }}
         />
       </div>
 

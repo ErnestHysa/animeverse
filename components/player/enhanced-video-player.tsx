@@ -320,7 +320,6 @@ export function EnhancedVideoPlayer({
 
     // Add new subtitle tracks if available
     if (subtitles && subtitles.length > 0) {
-      console.log("Loading subtitles:", subtitles);
       setSubtitleTracks(subtitles);
 
       // Load subtitles sequentially to avoid race conditions
@@ -338,7 +337,7 @@ export function EnhancedVideoPlayer({
 
             const response = await fetch(proxyUrl);
             if (!response.ok) {
-              console.warn(`Failed to fetch subtitle: ${sub.label} (${response.status})`);
+              // Silently skip failed subtitle loads
               continue;
             }
 
@@ -401,13 +400,12 @@ export function EnhancedVideoPlayer({
             }
 
             // Add all cues to the track
-            console.log(`Adding ${cues.length} cues for ${sub.label}`);
             for (const cue of cues) {
               try {
                 const vttCue = new VTTCue(cue.start, cue.end, cue.text);
                 track.addCue(vttCue);
               } catch (e) {
-                console.warn(`Failed to add cue:`, e);
+                // Silently skip invalid cues
               }
             }
 
@@ -418,10 +416,8 @@ export function EnhancedVideoPlayer({
             }
 
             loadedCount++;
-            console.log(`Successfully loaded ${sub.label} with ${cues.length} cues`);
-
           } catch (err) {
-            console.warn(`Could not load subtitle: ${sub.label}`, err);
+            // Silently skip failed subtitle loads
           }
         }
 
@@ -441,7 +437,6 @@ export function EnhancedVideoPlayer({
               s.lang === trackToEnable.language || s.label === trackToEnable.label
             );
             setCurrentSubtitle(enabledIndex >= 0 ? enabledIndex : 0);
-            console.log(`Enabled subtitle track: ${trackToEnable.label} (${trackToEnable.cues?.length || 0} cues)`);
             toast.success(`Subtitles loaded: ${trackToEnable.label}`, { duration: 2000 });
           }
         }, 100);
