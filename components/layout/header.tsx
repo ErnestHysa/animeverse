@@ -114,6 +114,9 @@ export const Header = memo(function Header() {
               <NavLink href="/schedule" icon={<Calendar className="w-4 h-4" />}>
                 Schedule
               </NavLink>
+              <NavLink href="/coming-soon" icon={<Clock className="w-4 h-4" />}>
+                Coming Soon
+              </NavLink>
               <NavLink href="/random" icon={<Shuffle className="w-4 h-4" />}>
                 Random
               </NavLink>
@@ -231,6 +234,9 @@ export const Header = memo(function Header() {
               </MobileNavLink>
               <MobileNavLink href="/schedule" icon={<Calendar className="w-5 h-5" />}>
                 Schedule
+              </MobileNavLink>
+              <MobileNavLink href="/coming-soon" icon={<Clock className="w-5 h-5" />}>
+                Coming Soon
               </MobileNavLink>
               <MobileNavLink href="/random" icon={<Shuffle className="w-5 h-5" />}>
                 Random

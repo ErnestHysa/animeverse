@@ -11,7 +11,7 @@ import { AIRecommendationsSection } from "@/components/recommendations/ai-recomm
 import { GlassCard } from "@/components/ui/glass-card";
 import { anilist } from "@/lib/anilist";
 import { Button } from "@/components/ui/button";
-import { Play, TrendingUp, Star, Clock } from "lucide-react";
+import { Play, TrendingUp, Star, Clock, Eye } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { Suspense } from "react";
@@ -80,6 +80,12 @@ async function getSeasonalAnime() {
 async function getAiringAnime() {
   const result = await anilist.getAiring(1, 12);
   return result.data?.Page.airingSchedules ?? [];
+}
+
+async function getMostViewedAnime() {
+  // Get page 2 of popular to show different anime than All Time Popular
+  const result = await anilist.getPopular(2, 12);
+  return result.data?.Page.media ?? [];
 }
 
 // ===================================
@@ -210,6 +216,24 @@ async function PopularSection({ anime }: { anime: Media[] }) {
   );
 }
 
+async function MostViewedSection({ anime }: { anime: Media[] }) {
+  if (anime.length === 0) return null;
+
+  return (
+    <section className="mb-16">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
+            <Eye className="w-5 h-5 text-purple-500" />
+          </div>
+          <h2 className="text-2xl font-display font-semibold">Most Viewed</h2>
+        </div>
+      </div>
+      <AnimeGrid anime={anime} />
+    </section>
+  );
+}
+
 async function SeasonalSection({ anime }: { anime: Media[] }) {
   if (anime.length === 0) return null;
 
@@ -311,11 +335,12 @@ async function AIRecommendationsSectionWrapper({ allAnime }: { allAnime: Media[]
 // ===================================
 
 export default async function HomePage() {
-  const [trendingAnime, popularAnime, seasonalAnime, airingAnime] = await Promise.all([
+  const [trendingAnime, popularAnime, seasonalAnime, airingAnime, mostViewedAnime] = await Promise.all([
     getTrendingAnime(),
     getPopularAnime(),
     getSeasonalAnime(),
     getAiringAnime(),
+    getMostViewedAnime(),
   ]);
 
   return (
@@ -350,6 +375,9 @@ export default async function HomePage() {
 
           {/* Popular Section */}
           <PopularSection anime={popularAnime} />
+
+          {/* Most Viewed Section */}
+          <MostViewedSection anime={mostViewedAnime} />
 
           {/* Seasonal Section */}
           <SeasonalSection anime={seasonalAnime} />
