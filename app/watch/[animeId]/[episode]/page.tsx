@@ -250,9 +250,9 @@ async function AnimeInfo({ anime }: { anime: Media }) {
 
 async function RecommendedSection({ animeId }: { animeId: number }) {
   const result = await anilist.getRecommendations(animeId);
-  const recommendations = result.data?.Media?.recommendations?.nodes
-    ?.map((n: { mediaRecommendation?: Media }) => n.mediaRecommendation)
-    .filter((media: Media | undefined): media is Media => Boolean(media));
+  const recommendations = (result.data?.Media as { recommendations?: { nodes?: { mediaRecommendation?: Media }[] } } | null)?.recommendations?.nodes
+    ?.map((n) => n.mediaRecommendation)
+    .filter((media): media is Media => Boolean(media));
 
   if (!recommendations || recommendations.length === 0) {
     return null;
@@ -262,7 +262,7 @@ async function RecommendedSection({ animeId }: { animeId: number }) {
     <div className="mt-6">
       <h3 className="font-semibold mb-4">You May Also Like</h3>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-        {recommendations.slice(0, 8).map((rec: Media) => (
+        {recommendations.slice(0, 8).map((rec) => (
           <Link
             key={rec.id}
             href={`/anime/${rec.id}`}

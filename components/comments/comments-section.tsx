@@ -50,7 +50,6 @@ export function CommentsSection({ animeId, animeTitle }: CommentsSectionProps) {
       } catch {
         // Ignore errors
       }
-      setLoading(false);
     };
 
     loadComments();
@@ -95,7 +94,6 @@ export function CommentsSection({ animeId, animeTitle }: CommentsSectionProps) {
     localStorage.setItem(`comments-${animeId}`, JSON.stringify(updatedComments));
     setNewComment("");
     setUserRating(0);
-    setShowReplyForm(false);
     setReplyTo(null);
     toast.success("Comment posted!");
   };
@@ -114,7 +112,6 @@ export function CommentsSection({ animeId, animeTitle }: CommentsSectionProps) {
 
   const handleReply = (commentId: string) => {
     setReplyTo(commentId);
-    setShowReplyForm(true);
   };
 
   const sortedComments = [...comments].sort((a, b) => {
@@ -214,7 +211,6 @@ export function CommentsSection({ animeId, animeTitle }: CommentsSectionProps) {
             <button
               onClick={() => {
                 setReplyTo(null);
-                setShowReplyForm(false);
               }}
               className="text-primary hover:underline"
             >
