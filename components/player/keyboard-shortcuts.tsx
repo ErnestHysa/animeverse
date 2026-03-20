@@ -11,27 +11,28 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
 
 interface ShortcutItem {
+  id: string;
   keys: string[];
   description: string;
   category: string;
 }
 
 const SHORTCUTS: ShortcutItem[] = [
-  { keys: ["Space", "K"], description: "Play / Pause", category: "Playback" },
-  { keys: ["J", "L"], description: "Rewind / Forward 10s", category: "Playback" },
-  { keys: ["←", "→"], description: "Seek -5s / +5s", category: "Playback" },
-  { keys: ["↓", "↑"], description: "Volume -5% / +5%", category: "Audio" },
-  { keys: ["M"], description: "Mute / Unmute", category: "Audio" },
-  { keys: ["F"], description: "Toggle Fullscreen", category: "Display" },
-  { keys: ["T"], description: "Toggle Theater Mode", category: "Display" },
-  { keys: ["P"], description: "Toggle Picture-in-Picture", category: "Display" },
-  { keys: ["C"], description: "Toggle Captions", category: "Display" },
-  { keys: ["N"], description: "Next Episode", category: "Navigation" },
-  { keys: ["1", "2", "3", "4", "5"], description: "Speed (0.5x - 2x)", category: "Playback" },
-  { keys: ["I"], description: "Skip Intro", category: "Navigation" },
-  { keys: ["O"], description: "Skip Outro", category: "Navigation" },
-  { keys: ["ESC"], description: "Exit Fullscreen / Close Modals", category: "General" },
-  { keys: ["?"], description: "Show Keyboard Shortcuts", category: "General" },
+  { id: "play-pause", keys: ["Space", "K"], description: "Play / Pause", category: "Playback" },
+  { id: "seek-jl", keys: ["J", "L"], description: "Rewind / Forward 10s", category: "Playback" },
+  { id: "seek-arrows", keys: ["←", "→"], description: "Seek -5s / +5s", category: "Playback" },
+  { id: "volume-arrows", keys: ["↓", "↑"], description: "Volume -5% / +5%", category: "Audio" },
+  { id: "mute", keys: ["M"], description: "Mute / Unmute", category: "Audio" },
+  { id: "fullscreen", keys: ["F"], description: "Toggle Fullscreen", category: "Display" },
+  { id: "theater", keys: ["T"], description: "Toggle Theater Mode", category: "Display" },
+  { id: "pip", keys: ["P"], description: "Toggle Picture-in-Picture", category: "Display" },
+  { id: "captions", keys: ["C"], description: "Toggle Captions", category: "Display" },
+  { id: "next-episode", keys: ["N"], description: "Next Episode", category: "Navigation" },
+  { id: "speed", keys: ["1", "2", "3", "4", "5"], description: "Speed (0.5x - 2x)", category: "Playback" },
+  { id: "skip-intro", keys: ["I"], description: "Skip Intro", category: "Navigation" },
+  { id: "skip-outro", keys: ["O"], description: "Skip Outro", category: "Navigation" },
+  { id: "escape", keys: ["ESC"], description: "Exit Fullscreen / Close Modals", category: "General" },
+  { id: "help", keys: ["?"], description: "Show Keyboard Shortcuts", category: "General" },
 ];
 
 interface ShortcutsModalProps {
@@ -108,16 +109,16 @@ export function KeyboardShortcutsModal({ isOpen, onClose }: ShortcutsModalProps)
                 {category}
               </h3>
               <div className="space-y-2">
-                {SHORTCUTS.filter(s => s.category === category).map((shortcut, index) => (
+                {SHORTCUTS.filter(s => s.category === category).map((shortcut) => (
                   <div
-                    key={index}
+                    key={shortcut.id}
                     className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
                   >
                     <span className="text-sm">{shortcut.description}</span>
                     <div className="flex gap-1">
-                      {shortcut.keys.map((key, i) => (
+                      {shortcut.keys.map((key) => (
                         <span
-                          key={i}
+                          key={`${shortcut.id}-${key}`}
                           className={`px-2 py-1 rounded text-xs font-mono min-w-[32px] text-center transition-colors ${
                             activeShortcuts.has(key.toUpperCase())
                               ? "bg-primary text-primary-foreground scale-110"
