@@ -17,11 +17,31 @@ import Image from "next/image";
 import { Suspense } from "react";
 import type { Media } from "@/types/anilist";
 
+interface AiringSchedule {
+  id: number;
+  timeUntilAiring: number;
+  episode: number;
+  media: Media;
+}
+
 // Client wrapper for buttons with navigation
-function HeroButton({ href, children, variant = "default", size = "default" }: { href: string; children: React.ReactNode; variant?: string; size?: string }) {
+type ButtonVariant = "default" | "glass" | "outline" | "ghost";
+type ButtonSize = "default" | "sm" | "lg" | "icon";
+
+function HeroButton({
+  href,
+  children,
+  variant = "default",
+  size = "default"
+}: {
+  href: string;
+  children: React.ReactNode;
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+}) {
   return (
     <Link href={href} className="no-underline">
-      <Button variant={variant as any} size={size as any}>
+      <Button variant={variant} size={size}>
         {children}
       </Button>
     </Link>
@@ -200,7 +220,7 @@ async function SeasonalSection({ anime }: { anime: Media[] }) {
   );
 }
 
-async function LatestEpisodesSection({ airingSchedules }: { airingSchedules: any[] }) {
+async function LatestEpisodesSection({ airingSchedules }: { airingSchedules: AiringSchedule[] }) {
   if (airingSchedules.length === 0) return null;
 
   // Group by anime and get latest episode info
@@ -220,7 +240,7 @@ async function LatestEpisodesSection({ airingSchedules }: { airingSchedules: any
         </Link>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {latestEpisodes.map((item: any) => {
+        {latestEpisodes.map((item) => {
           const anime = item.media;
           if (!anime) return null;
 

@@ -9,6 +9,7 @@ import { AnimeCardCompact } from "@/components/anime/anime-card";
 import { anilist } from "@/lib/anilist";
 import { Calendar, Clock } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
+import type { AiringSchedule } from "@/types/anilist";
 
 // ===================================
 // Data Fetching
@@ -23,20 +24,23 @@ async function getAiringSchedule() {
 // Components
 // ===================================
 
-interface ScheduleItem {
-  id: number;
-  timeUntilAiring: number;
-  episode: number;
-  media: any;
-}
-
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-function DaySection({ day, items, dayIndex }: { day: string; items: ScheduleItem[]; dayIndex: number }) {
+function DaySection({
+  day,
+  items,
+  dayIndex,
+  now
+}: {
+  day: string;
+  items: AiringSchedule[];
+  dayIndex: number;
+  now: number;
+}) {
   // Get items that air on this day (rough approximation based on time until airing)
-  const now = Math.floor(Date.now() / 1000);
   const secondsPerDay = 86400;
-  const dayStart = now + ((dayIndex + 1 - new Date().getDay()) % 7) * secondsPerDay;
+  const currentDayIndex = new Date(now * 1000).getDay();
+  const dayStart = now + ((dayIndex + 1 - currentDayIndex) % 7) * secondsPerDay;
   const dayEnd = dayStart + secondsPerDay;
 
   // Filter items airing in this day's window
@@ -68,7 +72,7 @@ function DaySection({ day, items, dayIndex }: { day: string; items: ScheduleItem
           return (
             <GlassCard key={item.id} className="p-3">
               <AnimeCardCompact
-                anime={item.media as any}
+                anime={item.media}
                 showNumber={true}
                 number={item.episode}
               />
@@ -97,9 +101,10 @@ function DaySection({ day, items, dayIndex }: { day: string; items: ScheduleItem
 
 export default async function SchedulePage() {
   const schedule = await getAiringSchedule();
+  const now = Math.floor(Date.now() / 1000);
 
   // Get today's day index (0 = Sunday, 1 = Monday, etc.)
-  const todayIndex = new Date().getDay();
+  const todayIndex = new Date(now * 1000).getDay();
 
   // Reorder days starting from today
   const reorderedDays = [
@@ -132,9 +137,9 @@ export default async function SchedulePage() {
               </h3>
               <div className="flex flex-wrap gap-4">
                 {schedule
-                  .filter((item: any) => item.timeUntilAiring > 0 && item.timeUntilAiring < 3600)
+                  .filter((item) => item.timeUntilAiring > 0 && item.timeUntilAiring < 3600)
                   .slice(0, 5)
-                  .map((item: any) => (
+                  .map((item) => (
                     <div key={item.id} className="text-sm">
                       <span className="text-foreground">
                         {item.media.title.userPreferred || item.media.title.romaji}
@@ -156,6 +161,7 @@ export default async function SchedulePage() {
                 day={day}
                 dayIndex={todayIndex + index >= 7 ? todayIndex + index - 7 : todayIndex + index}
                 items={schedule}
+                now={now}
               />
             ))}
           </div>

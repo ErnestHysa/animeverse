@@ -30,8 +30,10 @@ export async function GET(request: NextRequest) {
     const subtitleUrl = decodeURIComponent(encodedUrl);
 
     // Validate URL
+    let refererOrigin = "";
     try {
       const parsedUrl = new URL(subtitleUrl);
+      refererOrigin = parsedUrl.origin;
       // Only allow http/https protocols
       if (!["http:", "https:"].includes(parsedUrl.protocol)) {
         return NextResponse.json(
@@ -56,7 +58,7 @@ export async function GET(request: NextRequest) {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept": "*/*",
         "Accept-Language": "en-US,en;q=0.9",
-        "Referer": parsedUrl(subtitleUrl).origin,
+        "Referer": refererOrigin,
       },
       signal: controller.signal,
     });
@@ -116,15 +118,5 @@ export async function GET(request: NextRequest) {
       { error: "Internal server error" },
       { status: 500 }
     );
-  }
-}
-
-// Helper to get origin from URL
-function parsedUrl(url: string): { origin: string } {
-  try {
-    const u = new URL(url);
-    return { origin: u.origin };
-  } catch {
-    return { origin: "" };
   }
 }
