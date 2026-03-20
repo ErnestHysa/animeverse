@@ -189,19 +189,26 @@ export async function GET(request: NextRequest) {
       archive.on('end', () => resolve());
       archive.on('error', (err: Error) => reject(err));
       archive.on('warning', (err: Error) => {
-        // Silently handle archive warnings
+        // Log archive warnings for debugging
+        console.warn('Archive warning:', err);
       });
     });
 
     // Add video file (concatenated segments)
     const videoBuffers: Buffer[] = [];
+    const failedVideoSegments: number[] = [];
+    let segmentIndex = 0;
+
     for (const segment of videoSegments) {
+      segmentIndex++;
       try {
         const segmentStream = await proxyFetch(segment.url);
         const buffer = await streamToBuffer(segmentStream);
         videoBuffers.push(buffer);
       } catch (error) {
-        // Silently skip failed segments
+        // Track failed segments for warning in README
+        failedVideoSegments.push(segmentIndex);
+        console.error(`Failed to download video segment ${segmentIndex}:`, error);
       }
     }
 
@@ -212,15 +219,24 @@ export async function GET(request: NextRequest) {
     }
 
     // Add subtitle files
+    const subtitleFailures: Map<string, number[]> = new Map();
     for (const [lang, segments] of subtitleSegments) {
       const subBuffers: Buffer[] = [];
+      let subIndex = 0;
+
       for (const segment of segments) {
+        subIndex++;
         try {
           const segmentStream = await proxyFetch(segment.url);
           const buffer = await streamToBuffer(segmentStream);
           subBuffers.push(buffer);
         } catch (error) {
-          // Silently skip failed subtitle segments
+          // Track failed subtitle segments
+          if (!subtitleFailures.has(lang)) {
+            subtitleFailures.set(lang, []);
+          }
+          subtitleFailures.get(lang)!.push(subIndex);
+          console.error(`Failed to download ${lang} subtitle segment ${subIndex}:`, error);
         }
       }
 
@@ -242,6 +258,18 @@ Files:
 ${subtitleSegments.size > 0 ? Array.from(subtitleSegments.keys()).map(lang =>
   `  - ${animeTitle.replace(/[^a-z0-9]/gi, '_')}_EP${episodeNumber}_${lang}.vtt (${lang} subtitles)`
 ).join('\n') : ''}
+
+${failedVideoSegments.length > 0 ? `
+WARNING: Some video segments failed to download (${failedVideoSegments.length}/${videoSegments.length} segments).
+The video may have gaps or missing parts. Failed segments: ${failedVideoSegments.join(', ')}
+` : ''}
+
+${subtitleFailures.size > 0 ? `
+WARNING: Some subtitle segments failed to download:
+${Array.from(subtitleFailures.entries()).map(([lang, fails]) =>
+  `  - ${lang}: segments ${fails.join(', ')}`
+).join('\n')}
+` : ''}
 
 How to play with subtitles:
 1. VLC Media Player: Video → Subtitle → Add Subtitle File → Select .vtt file
