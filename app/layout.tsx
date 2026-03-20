@@ -89,6 +89,20 @@ export default function RootLayout({
           {children}
           <ServiceWorkerRegister />
         </ThemeProvider>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              // Add 'loaded' class to enable animations after page load
+              if (document.body) {
+                document.body.classList.add('loaded');
+              }
+              // Also add it on DOMContentLoaded to be safe
+              document.addEventListener('DOMContentLoaded', () => {
+                document.body.classList.add('loaded');
+              });
+            `,
+          }}
+        />
       </body>
     </html>
   );

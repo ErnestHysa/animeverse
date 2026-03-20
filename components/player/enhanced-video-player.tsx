@@ -128,6 +128,7 @@ export function EnhancedVideoPlayer({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
+  const [isBuffering, setIsBuffering] = useState(false);
   const [bufferProgress, setBufferProgress] = useState(0);
 
   // Throttled time update to improve performance
@@ -698,6 +699,14 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
         setBufferProgress((buffered / video.duration) * 100);
       }
     };
+    const handleWaiting = () => {
+      setIsBuffering(true);
+      setIsPlaying(false);
+    };
+    const handleCanPlay = () => {
+      setIsBuffering(false);
+      setIsLoading(false);
+    };
     const handleRateChange = () => {
       if (video.playbackRate !== playbackRate) {
         video.playbackRate = playbackRate;
@@ -710,6 +719,8 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
     video.addEventListener("play", handlePlay);
     video.addEventListener("pause", handlePause);
     video.addEventListener("progress", handleProgress);
+    video.addEventListener("waiting", handleWaiting);
+    video.addEventListener("canplay", handleCanPlay);
     video.addEventListener("ratechange", handleRateChange);
 
     return () => {
@@ -719,6 +730,8 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
       video.removeEventListener("play", handlePlay);
       video.removeEventListener("pause", handlePause);
       video.removeEventListener("progress", handleProgress);
+      video.removeEventListener("waiting", handleWaiting);
+      video.removeEventListener("canplay", handleCanPlay);
       video.removeEventListener("ratechange", handleRateChange);
     };
   }, [playbackRate, animeId, episodeNumber, nextEpisodeUrl, preferences.autoNext, onEpisodeEnd]);
@@ -1199,11 +1212,16 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
         playsInline
       />
 
-      {/* Loading Overlay */}
-      {isLoading && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="w-16 h-16 border-4 border-primary/30 border-t-primary rounded-full animate-spin mb-4" />
-          {bufferProgress > 0 ? (
+      {/* Loading/Buffering Overlay */}
+      {(isLoading || isBuffering) && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm animate-fadeIn z-30">
+          <div className="relative">
+            {/* Spinner with glow */}
+            <div className="w-16 h-16 border-4 border-primary/30 border-t-primary rounded-full animate-spin mb-4" />
+            <div className="absolute inset-0 w-16 h-16 bg-primary/20 rounded-full animate-pulse-glow blur-xl" />
+          </div>
+
+          {bufferProgress > 0 && bufferProgress < 95 ? (
             <div className="w-48 flex flex-col items-center gap-2">
               <div className="w-full h-2 bg-white/20 rounded-full overflow-hidden">
                 <div
@@ -1217,14 +1235,14 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
             </div>
           ) : (
             <div className="flex flex-col items-center gap-3">
-              <p className="text-sm text-muted-foreground">
-                {source.url.includes('.m3u8') ? 'Loading stream...' : 'Loading video...'}
+              <p className="text-sm font-medium">
+                {isBuffering ? 'Buffering...' : source.url.includes('.m3u8') ? 'Loading stream...' : 'Loading video...'}
               </p>
               {/* Animated dots */}
               <div className="flex gap-1">
-                <span className="w-2 h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '0ms' }} />
-                <span className="w-2 h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
-                <span className="w-2 h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
+                <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
             </div>
           )}

@@ -277,17 +277,28 @@ export function VideoSourceLoader({
   // Loading state
   if (loading) {
     return (
-      <GlassCard className="aspect-video flex items-center justify-center">
+      <GlassCard className="aspect-video flex items-center justify-center animate-fadeIn">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">
+          {/* Animated spinner with glow effect */}
+          <div className="relative mb-6">
+            <div className="w-16 h-16 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto" />
+            {/* Glow effect */}
+            <div className="absolute inset-0 w-16 h-16 bg-primary/20 rounded-full animate-pulse-glow blur-xl" />
+          </div>
+          <p className="text-muted-foreground font-medium">
             {isRetrying
               ? `Retrying... (Attempt ${retryCount + 1}/${MAX_RETRIES})`
               : `Loading ${currentLanguage === "dub" ? "Dubbed" : "Subtitled"} version...`
             }
           </p>
+          {/* Animated dots */}
+          <div className="flex gap-1 justify-center mt-3">
+            <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+            <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+            <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+          </div>
           {isRetrying && (
-            <p className="text-xs text-muted-foreground mt-2">
+            <p className="text-xs text-muted-foreground mt-4 max-w-xs mx-auto">
               This is taking longer than usual. The server might be busy.
             </p>
           )}

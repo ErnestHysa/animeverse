@@ -388,6 +388,17 @@ p {
   }
 }
 
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+  }
+  50% {
+    transform: translateY(-10px);
+    animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  }
+}
+
 .animate-fadeIn {
   animation: fadeIn var(--duration-normal) var(--ease-out);
 }
@@ -423,6 +434,10 @@ p {
   animation: float 3s ease-in-out infinite;
 }
 
+.animate-bounce {
+  animation: bounce 1s infinite;
+}
+
 /* ===================================
    Transitions
    =================================== */
@@ -432,6 +447,73 @@ p {
     opacity var(--duration-normal) var(--ease-default),
     transform var(--duration-normal) var(--ease-default),
     filter var(--duration-normal) var(--ease-default);
+}
+
+/* Smooth hover transitions for buttons and links */
+.transition-smooth {
+  transition: all var(--duration-normal) var(--ease-default);
+}
+
+.transition-fast {
+  transition: all var(--duration-fast) var(--ease-default);
+}
+
+/* Scale on hover */
+.hover-scale {
+  transition: transform var(--duration-normal) var(--ease-out);
+}
+
+.hover-scale:hover {
+  transform: scale(1.05);
+}
+
+/* Lift on hover */
+.hover-lift {
+  transition: transform var(--duration-normal) var(--ease-out),
+    box-shadow var(--duration-normal) var(--ease-out);
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.2);
+}
+
+/* Glow on hover */
+.hover-glow:hover {
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.4);
+}
+
+/* Press effect for buttons */
+.button-press:active {
+  transform: scale(0.98);
+}
+
+/* Link press effect */
+a:active {
+  transform: scale(0.99);
+}
+
+/* Smooth link transitions */
+a {
+  transition: color var(--duration-fast) var(--ease-default),
+              opacity var(--duration-fast) var(--ease-default);
+}
+
+/* Interactive element hover effects */
+button:active,
+a:active {
+  transition: transform var(--duration-fast) var(--ease-in);
+}
+
+/* Card hover effect */
+.interactive-card {
+  transition: transform var(--duration-normal) var(--ease-out),
+              box-shadow var(--duration-normal) var(--ease-out);
+}
+
+.interactive-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(139, 92, 246, 0.15);
 }
 
 /* ===================================
