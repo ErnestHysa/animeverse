@@ -13,6 +13,7 @@ import { Footer } from "@/components/layout/footer";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
 import { usePreferences, useWatchlist, useFavorites } from "@/store";
+import { useTheme } from "@/components/providers/theme-provider";
 import {
   Settings,
   Moon,
@@ -25,6 +26,7 @@ import {
   Download,
   RefreshCw,
   Bell,
+  Check,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { cn } from "@/lib/utils";
@@ -34,6 +36,7 @@ export default function SettingsPage() {
   const { preferences, updatePreferences, resetPreferences } = usePreferences();
   const { watchlist, clearWatchlist: clearList } = useWatchlist();
   const { favorites, clearFavorites } = useFavorites();
+  const { theme, setTheme, resolvedTheme } = useTheme();
 
   const [isSaving, setIsSaving] = useState(false);
   const [historyCount, setHistoryCount] = useState(0);
@@ -286,30 +289,52 @@ export default function SettingsPage() {
                   </p>
                   <div className="flex gap-2">
                     <button
-                      className="flex-1 px-4 py-2 rounded-lg bg-primary text-primary-foreground flex items-center justify-center gap-2"
+                      onClick={() => setTheme("dark")}
+                      className={cn(
+                        "flex-1 px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors",
+                        theme === "dark" || (theme === "system" && resolvedTheme === "dark")
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-white/5 border border-white/10 hover:bg-white/10"
+                      )}
                     >
                       <Moon className="w-4 h-4" />
                       Dark
+                      {(theme === "dark" || (theme === "system" && resolvedTheme === "dark")) && (
+                        <Check className="w-4 h-4 ml-1" />
+                      )}
                     </button>
                     <button
-                      disabled
-                      className="flex-1 px-4 py-2 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center gap-2 opacity-50"
-                      title="Light theme coming soon"
+                      onClick={() => setTheme("light")}
+                      className={cn(
+                        "flex-1 px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors",
+                        theme === "light" || (theme === "system" && resolvedTheme === "light")
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-white/5 border border-white/10 hover:bg-white/10"
+                      )}
                     >
                       <Sun className="w-4 h-4" />
                       Light
+                      {(theme === "light" || (theme === "system" && resolvedTheme === "light")) && (
+                        <Check className="w-4 h-4 ml-1" />
+                      )}
                     </button>
                     <button
-                      disabled
-                      className="flex-1 px-4 py-2 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center gap-2 opacity-50"
-                      title="System theme coming soon"
+                      onClick={() => setTheme("system")}
+                      className={cn(
+                        "flex-1 px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors",
+                        theme === "system"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-white/5 border border-white/10 hover:bg-white/10"
+                      )}
                     >
                       <Monitor className="w-4 h-4" />
                       System
+                      {theme === "system" && <Check className="w-4 h-4 ml-1" />}
                     </button>
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
-                    Currently using dark theme. Light and system themes coming soon.
+                    Currently using {resolvedTheme} theme.
+                    {theme === "system" && " Matches your system preference."}
                   </p>
                 </div>
               </div>

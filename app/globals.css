@@ -91,6 +91,42 @@
   --font-body: "Plus Jakarta Sans", system-ui, sans-serif;
 }
 
+/* Light Theme */
+.light {
+  --background: 0 0% 100%;        /* Pure white */
+  --foreground: 222 47% 10%;       /* Dark blue-gray text */
+
+  --primary: 263 70% 50%;          /* Purple accent (same) */
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 199 89% 48%;
+  --secondary-foreground: 0 0% 100%;
+
+  --muted: 210 40% 96%;            /* Light gray */
+  --muted-foreground: 215 16% 47%;  /* Medium gray text */
+
+  --accent: 263 70% 50%;
+  --accent-foreground: 0 0% 100%;
+
+  --card: 210 40% 98%;             /* Very light gray */
+  --card-foreground: 222 47% 10%;
+
+  --border: 210 40% 90%;           /* Light gray borders */
+  --ring: 263 70% 50%;
+
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+
+  --success: 142 76% 36%;
+  --warning: 38 92% 50%;
+  --info: 199 89% 48%;
+
+  /* Glassmorphism - Light */
+  --glass-bg: rgba(255, 255, 255, 0.8);
+  --glass-border: rgba(139, 92, 246, 0.15);
+  --glass-shine: rgba(139, 92, 246, 0.1);
+}
+
 @theme inline {
   /* Map CSS variables to Tailwind theme */
   --color-background: hsl(var(--background));
