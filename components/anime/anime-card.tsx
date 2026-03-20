@@ -8,7 +8,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { memo, useState } from "react";
-import { Star, Play, Clock, Zap } from "lucide-react";
+import { Star, Play, Zap } from "lucide-react";
 import type { Media } from "@/types/anilist";
 import { getAnimeTitle, getAnimeCover, formatEpisodeCount, getStarRating } from "@/lib/anilist";
 import { cn } from "@/lib/utils";
@@ -42,6 +42,7 @@ export const AnimeCard = memo(function AnimeCard({
   const [imageError, setImageError] = useState(false);
 
   // Check if simulcast (airs within 24 hours of Japan broadcast)
+  // eslint-disable-next-line react-hooks/purity -- Date.now() is used for real-time simulcast check
   const isSimulcast = anime.nextAiringEpisode && (
     anime.nextAiringEpisode.airingAt * 1000 - Date.now()
   ) < 24 * 60 * 60 * 1000; // Less than 24 hours until airing

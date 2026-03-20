@@ -90,7 +90,7 @@ export default function TermsPage() {
                 <h2 className="text-xl font-semibold mb-4">5. Disclaimer of Warranties</h2>
                 <div className="space-y-3 text-muted-foreground">
                   <p>
-                    AnimeVerse is provided "as is" without any warranties, expressed or implied.
+                    AnimeVerse is provided &quot;as is&quot; without any warranties, expressed or implied.
                     We do not guarantee that the service will be uninterrupted, secure, or error-free.
                   </p>
                 </div>

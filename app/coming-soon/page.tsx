@@ -7,9 +7,8 @@ import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { AnimeGrid } from "@/components/anime/anime-grid";
 import { anilist } from "@/lib/anilist";
-import { Calendar, Clock, Info } from "lucide-react";
+import { Calendar, Info } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
-import type { Media } from "@/types/anilist";
 
 export const metadata = {
   title: "Coming Soon",
@@ -53,7 +52,7 @@ export default async function ComingSoonPage() {
             <div className="flex items-start gap-3">
               <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
               <p className="text-sm text-muted-foreground">
-                This page shows anime that has been announced but hasn't started airing yet.
+                This page shows anime that has been announced but hasn&apos;t started airing yet.
                 Release dates are subject to change.
               </p>
             </div>

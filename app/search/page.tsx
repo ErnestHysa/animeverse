@@ -10,7 +10,7 @@ import { AnimeFilters } from "@/components/search/anime-filters";
 import { anilist } from "@/lib/anilist";
 import { Search } from "lucide-react";
 import { Suspense } from "react";
-import { AnimeGridSkeleton, SearchResultsSkeleton } from "@/components/ui/skeleton";
+import { AnimeGridSkeleton } from "@/components/ui/skeleton";
 
 // ===================================
 // Data Fetching

@@ -77,7 +77,7 @@ export default function PrivacyPolicyPage() {
                     We use minimal technical cookies essential for the application to function.
                   </p>
                   <p className="text-sm">
-                    We use AniList's API to fetch anime information. AniList may have its own
+                    We use AniList&apos;s API to fetch anime information. AniList may have its own
                     privacy policy which you can review at anilist.co.
                   </p>
                 </div>
@@ -110,7 +110,7 @@ export default function PrivacyPolicyPage() {
               </GlassCard>
 
               <GlassCard className="p-6">
-                <h2 className="text-xl font-semibold mb-4">6. Children's Privacy</h2>
+                <h2 className="text-xl font-semibold mb-4">6. Children&apos;s Privacy</h2>
                 <div className="space-y-3 text-muted-foreground">
                   <p>
                     AnimeVerse is not directed to children under 13. We do not knowingly collect

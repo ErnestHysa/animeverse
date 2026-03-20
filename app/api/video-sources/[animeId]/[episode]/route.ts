@@ -113,7 +113,7 @@ async function searchAnimeId(
         const searchTermLower = searchTerm.toLowerCase();
 
         // Look for exact or close title match
-        let bestMatch = data.results.find((r: any) => {
+        let bestMatch = data.results.find((r: { title?: string; id: string }) => {
           const titleLower = (r.title || "").toLowerCase();
           return titleLower.includes(searchTermLower) ||
                  searchTermLower.includes(titleLower.split(" ")[0]);

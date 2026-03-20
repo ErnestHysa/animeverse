@@ -72,9 +72,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check content type
-    const contentType = response.headers.get("content-type") || "text/vtt";
-
     // Check file size
     const contentLength = response.headers.get("content-length");
     if (contentLength && parseInt(contentLength) > MAX_FILE_SIZE) {

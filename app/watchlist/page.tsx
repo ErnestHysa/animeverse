@@ -16,17 +16,18 @@ import { Clock } from "lucide-react";
 import { anilist } from "@/lib/anilist";
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import type { Media } from "@/types/anilist";
 
 export default function WatchlistPage() {
   const { watchlist } = useWatchlist();
-  const [anime, setAnime] = useState<any[]>([]);
+  const [anime, setAnime] = useState<Media[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadWatchlist() {
       if (watchlist.length > 0) {
         const result = await anilist.getByIds(watchlist);
-        const fetchedAnime = result.data?.Page.media.filter((m: any) =>
+        const fetchedAnime = result.data?.Page.media.filter((m: Media) =>
           watchlist.includes(m.id)
         ) ?? [];
         setAnime(fetchedAnime);

@@ -14,8 +14,9 @@ import { KeyboardShortcutsButton } from "@/components/player/keyboard-shortcuts"
 import { ImageWithFallback } from "@/components/ui/image-with-fallback";
 import { anilist, getAnimeTitle } from "@/lib/anilist";
 import { sanitizeDescription } from "@/lib/html-sanitizer";
-import { Play, ChevronLeft, ChevronRight, Heart, Clock } from "lucide-react";
+import { Play, ChevronLeft, ChevronRight, Clock } from "lucide-react";
 import Link from "next/link";
+import type { Media } from "@/types/anilist";
 import { Suspense } from "react";
 import { VideoPlayerSkeleton, EpisodeListSkeleton, AnimeGridSkeleton } from "@/components/ui/skeleton";
 
@@ -53,7 +54,7 @@ async function getAnimeData(id: string) {
 // Components
 // ===================================
 
-async function VideoSection({ anime, episodeNum }: { anime: any; episodeNum: number }) {
+async function VideoSection({ anime, episodeNum }: { anime: Media; episodeNum: number }) {
   const title = getAnimeTitle(anime);
   // Use English title for video API since AnimeKai indexes by English titles
   const englishTitle = anime.title?.english || anime.title?.romaji || title;
@@ -134,7 +135,7 @@ async function VideoSection({ anime, episodeNum }: { anime: any; episodeNum: num
   );
 }
 
-async function EpisodesList({ anime, currentEpisode }: { anime: any; currentEpisode: number }) {
+async function EpisodesList({ anime, currentEpisode }: { anime: Media; currentEpisode: number }) {
   const totalEpisodes = anime.episodes || 12;
 
   return (
@@ -193,7 +194,7 @@ async function EpisodesList({ anime, currentEpisode }: { anime: any; currentEpis
   );
 }
 
-async function AnimeInfo({ anime }: { anime: any }) {
+async function AnimeInfo({ anime }: { anime: Media }) {
   const title = getAnimeTitle(anime);
 
   return (
@@ -249,9 +250,9 @@ async function AnimeInfo({ anime }: { anime: any }) {
 
 async function RecommendedSection({ animeId }: { animeId: number }) {
   const result = await anilist.getRecommendations(animeId);
-  const recommendations = (result.data as any)?.Media?.recommendations?.nodes
-    ?.map((n: any) => n.mediaRecommendation)
-    .filter(Boolean);
+  const recommendations = result.data?.Media?.recommendations?.nodes
+    ?.map((n: { mediaRecommendation?: Media }) => n.mediaRecommendation)
+    .filter((media: Media | undefined): media is Media => Boolean(media));
 
   if (!recommendations || recommendations.length === 0) {
     return null;
@@ -261,7 +262,7 @@ async function RecommendedSection({ animeId }: { animeId: number }) {
     <div className="mt-6">
       <h3 className="font-semibold mb-4">You May Also Like</h3>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-        {recommendations.slice(0, 8).map((rec: any) => (
+        {recommendations.slice(0, 8).map((rec: Media) => (
           <Link
             key={rec.id}
             href={`/anime/${rec.id}`}

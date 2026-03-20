@@ -101,6 +101,7 @@ function DaySection({
 
 export default async function SchedulePage() {
   const schedule = await getAiringSchedule();
+  // eslint-disable-next-line react-hooks/purity -- Server component: Date.now() is deterministic per request
   const now = Math.floor(Date.now() / 1000);
 
   // Get today's day index (0 = Sunday, 1 = Monday, etc.)

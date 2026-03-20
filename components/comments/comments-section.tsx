@@ -6,7 +6,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { MessageSquare, ThumbsUp, ThumbsDown, Reply, ArrowUpDown, User, Star } from "lucide-react";
+import { MessageSquare, ThumbsUp, ThumbsDown, Reply, User, Star } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
 import { toast } from "react-hot-toast";
@@ -33,8 +33,6 @@ interface CommentsSectionProps {
 
 export function CommentsSection({ animeId, animeTitle }: CommentsSectionProps) {
   const [comments, setComments] = useState<Comment[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [showReplyForm, setShowReplyForm] = useState(false);
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [newComment, setNewComment] = useState("");
   const [userRating, setUserRating] = useState(0);

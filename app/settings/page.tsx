@@ -11,7 +11,6 @@ import { useState, useEffect } from "react";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { GlassCard } from "@/components/ui/glass-card";
-import { Button } from "@/components/ui/button";
 import { usePreferences, useWatchlist, useFavorites } from "@/store";
 import { useTheme } from "@/components/providers/theme-provider";
 import {
@@ -20,7 +19,6 @@ import {
   Sun,
   Monitor,
   Play,
-  Volume2,
   Zap,
   Trash2,
   Download,
@@ -38,23 +36,22 @@ export default function SettingsPage() {
   const { favorites, clearFavorites } = useFavorites();
   const { theme, setTheme, resolvedTheme } = useTheme();
 
-  const [isSaving, setIsSaving] = useState(false);
   const [historyCount, setHistoryCount] = useState(0);
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
+    // Set mounted state to avoid hydration mismatch
     setIsMounted(true);
     if (typeof window !== "undefined") {
       const history = JSON.parse(localStorage.getItem("yggdrasil_watch_history") || "[]");
       setHistoryCount(history.length);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Only run on mount
   }, []);
 
-  const handleSavePreference = async (key: string, value: any) => {
-    setIsSaving(true);
+  const handleSavePreference = async (key: string, value: unknown) => {
     updatePreferences({ [key]: value });
     toast.success("Settings saved");
-    setIsSaving(false);
   };
 
   const handleResetAll = async () => {

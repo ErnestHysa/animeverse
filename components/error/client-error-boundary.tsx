@@ -11,7 +11,7 @@ import { ErrorFallback } from "./error-fallback";
 interface ClientErrorBoundaryProps {
   children: ReactNode;
   fallback?: ReactNode;
-  onError?: (error: Error, errorInfo: any) => void;
+  onError?: (error: Error, errorInfo: { componentStack?: string }) => void;
 }
 
 interface ClientErrorBoundaryState {
@@ -32,7 +32,7 @@ export class ClientErrorBoundary extends Component<
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: any) {
+  componentDidCatch(error: Error, errorInfo: { componentStack?: string }) {
     console.error("Client Error Boundary caught an error:", error, errorInfo);
     this.props.onError?.(error, errorInfo);
   }

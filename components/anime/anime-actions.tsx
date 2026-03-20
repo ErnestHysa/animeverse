@@ -24,6 +24,7 @@ export function AnimeActions({ animeId, animeTitle }: AnimeActionsProps) {
   // Prevent hydration mismatch
   useEffect(() => {
     setMounted(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Only run on mount
   }, []);
 
   if (!mounted) {
