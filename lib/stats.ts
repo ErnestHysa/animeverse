@@ -65,8 +65,9 @@ export function calculateStats(
       if (item.completed) {
         totalMinutes += duration;
       } else if (item.progress > 0) {
-        // Partial watch: count percentage of episode watched
-        totalMinutes += (item.progress / 60) * (duration / (item.progress / 60 || 1));
+        // Partial watch: count minutes watched (progress is in seconds)
+        const minutesWatched = Math.min(item.progress / 60, duration);
+        totalMinutes += minutesWatched;
       }
 
       // Count genres
