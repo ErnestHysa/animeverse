@@ -47,6 +47,10 @@ const QUERIES = {
   studios: `query Studios($page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { studios(sort: FAVOURITES_DESC) { nodes { id name isAnimationStudio media(first: 10, sort: POPULARITY_DESC) { nodes { id title { romaji english native userPreferred } coverImage { large medium } averageScore format } } } } } }`,
 
   byStudio: `query ByStudio($studioId: Int, $page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME, studios: [$studioId], sort: POPULARITY_DESC) { ${MEDIA_MINIMAL_FRAGMENT} } } }`,
+
+  byGenre: `query ByGenre($genre: String!, $page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME, genre_in: [$genre], sort: POPULARITY_DESC) { ${MEDIA_FULL_FRAGMENT} } } }`,
+
+  genreList: `query GenreList($genres: [String!]!) { genres: genres = $genres }`,
 };
 
 // ===================================
@@ -177,6 +181,18 @@ class AniListClient {
 
   async getByStudio(studioId: number, page: number = 1, perPage: number = 24): Promise<APIResult<TrendingResponse>> {
     return this.query<TrendingResponse>(QUERIES.byStudio, { studioId, page, perPage });
+  }
+
+  async getByGenre(genre: string, page: number = 1, perPage: number = 24): Promise<APIResult<TrendingResponse>> {
+    return this.query<TrendingResponse>(QUERIES.byGenre, { genre, page, perPage });
+  }
+
+  async getGenreCount(genre: string): Promise<number> {
+    const result = await this.query<{ Page: { pageInfo: { total: number } } }>(
+      `query GenreCount($genre: String!) { Page(page: 1, perPage: 1) { pageInfo { total } } }`,
+      { genre }
+    );
+    return result.data?.Page.pageInfo.total ?? 0;
   }
 }
 

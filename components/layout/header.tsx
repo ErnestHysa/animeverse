@@ -21,6 +21,7 @@ import {
   Calendar,
   Shuffle,
   MessageSquare,
+  Tags,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -122,6 +123,9 @@ export const Header = memo(function Header() {
               </NavLink>
               <NavLink href="/seasonal" icon={<Tv className="w-4 h-4" />}>
                 Seasonal
+              </NavLink>
+              <NavLink href="/genres" icon={<Tags className="w-4 h-4" />}>
+                Genres
               </NavLink>
               <NavLink href="/favorites" icon={<Heart className="w-4 h-4" />}>
                 Favorites
@@ -243,6 +247,9 @@ export const Header = memo(function Header() {
               </MobileNavLink>
               <MobileNavLink href="/seasonal" icon={<Tv className="w-5 h-5" />}>
                 Seasonal
+              </MobileNavLink>
+              <MobileNavLink href="/genres" icon={<Tags className="w-5 h-5" />}>
+                Genres
               </MobileNavLink>
               <MobileNavLink href="/favorites" icon={<Heart className="w-5 h-5" />}>
                 Favorites
