@@ -36,17 +36,24 @@ export default function SettingsPage() {
   const { favorites, clearFavorites } = useFavorites();
   const { theme, setTheme, resolvedTheme } = useTheme();
 
-  const [historyCount, setHistoryCount] = useState(0);
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    // Set mounted state to avoid hydration mismatch
-    setIsMounted(true);
+  const [historyCount, setHistoryCount] = useState(() => {
+    // Initialize with 0 on server, actual count on client
     if (typeof window !== "undefined") {
       const history = JSON.parse(localStorage.getItem("yggdrasil_watch_history") || "[]");
-      setHistoryCount(history.length);
+      return history.length;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- Only run on mount
+    return 0;
+  });
+
+  useEffect(() => {
+    // Re-sync history count when localStorage changes (e.g., after clearing)
+    const handleStorageChange = () => {
+      const history = JSON.parse(localStorage.getItem("yggdrasil_watch_history") || "[]");
+      setHistoryCount(history.length);
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
   }, []);
 
   const handleSavePreference = async (key: string, value: unknown) => {
@@ -92,7 +99,7 @@ export default function SettingsPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `yggdrasil-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `anime-stream-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
     toast.success("Data exported");
@@ -421,9 +428,7 @@ export default function SettingsPage() {
                   <p className="text-xs text-muted-foreground">Watchlist</p>
                 </div>
                 <div className="text-center p-4 bg-white/5 rounded-lg">
-                  <p className="text-2xl font-bold">
-                    {isMounted ? historyCount : 0}
-                  </p>
+                  <p className="text-2xl font-bold">{historyCount}</p>
                   <p className="text-xs text-muted-foreground">History</p>
                 </div>
               </div>
