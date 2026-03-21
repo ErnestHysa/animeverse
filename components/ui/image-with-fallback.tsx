@@ -81,7 +81,7 @@ export function ImageWithFallback({
 
   if (fill) {
     return (
-      <div className="relative">
+      <div className="relative w-full h-full">
         {!imageLoaded && (
           <div className={`absolute inset-0 bg-muted animate-shimmer ${placeholderClassName}`} />
         )}
