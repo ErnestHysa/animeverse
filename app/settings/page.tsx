@@ -29,12 +29,22 @@ import {
 import { toast } from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import { NotificationSettings } from "@/components/notifications/notification-settings";
+import {
+  calculateStats,
+  formatWatchTime,
+  getGenreColor,
+  saveStats,
+  type UserStats,
+} from "@/lib/stats";
+import { useStore } from "@/store";
+import { Clock, Flame, TrendingUp, BarChart3, Award } from "lucide-react";
 
 export default function SettingsPage() {
   const { preferences, updatePreferences, resetPreferences } = usePreferences();
   const { watchlist, clearWatchlist: clearList } = useWatchlist();
   const { favorites, clearFavorites } = useFavorites();
   const { theme, setTheme, resolvedTheme } = useTheme();
+  const { mediaCache } = useStore();
 
   const [historyCount, setHistoryCount] = useState(() => {
     // Initialize with 0 on server, actual count on client
@@ -44,6 +54,32 @@ export default function SettingsPage() {
     }
     return 0;
   });
+
+  const [userStats, setUserStats] = useState<UserStats>({
+    totalEpisodesWatched: 0,
+    totalMinutesWatched: 0,
+    totalHoursWatched: 0,
+    totalDaysWatched: 0,
+    topGenres: [],
+    completedAnime: 0,
+    uniqueAnimeWatched: 0,
+    currentStreak: 0,
+    longestStreak: 0,
+  });
+
+  const calculateAndSetStats = () => {
+    if (typeof window === "undefined") return;
+
+    const history = JSON.parse(localStorage.getItem("animeverse_watch_history") || "[]");
+    const stats = calculateStats(history, mediaCache);
+    setUserStats(stats);
+    saveStats(stats);
+  };
+
+  useEffect(() => {
+    calculateAndSetStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [historyCount, mediaCache]);
 
   useEffect(() => {
     // Re-sync history count when localStorage changes (e.g., after clearing)
@@ -71,7 +107,19 @@ export default function SettingsPage() {
   const handleClearHistory = () => {
     if (typeof window !== "undefined") {
       localStorage.removeItem("animeverse_watch_history");
+      localStorage.removeItem("animeverse_stats");
       setHistoryCount(0);
+      setUserStats({
+        totalEpisodesWatched: 0,
+        totalMinutesWatched: 0,
+        totalHoursWatched: 0,
+        totalDaysWatched: 0,
+        topGenres: [],
+        completedAnime: 0,
+        uniqueAnimeWatched: 0,
+        currentStreak: 0,
+        longestStreak: 0,
+      });
       toast.success("Watch history cleared");
     }
   };
@@ -89,17 +137,23 @@ export default function SettingsPage() {
       ? JSON.parse(localStorage.getItem("animeverse_watch_history") || "[]")
       : [];
 
+    const statsData = typeof window !== "undefined"
+      ? JSON.parse(localStorage.getItem("animeverse_stats") || "null")
+      : null;
+
     const data = {
       preferences,
       watchlist,
       favorites,
       watchHistory,
+      stats: statsData,
+      exportDate: new Date().toISOString(),
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `anime-stream-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `animeverse-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
     toast.success("Data exported");
@@ -417,21 +471,125 @@ export default function SettingsPage() {
 
             {/* Stats */}
             <GlassCard>
-              <h2 className="text-xl font-semibold mb-4">Your Stats</h2>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="text-center p-4 bg-white/5 rounded-lg">
-                  <p className="text-2xl font-bold text-primary">{favorites.length}</p>
-                  <p className="text-xs text-muted-foreground">Favorites</p>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold">Your Stats</h2>
+                <button
+                  onClick={calculateAndSetStats}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  Refresh
+                </button>
+              </div>
+
+              {/* Primary Stats Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+                <div className="text-center p-3 bg-gradient-to-br from-primary/20 to-primary/10 rounded-lg">
+                  <Clock className="w-5 h-5 text-primary mx-auto mb-1" />
+                  <p className="text-xl font-bold text-primary">{formatWatchTime(userStats.totalMinutesWatched)}</p>
+                  <p className="text-xs text-muted-foreground">Watch Time</p>
                 </div>
-                <div className="text-center p-4 bg-white/5 rounded-lg">
-                  <p className="text-2xl font-bold text-secondary">{watchlist.length}</p>
-                  <p className="text-xs text-muted-foreground">Watchlist</p>
+                <div className="text-center p-3 bg-gradient-to-br from-secondary/20 to-secondary/10 rounded-lg">
+                  <Play className="w-5 h-5 text-secondary mx-auto mb-1" />
+                  <p className="text-xl font-bold text-secondary">{userStats.totalEpisodesWatched}</p>
+                  <p className="text-xs text-muted-foreground">Episodes</p>
                 </div>
-                <div className="text-center p-4 bg-white/5 rounded-lg">
-                  <p className="text-2xl font-bold">{historyCount}</p>
-                  <p className="text-xs text-muted-foreground">History</p>
+                <div className="text-center p-3 bg-gradient-to-br from-orange-500/20 to-orange-500/10 rounded-lg">
+                  <Flame className="w-5 h-5 text-orange-500 mx-auto mb-1" />
+                  <p className="text-xl font-bold text-orange-500">{userStats.currentStreak}</p>
+                  <p className="text-xs text-muted-foreground">Day Streak</p>
+                </div>
+                <div className="text-center p-3 bg-gradient-to-br from-purple-500/20 to-purple-500/10 rounded-lg">
+                  <Award className="w-5 h-5 text-purple-500 mx-auto mb-1" />
+                  <p className="text-xl font-bold text-purple-500">{userStats.uniqueAnimeWatched}</p>
+                  <p className="text-xs text-muted-foreground">Anime Watched</p>
                 </div>
               </div>
+
+              {/* Detailed Stats */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                <div className="p-4 bg-white/5 rounded-lg">
+                  <div className="flex items-center gap-2 mb-3">
+                    <BarChart3 className="w-4 h-4 text-muted-foreground" />
+                    <p className="text-sm font-medium">Watch Breakdown</p>
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Favorites</span>
+                      <span className="font-medium">{favorites.length}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Watchlist</span>
+                      <span className="font-medium">{watchlist.length}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">History Items</span>
+                      <span className="font-medium">{historyCount}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Hours Watched</span>
+                      <span className="font-medium">{userStats.totalHoursWatched}h</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-white/5 rounded-lg">
+                  <div className="flex items-center gap-2 mb-3">
+                    <TrendingUp className="w-4 h-4 text-muted-foreground" />
+                    <p className="text-sm font-medium">Achievements</p>
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Longest Streak</span>
+                      <span className="font-medium">{userStats.longestStreak} days</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Completed</span>
+                      <span className="font-medium">{userStats.completedAnime} anime</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Total Time</span>
+                      <span className="font-medium">{userStats.totalDaysWatched} days</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Top Genres */}
+              {userStats.topGenres.length > 0 && (
+                <div className="p-4 bg-white/5 rounded-lg">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-sm font-medium">Top Genres</span>
+                    <span className="text-xs text-muted-foreground">(based on your watch history)</span>
+                  </div>
+                  <div className="space-y-2">
+                    {userStats.topGenres.map((genre, index) => {
+                      const maxCount = userStats.topGenres[0]?.count || 1;
+                      const percentage = (genre.count / maxCount) * 100;
+                      return (
+                        <div key={genre.genre} className="flex items-center gap-3">
+                          <span className="text-xs text-muted-foreground w-6 text-center">#{index + 1}</span>
+                          <div className="flex-1">
+                            <div className="flex justify-between text-sm mb-1">
+                              <span className="font-medium">{genre.genre}</span>
+                              <span className="text-muted-foreground">{genre.count}</span>
+                            </div>
+                            <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                              <div
+                                className={cn(
+                                  "h-full rounded-full bg-gradient-to-r",
+                                  getGenreColor(genre.genre)
+                                )}
+                                style={{ width: `${percentage}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </GlassCard>
 
             {/* Reset Button */}
