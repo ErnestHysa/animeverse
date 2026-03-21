@@ -39,7 +39,7 @@ export default function SettingsPage() {
   const [historyCount, setHistoryCount] = useState(() => {
     // Initialize with 0 on server, actual count on client
     if (typeof window !== "undefined") {
-      const history = JSON.parse(localStorage.getItem("yggdrasil_watch_history") || "[]");
+      const history = JSON.parse(localStorage.getItem("animeverse_watch_history") || "[]");
       return history.length;
     }
     return 0;
@@ -48,7 +48,7 @@ export default function SettingsPage() {
   useEffect(() => {
     // Re-sync history count when localStorage changes (e.g., after clearing)
     const handleStorageChange = () => {
-      const history = JSON.parse(localStorage.getItem("yggdrasil_watch_history") || "[]");
+      const history = JSON.parse(localStorage.getItem("animeverse_watch_history") || "[]");
       setHistoryCount(history.length);
     };
 
@@ -70,7 +70,7 @@ export default function SettingsPage() {
 
   const handleClearHistory = () => {
     if (typeof window !== "undefined") {
-      localStorage.removeItem("yggdrasil_watch_history");
+      localStorage.removeItem("animeverse_watch_history");
       setHistoryCount(0);
       toast.success("Watch history cleared");
     }
@@ -86,7 +86,7 @@ export default function SettingsPage() {
 
   const exportData = () => {
     const watchHistory = typeof window !== "undefined"
-      ? JSON.parse(localStorage.getItem("yggdrasil_watch_history") || "[]")
+      ? JSON.parse(localStorage.getItem("animeverse_watch_history") || "[]")
       : [];
 
     const data = {

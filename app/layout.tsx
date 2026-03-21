@@ -19,7 +19,7 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://yggdrasil.stream"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://animeverse.stream"),
   title: {
     default: "AnimeVerse Stream - Anime Streaming",
     template: "%s | AnimeVerse Stream",
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://yggdrasil.stream",
+    url: "https://animeverse.stream",
     siteName: "AnimeVerse Stream",
     title: "AnimeVerse Stream - Anime Streaming",
     description: "Watch your favorite anime with free P2P streaming.",

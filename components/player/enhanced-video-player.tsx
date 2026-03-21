@@ -939,7 +939,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
       localStorage.setItem(key, JSON.stringify(data));
 
       // Also update global watch history
-      const historyKey = "yggdrasil_watch_history";
+      const historyKey = "animeverse_watch_history";
       const history = JSON.parse(localStorage.getItem(historyKey) || "[]");
       const existingIndex = history.findIndex((h: any) => h.mediaId === mediaId);
       const entry = {

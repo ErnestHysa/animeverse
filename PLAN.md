@@ -1,6 +1,6 @@
 # Anime Streaming Webapp - Implementation Plan
 
-**Project Name:** Yggdrasil Stream
+**Project Name:** AnimeVerse Stream
 **Tech Stack:** Next.js 16 (React 19), TypeScript, Tailwind CSS, WebTorrent
 **Design:** Dark anime aesthetic with purple/blue accents, glassmorphism
 **Streaming:** Hybrid (WebTorrent P2P + Direct video URLs)
