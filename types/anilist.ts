@@ -266,6 +266,39 @@ export interface AiringResponse {
   };
 }
 
+export interface StudioMedia {
+  id: number;
+  title: {
+    romaji: string;
+    english: string | null;
+    native: string | null;
+    userPreferred: string | null;
+  };
+  coverImage: {
+    large: string | null;
+    medium: string | null;
+  };
+  averageScore: number | null;
+  format: MediaFormat | null;
+}
+
+export interface Studio {
+  id: number;
+  name: string;
+  isAnimationStudio: boolean;
+  media: {
+    nodes: StudioMedia[];
+  };
+}
+
+export interface StudioListResponse {
+  Page: {
+    studios: {
+      nodes: Studio[];
+    };
+  };
+}
+
 // ===================================
 // Local Types (Extended)
 // ===================================

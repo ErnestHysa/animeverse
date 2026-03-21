@@ -128,8 +128,10 @@ test.describe('Anime Detail Page', () => {
     }
 
     // Check for episodes section - use flexible selector
-    const episodesText = page.locator('text=/Episodes/i');
-    const episodesSection = page.locator('section:has(text=/Episodes/i), div:has(text=/Episodes/i)');
+    const episodesText = page.getByText('Episodes', { exact: false });
+    const episodesSection = page.locator('section').filter({ hasText: 'Episodes' }).or(
+      page.locator('div').filter({ hasText: 'Episodes' })
+    );
     const episodeButtons = page.locator('a[href*="/watch/"]');
 
     // Wait a bit for dynamic content

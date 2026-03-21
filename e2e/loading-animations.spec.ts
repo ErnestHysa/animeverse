@@ -16,8 +16,8 @@ test.describe('Loading Animations', () => {
       return;
     }
 
-    // Navigate to the anime detail page
-    await page.goto(`/${animeHref}`);
+    // Navigate to the anime detail page (href already includes leading /)
+    await page.goto(animeHref);
     await page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
     await page.waitForTimeout(2000);
 

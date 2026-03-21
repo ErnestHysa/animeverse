@@ -34,8 +34,10 @@ test.describe('Video Player', () => {
   });
 
   test('should toggle play/pause', async ({ page }) => {
-    // Find play/pause button
-    const playButton = page.locator('button[aria-label*="lay" i], button[aria-label*="ause" i], button:has([class*="play"], button:has([class*="pause"])');
+    // Find play/pause button using multiple strategies
+    const playButton = page.locator('button[aria-label*="play" i], button[aria-label*="pause" i]').or(
+      page.locator('button').filter({ hasText: /play|pause/i })
+    );
 
     // If we found a play/pause button, click it
     const playCount = await playButton.count();
@@ -81,7 +83,9 @@ test.describe('Video Player', () => {
       await page.waitForTimeout(300);
 
       // Try to find subtitle-related buttons or text
-      const subtitleElements = page.locator('text=/subtitle|captions/i, button:has([class*="cc"], button:has([class*="subtitle"]))');
+      const subtitleElements = page.getByText(/subtitle|captions/i, { exact: false }).or(
+        page.locator('button').filter({ hasText: /cc|caption/i })
+      );
       const subCount = await subtitleElements.count();
 
       // Test passes if settings menu opened (subtitle section optional)
@@ -152,7 +156,9 @@ test.describe('Video Player', () => {
     await page.waitForTimeout(2000);
 
     // Check for language selector (Sub/Dub) - look for common patterns
-    const languageSelector = page.locator('button:has-text(/Sub|Dub|Language/i), [aria-label*="language" i]');
+    const languageSelector = page.locator('[aria-label*="language" i]').or(
+      page.locator('button').filter({ hasText: /Sub|Dub|Language/i })
+    );
     const langCount = await languageSelector.count();
 
     // Language selector may or may not be present depending on anime
@@ -175,7 +181,9 @@ test.describe('Video Player', () => {
     await page.waitForTimeout(2000);
 
     // Check for episodes section
-    const episodesSection = page.locator('text=/Episode/i, [aria-label*="episode" i]');
+    const episodesSection = page.locator('[aria-label*="episode" i]').or(
+      page.getByText('Episode', { exact: false })
+    );
     const epCount = await episodesSection.count();
 
     // Should have episode information

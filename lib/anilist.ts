@@ -10,6 +10,7 @@ import type {
   TrendingResponse,
   SearchResponse,
   AiringResponse,
+  StudioListResponse,
   APIResult,
 } from "@/types/anilist";
 import { ANILIST_API_URL, API_CONFIG } from "./constants";
@@ -42,6 +43,10 @@ const QUERIES = {
   recommendations: `query Recommendations($id: Int) { Media(id: $id) { recommendations(perPage: 10, sort: RATING_DESC) { nodes { mediaRecommendation { ${MEDIA_MINIMAL_FRAGMENT} } } } } }`,
 
   byIds: `query GetByIds($ids: [Int]) { Page(page: 1, perPage: 50) { pageInfo { total } media(id_in: $ids, type: ANIME) { ${MEDIA_MINIMAL_FRAGMENT} } } }`,
+
+  studios: `query Studios($page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { studios(sort: FAVOURITES_DESC) { nodes { id name isAnimationStudio media(first: 10, sort: POPULARITY_DESC) { nodes { id title { romaji english native userPreferred } coverImage { large medium } averageScore format } } } } } }`,
+
+  byStudio: `query ByStudio($studioId: Int, $page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME, studios: [$studioId], sort: POPULARITY_DESC) { ${MEDIA_MINIMAL_FRAGMENT} } } }`,
 };
 
 // ===================================
@@ -164,6 +169,14 @@ class AniListClient {
 
   async getByIds(ids: number[]): Promise<APIResult<MediaListResponse>> {
     return this.query<MediaListResponse>(QUERIES.byIds, { ids });
+  }
+
+  async getStudios(page: number = 1, perPage: number = 50): Promise<APIResult<StudioListResponse>> {
+    return this.query<StudioListResponse>(QUERIES.studios, { page, perPage });
+  }
+
+  async getByStudio(studioId: number, page: number = 1, perPage: number = 24): Promise<APIResult<TrendingResponse>> {
+    return this.query<TrendingResponse>(QUERIES.byStudio, { studioId, page, perPage });
   }
 }
 
