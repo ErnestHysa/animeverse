@@ -15,17 +15,11 @@ import {
   Minimize,
   Settings,
   Download,
-  Upload,
   SkipBack,
   SkipForward,
-  RotateCw,
   Monitor,
-  ChevronDown,
-  ChevronUp,
-  FastForward,
   Copy,
   X,
-  Globe,
 } from "lucide-react";
 import { cn, formatTime } from "@/lib/utils";
 import { usePreferences } from "@/store";
@@ -34,6 +28,11 @@ import { ServerSelector, LanguageSelector } from "@/components/player/server-sel
 import dynamic from "next/dynamic";
 import { SimpleThumbnailPreview } from "@/components/player/episode-thumbnails";
 import { DownloadButton } from "@/components/player/download-button";
+import {
+  getIntroOutroTimestamps,
+  getEstimatedTimestamps,
+  type IntroOutroTimestamps,
+} from "@/lib/aniskip";
 
 // Dynamic import for watch party controls to reduce initial bundle
 const WatchPartyControls = dynamic(
@@ -59,6 +58,7 @@ interface VideoPlayerProps {
   onEpisodeEnd?: () => void;
   animeId?: number;
   episodeNumber?: number;
+  malId?: number | null;
   nextEpisodeUrl?: string;
   // New props for server/language selection
   allServers?: Array<{
@@ -103,6 +103,7 @@ export function EnhancedVideoPlayer({
   onEpisodeEnd,
   animeId,
   episodeNumber,
+  malId,
   nextEpisodeUrl,
   allServers = [],
   allLanguages = [
@@ -150,8 +151,6 @@ export function EnhancedVideoPlayer({
 
   // Settings
   const [showSettings, setShowSettings] = useState(false);
-  const [showQualitySelector, setShowQualitySelector] = useState(false);
-  const [showSpeedSelector, setShowSpeedSelector] = useState(false);
   const [showSubtitleSettings, setShowSubtitleSettings] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [currentQuality, setCurrentQuality] = useState<string>("auto");
@@ -160,7 +159,6 @@ export function EnhancedVideoPlayer({
   const [subtitleTracks, setSubtitleTracks] = useState<SubtitleTrack[]>([]);
   const [subtitlesEnabled, setSubtitlesEnabled] = useState(true);
   const [currentSubtitle, setCurrentSubtitle] = useState(0);
-  const [settingsPosition, setSettingsPosition] = useState<'top' | 'bottom'>('top');
   const [portalDropdownStyle, setPortalDropdownStyle] = useState<React.CSSProperties>({});
 
   // Subtitle customization
@@ -227,11 +225,14 @@ export function EnhancedVideoPlayer({
   // User preferences
   const { preferences, updatePreferences } = usePreferences();
 
-  // Intro/outro timestamps (in seconds) - can be customized per anime
-  const introStart = 85;
-  const introEnd = 179;
-  const outroStart = 1320;
-  const outroEnd = 1410;
+  // Dynamic intro/outro timestamps from AniSkip API
+  const [skipTimestamps, setSkipTimestamps] = useState<IntroOutroTimestamps>({});
+
+  // Computed timestamps with fallback to defaults
+  const introStart = skipTimestamps.intro?.start ?? 85;
+  const introEnd = skipTimestamps.intro?.end ?? 170;
+  const outroStart = skipTimestamps.outro?.start ?? 1320;
+  const outroEnd = skipTimestamps.outro?.end ?? 1410;
 
   // ===================================
   // Video Loading
@@ -307,6 +308,54 @@ export function EnhancedVideoPlayer({
   }, [source.qualities, source.url]);
 
   // ===================================
+  // Fetch Intro/Outro Timestamps from AniSkip API
+  // ===================================
+
+  useEffect(() => {
+    // Only fetch if we have episodeNumber
+    if (!episodeNumber) return;
+
+    // We need the MyAnimeList ID for AniSkip API
+    // Use malId prop if available, otherwise fall back to animeId
+    const effectiveMalId = malId || animeId;
+
+    if (!effectiveMalId) return;
+
+    const fetchTimestamps = async () => {
+      try {
+        // Store MAL ID for future use
+        if (malId && typeof window !== "undefined") {
+          localStorage.setItem(`mal-id-${animeId}`, malId.toString());
+        }
+
+        // Fetch timestamps from AniSkip API
+        const timestamps = await getIntroOutroTimestamps(
+          effectiveMalId,
+          episodeNumber,
+          animeId
+        );
+
+        // If we got timestamps, use them
+        if (timestamps.intro || timestamps.outro) {
+          setSkipTimestamps(timestamps);
+        } else {
+          // No data from API, use estimated timestamps based on duration
+          const video = videoRef.current;
+          const estimated = getEstimatedTimestamps(video?.duration);
+          setSkipTimestamps(estimated);
+        }
+      } catch (error) {
+        // Silently fall back to estimated timestamps
+        const video = videoRef.current;
+        const estimated = getEstimatedTimestamps(video?.duration);
+        setSkipTimestamps(estimated);
+      }
+    };
+
+    fetchTimestamps();
+  }, [malId, animeId, episodeNumber]);
+
+  // ===================================
   // Load Subtitles - CRITICAL FIX
   // ===================================
 
@@ -353,7 +402,7 @@ export function EnhancedVideoPlayer({
             let currentCue: { start: number; end: number; text: string } | null = null;
 
             for (let i = 0; i < lines.length; i++) {
-              let line = lines[i].trim();
+              const line = lines[i].trim();
               if (!line) continue;
 
               // Parse timestamp line: 00:00:00.000 --> 00:00:05.000
@@ -578,8 +627,6 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
             document.exitFullscreen();
           }
           setShowSettings(false);
-          setShowQualitySelector(false);
-          setShowSpeedSelector(false);
           setShowSubtitleSettings(false);
           break;
       }
@@ -894,8 +941,6 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
       // Position above if there's enough space, otherwise below
       const positionTop = spaceAbove >= estimatedHeight;
 
-      setSettingsPosition(positionTop ? 'top' : 'bottom');
-
       // Calculate fixed position for portal
       if (positionTop) {
         setPortalDropdownStyle({
@@ -1085,13 +1130,11 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
     }, { once: true });
 
     setCurrentQuality(qualityLabel);
-    setShowQualitySelector(false);
     toast(`Quality changed to ${qualityLabel}`, { duration: 2000 });
   };
 
   const changeSpeed = (speed: number) => {
     setPlaybackRate(speed);
-    setShowSpeedSelector(false);
     toast(`Playback speed: ${speed}x`, { duration: 2000 });
   };
 
@@ -1535,8 +1578,6 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
                 ref={settingsButtonRef}
                 onClick={() => {
                   setShowSettings(!showSettings);
-                  setShowQualitySelector(false);
-                  setShowSpeedSelector(false);
                 }}
                 className="p-2.5 hover:bg-white/10 rounded-full transition-colors min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 sm:p-2"
                 aria-label="Settings"

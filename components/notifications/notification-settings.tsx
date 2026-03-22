@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Bell, BellOff, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,18 +13,12 @@ import {
   getNotificationPermission,
   requestNotificationPermission,
 } from "@/lib/notifications";
-import { cn } from "@/lib/utils";
 
 export function NotificationSettings() {
-  const [permission, setPermission] = useState<NotificationPermission>("default");
-  const [isSupported, setIsSupported] = useState(true);
+  // Use lazy initializers to avoid setState in effect
+  const [permission, setPermission] = useState(() => getNotificationPermission());
+  const [isSupported] = useState(() => areNotificationsSupported());
   const [requesting, setRequesting] = useState(false);
-
-  useEffect(() => {
-    setIsSupported(areNotificationsSupported());
-    setPermission(getNotificationPermission());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const handleRequestPermission = async () => {
     setRequesting(true);
@@ -41,7 +35,7 @@ export function NotificationSettings() {
           <div>
             <p className="font-medium text-yellow-500">Notifications Not Supported</p>
             <p className="text-sm text-muted-foreground mt-1">
-              Your browser doesn't support push notifications. Try using a modern browser like Chrome, Firefox, or Edge.
+              Your browser doesn&apos;t support push notifications. Try using a modern browser like Chrome, Firefox, or Edge.
             </p>
           </div>
         </div>
@@ -105,12 +99,12 @@ export function NotificationSettings() {
         <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
           <p className="font-medium text-red-400 mb-2">Notifications Blocked</p>
           <p className="text-sm text-muted-foreground">
-            You've blocked notifications. To enable them:
+            You&apos;ve blocked notifications. To enable them:
           </p>
           <ol className="text-sm text-muted-foreground mt-2 space-y-1 list-decimal list-inside">
-            <li>Click the lock/info icon in your browser's address bar</li>
-            <li>Find "Notifications" in the permissions</li>
-            <li>Select "Allow" and refresh the page</li>
+            <li>Click the lock/info icon in your browser&apos;s address bar</li>
+            <li>Find &quot;Notifications&quot; in the permissions</li>
+            <li>Select &quot;Allow&quot; and refresh the page</li>
           </ol>
         </div>
       )}
@@ -139,7 +133,7 @@ export function NotificationSettings() {
           <label className="flex items-center justify-between p-3 bg-white/5 rounded-lg cursor-pointer hover:bg-white/10 transition-colors">
             <div>
               <p className="font-medium">Recommendations</p>
-              <p className="text-xs text-muted-foreground">New anime we think you'll like based on your history</p>
+              <p className="text-xs text-muted-foreground">New anime we think you&apos;ll like based on your history</p>
             </div>
             <input type="checkbox" className="w-5 h-5 rounded" />
           </label>

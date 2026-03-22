@@ -7,7 +7,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { memo, useState } from "react";
+import { memo, useState, useEffect } from "react";
 import { Star, Play, Zap } from "lucide-react";
 import type { Media } from "@/types/anilist";
 import { getAnimeTitle, getAnimeCover, formatEpisodeCount, getStarRating } from "@/lib/anilist";
@@ -22,6 +22,28 @@ export interface AnimeCardProps {
   className?: string;
   showLanguageBadge?: boolean;
   hasDub?: boolean;
+}
+
+// Custom hook to get simulcast status without impure render
+function useSimulcastStatus(airingAt: number | null | undefined): boolean {
+  const [isSimulcast, setIsSimulcast] = useState(false);
+
+  useEffect(() => {
+    if (!airingAt) return;
+
+    const checkSimulcast = () => {
+      const now = Date.now();
+      const airingTime = airingAt * 1000;
+      setIsSimulcast(airingTime - now < 24 * 60 * 60 * 1000 && airingTime > now);
+    };
+
+    checkSimulcast();
+    const interval = setInterval(checkSimulcast, 60000); // Update every minute
+
+    return () => clearInterval(interval);
+  }, [airingAt]);
+
+  return isSimulcast;
 }
 
 export const AnimeCard = memo(function AnimeCard({
@@ -42,10 +64,7 @@ export const AnimeCard = memo(function AnimeCard({
   const [imageError, setImageError] = useState(false);
 
   // Check if simulcast (airs within 24 hours of Japan broadcast)
-  // eslint-disable-next-line react-hooks/purity -- Date.now() is used for real-time simulcast check
-  const isSimulcast = anime.nextAiringEpisode && (
-    anime.nextAiringEpisode.airingAt * 1000 - Date.now()
-  ) < 24 * 60 * 60 * 1000; // Less than 24 hours until airing
+  const isSimulcast = useSimulcastStatus(anime.nextAiringEpisode?.airingAt);
 
   return (
     <Link href={`/anime/${anime.id}`} className={cn("group block", className)}>

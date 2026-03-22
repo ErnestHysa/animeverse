@@ -26,6 +26,22 @@ interface Comment {
   replies?: Comment[];
 }
 
+// Custom hook to get current time with periodic updates (every minute)
+function useCurrentTime() {
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
+
+  useEffect(() => {
+    // Update every minute to refresh relative time displays
+    const interval = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  return currentTime;
+}
+
 interface CommentsSectionProps {
   animeId: number;
   animeTitle: string;
@@ -37,6 +53,7 @@ export function CommentsSection({ animeId, animeTitle }: CommentsSectionProps) {
   const [newComment, setNewComment] = useState("");
   const [userRating, setUserRating] = useState(0);
   const [sortBy, setSortBy] = useState<"recent" | "top">("recent");
+  const currentTime = useCurrentTime(); // Hook that updates every minute
 
   // Load comments from localStorage
   useEffect(() => {
@@ -122,7 +139,7 @@ export function CommentsSection({ animeId, animeTitle }: CommentsSectionProps) {
   });
 
   const formatTime = (timestamp: number) => {
-    const diff = Date.now() - timestamp;
+    const diff = currentTime - timestamp;
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
     const days = Math.floor(diff / 86400000);

@@ -3,7 +3,7 @@
  */
 
 import Link from "next/link";
-import { Github, Heart } from "lucide-react";
+import { Heart } from "lucide-react";
 
 export function Footer() {
   return (

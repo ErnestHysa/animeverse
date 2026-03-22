@@ -5,7 +5,7 @@
 
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useMemo } from "react";
 
 type Theme = "dark" | "light" | "system";
 
@@ -19,27 +19,48 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 const THEME_STORAGE_KEY = "animeverse-theme";
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("dark");
-  const [resolvedTheme, setResolvedTheme] = useState<"dark" | "light">("dark");
+function getSystemTheme(): "dark" | "light" {
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
 
-  // Load theme from localStorage on mount
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(THEME_STORAGE_KEY) as Theme;
-      if (stored && ["dark", "light", "system"].includes(stored)) {
-        setThemeState(stored);
-      }
-    } catch {
-      // Ignore localStorage errors
+function getStoredTheme(): Theme {
+  if (typeof window === "undefined") return "dark";
+  try {
+    const stored = localStorage.getItem(THEME_STORAGE_KEY) as Theme;
+    if (stored && ["dark", "light", "system"].includes(stored)) {
+      return stored;
     }
-  }, []);
+  } catch {
+    // Ignore localStorage errors
+  }
+  return "dark";
+}
+
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  // Initialize theme from localStorage using lazy initializer
+  const [theme, setThemeState] = useState<Theme>(() => getStoredTheme());
+
+  // Derive resolved theme from current theme instead of using state
+  const resolvedTheme = useMemo<"dark" | "light">(() => {
+    return theme === "system" ? getSystemTheme() : theme;
+  }, [theme]);
+
+  // Force re-render when system theme changes in system mode
+  const [, forceUpdate] = useState({});
+  useEffect(() => {
+    if (theme !== "system") return;
+
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleChange = () => forceUpdate({});
+
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
+  }, [theme]);
 
   // Apply theme to document
   useEffect(() => {
     const root = document.documentElement;
-    const effectiveTheme = theme === "system" ? getSystemTheme() : theme;
-    setResolvedTheme(effectiveTheme);
+    const effectiveTheme = resolvedTheme;
 
     if (effectiveTheme === "dark") {
       root.classList.add("dark");
@@ -48,18 +69,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       root.classList.add("light");
       root.classList.remove("dark");
     }
-  }, [theme]);
-
-  // Listen for system theme changes when in system mode
-  useEffect(() => {
-    if (theme !== "system") return;
-
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    const handleChange = () => setResolvedTheme(getSystemTheme());
-
-    mediaQuery.addEventListener("change", handleChange);
-    return () => mediaQuery.removeEventListener("change", handleChange);
-  }, [theme]);
+  }, [resolvedTheme]);
 
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme);
@@ -83,8 +93,4 @@ export function useTheme() {
     throw new Error("useTheme must be used within ThemeProvider");
   }
   return context;
-}
-
-function getSystemTheme(): "dark" | "light" {
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }

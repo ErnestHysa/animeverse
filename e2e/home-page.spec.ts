@@ -10,7 +10,7 @@ const DEFAULT_TIMEOUT = 30000;
 
 test.describe('Home Page', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/', { waitUntil: 'networkidle' });
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
   });
 
   test('should load home page', async ({ page }) => {
@@ -54,17 +54,21 @@ test.describe('Home Page', () => {
       const href = await firstAnimeLink.getAttribute('href');
       console.log(`Clicking anime link: ${href}`);
 
+      // For Next.js Link components, we need to wait for hydration
+      // Click and wait for URL to change
+      const promisedNavigation = page.waitForURL(/\/anime\/\d+/, { timeout: 10000 }).catch(() => null);
+
       await firstAnimeLink.click();
 
-      // Wait for navigation with extended timeout
-      await page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
+      // Wait for either navigation or timeout
+      await promisedNavigation;
       await page.waitForTimeout(2000);
 
       // Check if we navigated to anime detail page
       const url = page.url();
       console.log(`Current URL after click: ${url}`);
 
-      // Either we're on an anime detail page OR the navigation happened
+      // Check if URL changed to anime detail page
       const hasAnimeUrl = /\/anime\/\d+/.test(url);
       expect(hasAnimeUrl).toBeTruthy();
     } else {
@@ -156,14 +160,23 @@ test.describe('Anime Detail Page', () => {
     const linkCount = await watchLinks.count();
 
     if (linkCount > 0) {
+      // Get the href before clicking
+      const href = await watchLinks.first().getAttribute('href');
+      console.log(`Clicking watch link: ${href}`);
+
+      // Wait for URL change after clicking
+      const promisedNavigation = page.waitForURL(/\/watch\/\d+\/\d+/, { timeout: 10000 }).catch(() => null);
+
       await watchLinks.first().click();
 
       // Wait for navigation
-      await page.waitForLoadState('domcontentloaded', { timeout: 15000 });
+      await promisedNavigation;
+      await page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
       await page.waitForTimeout(2000);
 
       // Check if we're on watch page
       const url = page.url();
+      console.log(`Current URL after click: ${url}`);
       expect(url).toMatch(/\/watch\/\d+\/\d+/);
     } else {
       test.skip(true, 'No watch links available');

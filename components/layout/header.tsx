@@ -31,17 +31,18 @@ interface NavLinkProps {
   href: string;
   icon: React.ReactNode;
   children: React.ReactNode;
+  className?: string;
 }
 
 // Memoized navigation link components (must be defined before Header)
-const NavLink = memo(function NavLink({ href, icon, children }: NavLinkProps) {
+const NavLink = memo(function NavLink({ href, icon, children, className = "" }: NavLinkProps) {
   return (
     <Link
       href={href}
-      className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
+      className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors ${className}`}
     >
       {icon}
-      <span>{children}</span>
+      <span className="hidden xl:inline">{children}</span>
     </Link>
   );
 });
@@ -91,9 +92,9 @@ export const Header = memo(function Header() {
   return (
     <>
       {/* Main Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-background/80 backdrop-blur-xl">
+      <header className="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-background/80 backdrop-blur-xl overflow-hidden">
         <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex items-center justify-between h-16 min-w-0">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-2 group">
               <div className="relative w-8 h-8">
@@ -108,7 +109,7 @@ export const Header = memo(function Header() {
             </Link>
 
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-1">
+            <nav className="hidden md:flex items-center gap-0.5 min-w-0 flex-1">
               <NavLink href="/" icon={<TrendingUp className="w-4 h-4" />}>
                 Trending
               </NavLink>
@@ -121,30 +122,31 @@ export const Header = memo(function Header() {
               <NavLink href="/random" icon={<Shuffle className="w-4 h-4" />}>
                 Random
               </NavLink>
-              <NavLink href="/seasonal" icon={<Tv className="w-4 h-4" />}>
+              <NavLink href="/seasonal" icon={<Tv className="w-4 h-4" />} className="hidden lg:flex">
                 Seasonal
               </NavLink>
-              <NavLink href="/genres" icon={<Tags className="w-4 h-4" />}>
+              <NavLink href="/genres" icon={<Tags className="w-4 h-4" />} className="hidden lg:flex">
                 Genres
               </NavLink>
-              <NavLink href="/favorites" icon={<Heart className="w-4 h-4" />}>
+              <NavLink href="/favorites" icon={<Heart className="w-4 h-4" />} className="hidden xl:flex">
                 Favorites
               </NavLink>
-              <NavLink href="/watchlist" icon={<Clock className="w-4 h-4" />}>
+              <NavLink href="/watchlist" icon={<Clock className="w-4 h-4" />} className="hidden xl:flex">
                 Watchlist
               </NavLink>
             </nav>
 
             {/* Actions */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 flex-shrink-0">
               {/* Search Button */}
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={toggleSearch}
                 aria-label="Search"
+                className="h-9 w-9"
               >
-                <Search className="w-5 h-5" />
+                <Search className="w-4 h-4" />
               </Button>
 
               {/* Discord Community */}
@@ -152,11 +154,11 @@ export const Header = memo(function Header() {
                 href="https://discord.gg/animeverse"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hidden sm:inline-flex items-center justify-center rounded-lg text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 h-10 px-3 gap-2 transition-colors text-sm font-medium"
+                className="hidden lg:inline-flex items-center justify-center rounded-lg text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 h-9 px-2.5 gap-1.5 transition-colors text-sm font-medium"
                 aria-label="Join Discord"
               >
                 <MessageSquare className="w-4 h-4" />
-                <span>Discord</span>
+                <span className="hidden xl:inline">Discord</span>
               </a>
 
               {/* Episode Notifications */}
@@ -165,24 +167,24 @@ export const Header = memo(function Header() {
               {/* Settings */}
               <button
                 onClick={() => router.push("/settings")}
-                className="inline-flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/5 h-10 w-10 transition-colors"
+                className="inline-flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/5 h-9 w-9 transition-colors"
                 aria-label="Settings"
               >
-                <Settings className="w-5 h-5" />
+                <Settings className="w-4 h-4" />
               </button>
 
               {/* Mobile Menu Toggle */}
               <Button
                 variant="ghost"
                 size="icon"
-                className="md:hidden"
+                className="md:hidden h-9 w-9"
                 onClick={toggleMobileMenu}
                 aria-label="Menu"
               >
                 {mobileMenuOpen ? (
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4" />
                 ) : (
-                  <Menu className="w-5 h-5" />
+                  <Menu className="w-4 h-4" />
                 )}
               </Button>
             </div>

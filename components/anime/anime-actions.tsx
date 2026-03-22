@@ -8,7 +8,7 @@
 import { Plus, Check, Heart, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useWatchlist, useFavorites } from "@/store";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { ShareButton } from "@/components/player/share-dialog";
 
 interface AnimeActionsProps {
@@ -19,15 +19,16 @@ interface AnimeActionsProps {
 export function AnimeActions({ animeId, animeTitle }: AnimeActionsProps) {
   const { isInWatchlist, toggleWatchlist } = useWatchlist();
   const { isFavorite, toggleFavorite } = useFavorites();
-  const [mounted, setMounted] = useState(false);
 
-  // Prevent hydration mismatch
-  useEffect(() => {
-    setMounted(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- Only run on mount
-  }, []);
+  // Track if component is client-mounted for hydration safety
+  // Using useSyncExternalStore for proper client detection
+  const isClient = useSyncExternalStore(
+    () => () => {}, // No subscription needed
+    () => true, // Client snapshot
+    () => false, // Server snapshot
+  );
 
-  if (!mounted) {
+  if (!isClient) {
     return (
       <>
         <Button variant="glass" size="lg" disabled>

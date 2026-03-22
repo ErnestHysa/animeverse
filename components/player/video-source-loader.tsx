@@ -109,6 +109,11 @@ export function VideoSourceLoader({
 
       const response = await fetch(url.toString());
 
+      // 404 means anime/episode not found - don't retry
+      if (response.status === 404) {
+        throw new Error("This episode is not available. The anime may not be in our database yet.");
+      }
+
       if (!response.ok) {
         if (response.status === 503) {
           // API unavailable error
@@ -192,6 +197,9 @@ export function VideoSourceLoader({
 
       setRetryCount(0); // Reset retry count on success
     } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to load video sources";
+
+      // Check if error is retryable
       const isRetryable = err instanceof Error && (
         err.message.includes("fetch") ||
         err.message.includes("network") ||
@@ -201,20 +209,25 @@ export function VideoSourceLoader({
         err.message.includes("API")
       );
 
+      // Don't retry 404 or "not available" errors
+      const isFinalError = err instanceof Error && (
+        err.message.includes("not available") ||
+        err.message.includes("not in our database")
+      );
+
       // Retry logic for retryable errors
-      if (isRetryable && retryAttempt < MAX_RETRIES) {
+      if (isRetryable && !isFinalError && retryAttempt < MAX_RETRIES) {
         const delay = RETRY_DELAY * Math.pow(2, retryAttempt); // Exponential backoff
         await sleep(delay);
         return fetchSources(language, retryAttempt + 1);
       }
 
-      // Final error after all retries exhausted
-      const message = err instanceof Error ? err.message : "Failed to load video sources";
-      const errorMessage = retryAttempt > 0
-        ? `${message} (Failed after ${MAX_RETRIES} retry attempts)`
-        : message;
-      setError(errorMessage);
-      onError?.(new Error(errorMessage));
+      // Final error after all retries exhausted or non-retryable error
+      const finalMessage = retryAttempt > 0
+        ? `${errorMessage} (Failed after ${MAX_RETRIES} retry attempts)`
+        : errorMessage;
+      setError(finalMessage);
+      onError?.(new Error(finalMessage));
       setRetryCount(retryAttempt);
     } finally {
       setLoading(false);
@@ -373,6 +386,7 @@ export function VideoSourceLoader({
       animeTitle={animeTitle}
       animeId={animeId}
       episodeNumber={episodeNumber}
+      malId={malId}
       nextEpisodeUrl={nextEpisodeUrl}
       onError={onError}
       onEpisodeEnd={onEpisodeEnd}

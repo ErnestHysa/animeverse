@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Share2, X, Check, Link as LinkIcon, Facebook, Twitter, MessageCircle } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
@@ -55,11 +55,9 @@ const PLATFORMS = [
 
 export function ShareDialog({ isOpen, onClose, title, url, episode }: ShareDialogProps) {
   const [copied, setCopied] = useState(false);
-  const [shareUrl, setShareUrl] = useState(url);
 
-  useEffect(() => {
-    setShareUrl(url);
-  }, [url, episode]);
+  // Derive shareUrl from props instead of using state + effect
+  const shareUrl = useMemo(() => url, [url]);
 
   if (!isOpen) return null;
 
@@ -164,7 +162,6 @@ export function ShareDialog({ isOpen, onClose, title, url, episode }: ShareDialo
               <input
                 type="text"
                 value={shareUrl}
-                onChange={(e) => setShareUrl(e.target.value)}
                 readOnly
                 className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm"
               />

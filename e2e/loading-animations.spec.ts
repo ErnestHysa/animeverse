@@ -3,8 +3,8 @@ import { test, expect } from '@playwright/test';
 test.describe('Loading Animations', () => {
   test('video player shows loading animation with animation classes', async ({ page }) => {
     // Start from homepage and find a valid anime
-    await page.goto('/');
-    await page.waitForLoadState('domcontentloaded', { timeout: 20000 }).catch(() => {});
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
 
     // Find the first anime card and get its link
     const animeCard = page.locator('a[href^="/anime/"]').first();
@@ -17,8 +17,7 @@ test.describe('Loading Animations', () => {
     }
 
     // Navigate to the anime detail page (href already includes leading /)
-    await page.goto(animeHref);
-    await page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
+    await page.goto(animeHref, { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(2000);
 
     // Look for episode button or link
@@ -53,8 +52,8 @@ test.describe('Loading Animations', () => {
   });
 
   test('page has smooth transitions enabled', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('domcontentloaded', { timeout: 20000 }).catch(() => {});
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
 
     // Check for fade-in elements or transition classes
     const fadeInElements = page.locator('[class*="fade"], [class*="transition"]');
@@ -65,8 +64,8 @@ test.describe('Loading Animations', () => {
   });
 
   test('buttons have hover effects', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('domcontentloaded', { timeout: 20000 }).catch(() => {});
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2000);
 
     // Check for buttons with hover classes
     const buttons = page.locator('button');
@@ -127,10 +126,7 @@ test.describe('Loading Animations', () => {
   });
 
   test('glass card loading state has animations', async ({ page }) => {
-    await page.goto('/', { timeout: 15000 });
-
-    // Try to wait for domcontentloaded, but don't fail if it times out
-    await page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
+    await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 15000 });
 
     // Give page time to settle
     await page.waitForTimeout(2000);

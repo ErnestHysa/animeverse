@@ -6,12 +6,11 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Bell, BellOff, Check, X, Settings } from "lucide-react";
+import { Bell, BellOff, Check, X } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
 import { toast } from "react-hot-toast";
 import { useWatchlist, useFavorites } from "@/store";
-import type { Media } from "@/types/anilist";
 
 // ===================================
 // Types
@@ -83,13 +82,14 @@ class NotificationManager {
     if (!this.swRegistration) return;
 
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Reserved for production push notifications
       const subscription = await this.swRegistration.pushManager.subscribe({
         userVisibleOnly: true,
       });
       // In production, send subscription to server
       // Push subscription created successfully
-    } catch (error) {
-      // Push not supported or user declined
+    } catch {
+      // Push not supported or user declined - silently ignore
     }
   }
 
@@ -219,14 +219,6 @@ export function EpisodeNotifications({ airingSchedule = [] }: EpisodeNotificatio
     const granted = await notificationManager.requestPermission();
     setPermission(granted ? "granted" : "denied");
   };
-
-  // Enable notifications for an anime
-  const enableForAnime = useCallback((anime: Media, currentEpisode: number = 0) => {
-    notificationManager.enableNotification(anime.id, anime.title.romaji || anime.title.english || "", currentEpisode);
-    setPrefs(notificationManager.getPreferences());
-    setEnabledCount((prev) => prev + 1);
-    toast.success(`Notifications enabled for ${anime.title.romaji || anime.title.english}`);
-  }, []);
 
   // Disable notifications for an anime
   const disableForAnime = useCallback((mediaId: number) => {
@@ -426,6 +418,7 @@ export function NotificationPermissionRequest() {
 
   useEffect(() => {
     if ("Notification" in window) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Setting initial permission state on mount
       setPermission(Notification.permission);
     }
   }, []);
