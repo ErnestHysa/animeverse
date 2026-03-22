@@ -1,7 +1,9 @@
 /**
  * Video Sources API Route
- * Fetches video sources from the local Consumet API (AnimeKai provider)
+ * Fetches video sources from the local Consumet API (AnimeSaturn provider)
  * Proxies requests to avoid CORS issues
+ *
+ * Note: AnimeSaturn is used as the primary provider as AnimeKai is blocked by Cloudflare
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -12,19 +14,18 @@ export const dynamic = "force-dynamic";
 // Get API base URL from environment or use localhost
 const API_BASE_URL = process.env.VIDEO_API_BASE_URL || "http://localhost:3001";
 
-interface AnimeKaiEpisode {
+interface AnimeSaturnEpisode {
   id: string;
   number: number;
-  title?: string;
 }
 
-interface AnimeKaiInfo {
+interface AnimeSaturnInfo {
   id: string;
   title: string;
-  episodes?: AnimeKaiEpisode[];
+  episodes?: AnimeSaturnEpisode[];
 }
 
-interface AnimeKaiSourcesResponse {
+interface AnimeSaturnSourcesResponse {
   headers?: {
     Referer?: string;
   };
@@ -36,25 +37,22 @@ interface AnimeKaiSourcesResponse {
   subtitles?: Array<{
     url: string;
     lang: string;
-    kind: string;
   }>;
 }
 
 /**
- * Search for anime on AnimeKai by title
+ * Search for anime on AnimeSaturn by title
  * Returns the anime ID if found
- * AnimeKai indexes by English titles, so we need to try various strategies
  */
 async function searchAnimeId(
   title: string,
   malId: number | null
 ): Promise<string | null> {
-  // Build search strategies - prioritize English-style titles
+  // Build search strategies - try various title formats
   const searchStrategies: string[] = [];
 
-  // Strategy 1: Direct title (should be English if passed correctly)
+  // Strategy 1: Direct title
   if (title) {
-    // Keep most characters, only remove very special ones
     const cleanTitle = title.toLowerCase().trim();
     searchStrategies.push(cleanTitle);
   }
@@ -62,11 +60,9 @@ async function searchAnimeId(
   // Strategy 2: Extract key words and try combinations
   if (title) {
     const words = title.split(" ").filter(w => w.length > 3);
-    // Try first 2 significant words
     if (words.length >= 2) {
       searchStrategies.push(`${words[0]} ${words[1]}`.toLowerCase());
     }
-    // Try first 3 significant words
     if (words.length >= 3) {
       searchStrategies.push(`${words[0]} ${words[1]} ${words[2]}`.toLowerCase());
     }
@@ -99,7 +95,7 @@ async function searchAnimeId(
   // Try each search strategy
   for (const searchTerm of uniqueStrategies) {
     try {
-      const searchUrl = `${API_BASE_URL}/anime/animekai/${encodeURIComponent(searchTerm)}`;
+      const searchUrl = `${API_BASE_URL}/anime/animesaturn/${encodeURIComponent(searchTerm)}`;
       const response = await fetch(searchUrl, {
         signal: AbortSignal.timeout(10000),
       });
@@ -149,7 +145,7 @@ async function searchAnimeId(
           for (const titleData of jikanTitles) {
             const searchTerm = titleData.title?.toLowerCase().replace(/[^\w\s]/g, " ").trim();
             if (searchTerm && searchTerm.length > 3) {
-              const searchUrl = `${API_BASE_URL}/anime/animekai/${encodeURIComponent(searchTerm)}`;
+              const searchUrl = `${API_BASE_URL}/anime/animesaturn/${encodeURIComponent(searchTerm)}`;
               const response = await fetch(searchUrl, { signal: AbortSignal.timeout(5000) });
               if (response.ok) {
                 const data = await response.json();
@@ -172,9 +168,9 @@ async function searchAnimeId(
 /**
  * Get anime info including episode list
  */
-async function getAnimeInfo(animeId: string): Promise<AnimeKaiInfo | null> {
+async function getAnimeInfo(animeId: string): Promise<AnimeSaturnInfo | null> {
   try {
-    const url = `${API_BASE_URL}/anime/animekai/info?id=${encodeURIComponent(animeId)}`;
+    const url = `${API_BASE_URL}/anime/animesaturn/info?id=${encodeURIComponent(animeId)}`;
     const response = await fetch(url, {
       signal: AbortSignal.timeout(10000),
     });
@@ -188,11 +184,10 @@ async function getAnimeInfo(animeId: string): Promise<AnimeKaiInfo | null> {
 }
 
 /**
- * Get episode sources from AnimeKai
+ * Get episode sources from AnimeSaturn
  */
 async function getEpisodeSources(
-  episodeId: string,
-  language: "sub" | "dub" = "sub"
+  episodeId: string
 ): Promise<{
   sources: Array<{
     url: string;
@@ -209,8 +204,7 @@ async function getEpisodeSources(
   referer?: string;
 } | null> {
   try {
-    const dubParam = language === "dub" ? "?dub=true" : "";
-    const url = `${API_BASE_URL}/anime/animekai/watch/${encodeURIComponent(episodeId)}${dubParam}`;
+    const url = `${API_BASE_URL}/anime/animesaturn/watch/${encodeURIComponent(episodeId)}`;
 
     const response = await fetch(url, {
       signal: AbortSignal.timeout(15000),
@@ -218,27 +212,27 @@ async function getEpisodeSources(
 
     if (!response.ok) return null;
 
-    const data: AnimeKaiSourcesResponse = await response.json();
+    const data: AnimeSaturnSourcesResponse = await response.json();
 
     if (!data.sources || data.sources.length === 0) return null;
 
     // Map sources to our format
-    const sources = data.sources.map((s) => ({
-      url: s.url,
-      quality: mapQuality(s.quality),
-      label: s.quality || "Auto",
-      provider: `AnimeKai (${language.toUpperCase()})`,
-      type: (s.isM3U8 ? "hls" : "mp4") as "mp4" | "hls" | "webm",
-    }));
+    const sources = data.sources
+      .filter(s => !s.url.includes("thumbnails.vtt")) // Filter out thumbnail streams
+      .map((s) => ({
+        url: s.url,
+        quality: "auto" as const, // AnimeSaturn doesn't provide quality info
+        label: s.quality || "Auto",
+        provider: "AnimeSaturn",
+        type: (s.isM3U8 ? "hls" : "mp4") as "mp4" | "hls" | "webm",
+      }));
 
     // Map subtitles
-    const subtitles = (data.subtitles || [])
-      .filter((sub) => sub.kind === "captions")
-      .map((sub) => ({
-        url: sub.url,
-        lang: sub.lang.split(" ")[0].toLowerCase(), // Take first part of language
-        label: sub.lang,
-      }));
+    const subtitles = (data.subtitles || []).map((sub) => ({
+      url: sub.url,
+      lang: sub.lang.split(" ")[0].toLowerCase(), // Take first part of language
+      label: sub.lang,
+    }));
 
     return {
       sources,
@@ -251,26 +245,12 @@ async function getEpisodeSources(
 }
 
 /**
- * Map quality string to standard format
- */
-function mapQuality(quality: string | undefined): "360p" | "480p" | "720p" | "1080p" | "auto" {
-  if (!quality) return "auto";
-
-  const q = quality.toLowerCase();
-  if (q.includes("1080")) return "1080p";
-  if (q.includes("720")) return "720p";
-  if (q.includes("480")) return "480p";
-  if (q.includes("360")) return "360p";
-  return "auto";
-}
-
-/**
  * GET /api/video-sources/[animeId]/[episode]
  * Returns video sources for the requested episode
  * Query params:
  * - title: Anime title for searching
  * - malId: MyAnimeList ID for better matching
- * - language: "sub" or "dub" (default: "sub")
+ * - language: "sub" or "dub" (default: "sub") - Note: AnimeSaturn primarily has Italian subs
  */
 export async function GET(
   request: NextRequest,
@@ -313,19 +293,19 @@ export async function GET(
 
     const availableLanguages: Array<{ type: "sub" | "dub"; available: boolean }> = [
       { type: "sub", available: true },
-      { type: "dub", available: false },
+      { type: "dub", available: false }, // AnimeSaturn primarily has subs
     ];
 
-    // Search for the anime on AnimeKai
+    // Search for the anime on AnimeSaturn
     if (title) {
-      const animeKaiId = await searchAnimeId(
+      const animeSaturnId = await searchAnimeId(
         title,
         malId ? parseInt(malId) : null
       );
 
-      if (animeKaiId) {
+      if (animeSaturnId) {
         // Get anime info to find the episode ID
-        const animeInfo = await getAnimeInfo(animeKaiId);
+        const animeInfo = await getAnimeInfo(animeSaturnId);
 
         if (animeInfo?.episodes) {
           const episodeData = animeInfo.episodes.find(
@@ -334,24 +314,13 @@ export async function GET(
 
           if (episodeData) {
             // Get sources for this episode
-            const sourcesData = await getEpisodeSources(
-              episodeData.id,
-              language
-            );
+            const sourcesData = await getEpisodeSources(episodeData.id);
 
             if (sourcesData && sourcesData.sources.length > 0) {
               sources = sourcesData.sources;
               subtitles.push(...sourcesData.subtitles);
               referer = sourcesData.referer;
-              provider = `animekai-${language}`;
-
-              // Check if dub is available
-              if (language === "sub") {
-                // Try to get dub sources to check availability
-                const dubSources = await getEpisodeSources(episodeData.id, "dub");
-                availableLanguages.find((l) => l.type === "dub")!.available =
-                  !!dubSources && dubSources.sources.length > 0;
-              }
+              provider = "animesaturn";
             }
           }
         }
@@ -372,7 +341,7 @@ export async function GET(
           intro: null,
           outro: null,
           error: "NO_SOURCES",
-          message: `No video sources found for episode ${episodeNumber}. The anime might not be available on AnimeKai.`,
+          message: `No video sources found for episode ${episodeNumber}. The anime might not be available on AnimeSaturn.`,
         },
         { status: 404 }
       );
