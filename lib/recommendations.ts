@@ -50,8 +50,8 @@ class RecommendationEngine {
     const genreCounts = new Map<string, number>();
     const formatCounts = new Map<string, number>();
     const studioCounts = new Map<string, number>();
-    let totalScore = 0;
-    let scoreCount = 0;
+    const totalScore = 0;
+    const scoreCount = 0;
 
     // In production, fetch full anime details to extract genres
     // For now, use default preferences based on watch history size

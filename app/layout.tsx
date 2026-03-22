@@ -3,6 +3,7 @@ import { Space_Grotesk, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
 import { ThemeProvider } from "@/components/providers/theme-provider";
+import { GlobalComponents } from "@/components/layout/global-components";
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-display",
@@ -88,6 +89,7 @@ export default function RootLayout({
         <ThemeProvider>
           {children}
           <ServiceWorkerRegister />
+          <GlobalComponents />
         </ThemeProvider>
         <script
           dangerouslySetInnerHTML={{

@@ -7,7 +7,8 @@
 
 export const dynamic = "force-dynamic";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -34,6 +35,7 @@ import {
 import { toast } from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import { NotificationSettings } from "@/components/notifications/notification-settings";
+import { SubtitleSettings } from "@/components/settings/subtitle-settings";
 import {
   calculateStats,
   formatWatchTime,
@@ -53,11 +55,20 @@ export default function SettingsPage() {
   const {
     anilistUser,
     anilistToken,
+    anilistMediaList,
     isAuthenticated,
     setAniListAuth,
     clearAniListAuth,
     syncAniListData,
+    migrateAniListData,
   } = useAniListAuth();
+
+  // AniList auth state
+  const [showTokenInput, setShowTokenInput] = useState(false);
+  const [accessToken, setAccessToken] = useState('');
+  const [clientId] = useState(process.env.NEXT_PUBLIC_ANILIST_CLIENT_ID || "37660");
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [anilistFilter, setAnilistFilter] = useState<'all' | 'watching' | 'completed' | 'planning' | 'paused' | 'dropped'>('all');
 
   const [historyCount, setHistoryCount] = useState(() => {
     // Initialize with 0 on server, actual count on client
@@ -164,39 +175,19 @@ export default function SettingsPage() {
   // AniList OAuth Handlers
   // ===================================
 
-  // Handle OAuth callback from URL hash
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const params = new URLSearchParams(window.location.search);
-    const authStatus = params.get("auth");
-
-    if (authStatus === "success") {
-      // Get auth data from URL hash
-      try {
-        const hashData = JSON.parse(decodeURIComponent(window.location.hash.slice(1)));
-        if (hashData.token && hashData.user) {
-          setAniListAuth(hashData.user, hashData.token);
-          toast.success(`Welcome back, ${hashData.user.name}!`);
-
-          // Fetch and sync AniList data
-          fetchAniListData(hashData.token);
-        }
-      } catch (error) {
-        console.error("Error parsing auth data:", error);
-      }
-
-      // Clean up URL
-      window.history.replaceState({}, "", "/settings");
-    } else if (authStatus === "error") {
-      const message = params.get("message");
-      toast.error(`Authentication failed: ${message}`);
-      window.history.replaceState({}, "", "/settings");
-    }
-  }, [setAniListAuth]);
-
   // Fetch user's AniList data and sync with local state
-  const fetchAniListData = async (token: string) => {
+  const fetchAniListData = useCallback(async (token: string) => {
+    if (!token) {
+      toast.error("No access token available. Please login again.");
+      return;
+    }
+
+    if (!anilistUser?.id) {
+      toast.error("User data not available. Please login again.");
+      return;
+    }
+
+    setIsSyncing(true);
     try {
       const response = await fetch("https://graphql.anilist.co", {
         method: "POST",
@@ -207,43 +198,232 @@ export default function SettingsPage() {
         },
         body: JSON.stringify({
           query: `
-            query {
+            query ($userId: Int) {
               MediaListCollection(userId: $userId, type: ANIME) {
-                mediaId
-                status
-                progress
-                score
-                media {
-                  id
-                  idMal
-                  title { romaji english }
-                  coverImage { large }
-                  status
-                  episodes
+                lists {
+                  entries {
+                    mediaId
+                    status
+                    progress
+                    score
+                    startedAt { year month day }
+                    completedAt { year month day }
+                    media {
+                      id
+                      idMal
+                      title { romaji english }
+                      coverImage { large extraLarge }
+                      status
+                      episodes
+                      genres
+                      averageScore
+                      format
+                      duration
+                      description
+                      studios { nodes { name } }
+                    }
+                  }
                 }
+              }
+            }
+          `,
+          variables: {
+            userId: anilistUser.id,
+          },
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        const lists = result.data?.MediaListCollection?.lists || [];
+        // Flatten the lists to get all entries
+        const allEntries = lists.flatMap((list: { entries: unknown[] }) => list.entries || []);
+
+        // First sync the AniList data
+        syncAniListData(allEntries);
+
+        // Then migrate data to app structures (watch history, media cache, stats)
+        // Use setTimeout to allow state to update first
+        setTimeout(() => {
+          // Get the updated state from the store
+          const currentState = useStore.getState().anilistMediaList;
+          migrateAniListData(currentState);
+
+          // Recalculate stats display
+          calculateAndSetStats();
+
+          toast.success(`Synced ${allEntries.length} anime from AniList! Data migrated successfully.`);
+        }, 100);
+      } else {
+        const errorText = await response.text();
+        console.error("AniList API error:", errorText);
+        toast.error("Failed to sync AniList data. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error fetching AniList data:", error);
+      toast.error("Failed to sync AniList data. Please try again.");
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [anilistUser?.id, syncAniListData, migrateAniListData, calculateAndSetStats]);
+
+  // Handle OAuth callback from URL hash
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    const authStatus = params.get("auth");
+
+    if (authStatus === "success") {
+      // Check URL hash for auth data (passed by callback route)
+      let tokenFromHash = null;
+      let userFromHash = null;
+
+      try {
+        const hashData = JSON.parse(decodeURIComponent(window.location.hash.slice(1)));
+        if (hashData.token && hashData.user) {
+          tokenFromHash = hashData.token;
+          userFromHash = hashData.user;
+          // Store in Zustand
+          setAniListAuth(hashData.user, hashData.token);
+          toast.success(`Welcome back, ${hashData.user.name}!`);
+          fetchAniListData(hashData.token);
+        }
+      } catch (e) {
+        // Hash parse failed, try Zustand state
+      }
+
+      // Clean URL hash
+      window.history.replaceState({}, "", "/settings");
+
+      // If no hash data, check Zustand state
+      if (!tokenFromHash) {
+        setTimeout(() => {
+          if (isAuthenticated && anilistUser) {
+            toast.success(`Welcome back, ${anilistUser.name}!`);
+            if (anilistToken) {
+              fetchAniListData(anilistToken);
+            }
+          } else {
+            // Fallback: try to get from localStorage directly
+            try {
+              const zustandData = localStorage.getItem("animeverse-stream-storage");
+              if (zustandData) {
+                const parsed = JSON.parse(zustandData);
+                if (parsed.state?.anilistUser && parsed.state?.anilistToken) {
+                  setAniListAuth(parsed.state.anilistUser, parsed.state.anilistToken);
+                  toast.success(`Welcome back, ${parsed.state.anilistUser.name}!`);
+                  fetchAniListData(parsed.state.anilistToken);
+                }
+              }
+            } catch (e) {
+              console.error("Error parsing Zustand state:", e);
+            }
+          }
+        }, 100);
+      }
+
+      // Clean URL
+      window.history.replaceState({}, "", "/settings");
+    } else if (authStatus === "error") {
+      const message = params.get("message");
+      const debug = params.get("debug");
+
+      let errorDetails = message || "Unknown error";
+
+      // Provide helpful error messages
+      if (message === "redirect_uri_mismatch" || message?.includes("redirect")) {
+        const expectedRedirectUri = `${window.location.origin}/auth/anilist/callback`;
+        errorDetails = "Redirect URL mismatch. Make sure your AniList app has this exact redirect URL:\n\n" + (debug || expectedRedirectUri);
+      } else if (message === "token_exchange_failed") {
+        errorDetails = "Failed to exchange authorization code for token. Please try again.";
+      } else if (message === "no_code") {
+        errorDetails = "No authorization code received. Please try the login flow again.";
+      }
+
+      toast.error(`Authentication failed: ${errorDetails}`, { duration: 8000 });
+      console.error("OAuth Error Details:", { message, debug, errorDetails });
+      window.history.replaceState({}, "", "/settings");
+    }
+  }, [isAuthenticated, anilistUser, anilistToken, setAniListAuth, fetchAniListData]);
+
+  // Login with AniList using Authorization Code Grant
+  // This is the proper OAuth 2.0 flow with client_secret
+  const handleAniListLogin = () => {
+    const redirectUri = `${window.location.origin}/auth/anilist/callback`;
+    const authUrl = `https://anilist.co/api/v2/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
+
+    // Debug: show what redirect URI is being used
+    console.log('OAuth Login Initiated');
+    console.log('Client ID:', clientId);
+    console.log('Redirect URI:', redirectUri);
+    console.log('Auth URL:', authUrl);
+
+    // Show toast with expected redirect URI for verification
+    toast(`Redirecting to AniList...\n\nMake sure your AniList app has this redirect URL:\n${redirectUri}`, {
+      duration: 5000,
+      icon: '🔗',
+    });
+
+    // Small delay to allow toast to show
+    setTimeout(() => {
+      window.location.href = authUrl;
+    }, 100);
+  };
+
+  // Handle manual token submission (fallback)
+  const handleTokenSubmit = async () => {
+    if (!accessToken.trim()) {
+      toast.error('Please enter your access token');
+      return;
+    }
+
+    try {
+      // Verify token by fetching user data
+      const userResponse = await fetch('https://graphql.anilist.co', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken.trim()}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: `
+            query {
+              Viewer {
+                id
+                name
+                avatar { large medium }
+                options { displayAdultContent }
+                mediaListOptions { scoreFormat rowOrder }
               }
             }
           `,
         }),
       });
 
-      if (response.ok) {
-        const result = await response.json();
-        const mediaList = result.data?.MediaListCollection || [];
-        syncAniListData(mediaList);
-        toast.success("AniList data synced!");
+      if (!userResponse.ok) {
+        throw new Error('Invalid access token');
       }
-    } catch (error) {
-      console.error("Error fetching AniList data:", error);
-    }
-  };
 
-  // Login with AniList
-  const handleAniListLogin = () => {
-    const clientId = process.env.NEXT_PUBLIC_ANILIST_CLIENT_ID || "16500";
-    const redirectUri = `${window.location.origin}/auth/anilist/callback`;
-    const authUrl = `https://anilist.co/api/v2/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
-    window.location.href = authUrl;
+      const userResult = await userResponse.json();
+      const userData = userResult.data?.Viewer;
+
+      if (!userData) {
+        throw new Error('Failed to fetch user data');
+      }
+
+      setAniListAuth(userData, accessToken.trim());
+      toast.success(`Welcome back, ${userData.name}!`);
+      setShowTokenInput(false);
+      setAccessToken('');
+
+      // Fetch and sync AniList data
+      fetchAniListData(accessToken.trim());
+    } catch (error) {
+      console.error('Token verification error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(`Failed to authenticate: ${errorMessage}`);
+    }
   };
 
   // Logout from AniList
@@ -474,6 +654,15 @@ export default function SettingsPage() {
               </div>
             </GlassCard>
 
+            {/* Subtitle Settings */}
+            <GlassCard>
+              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                <Bell className="w-5 h-5 text-primary" />
+                Subtitle Appearance
+              </h2>
+              <SubtitleSettings />
+            </GlassCard>
+
             {/* Appearance */}
             <GlassCard>
               <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
@@ -575,11 +764,12 @@ export default function SettingsPage() {
                   {/* Sync Options */}
                   <div className="grid grid-cols-2 gap-3">
                     <button
-                      onClick={() => fetchAniListData(anilistToken || "")}
-                      className="px-4 py-3 bg-white/5 hover:bg-white/10 rounded-lg flex items-center justify-center gap-2 transition-colors"
+                      onClick={() => anilistToken && fetchAniListData(anilistToken)}
+                      disabled={!anilistToken || isSyncing}
+                      className="px-4 py-3 bg-white/5 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg flex items-center justify-center gap-2 transition-colors"
                     >
-                      <RefreshCw className="w-4 h-4" />
-                      Sync Now
+                      <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                      {isSyncing ? 'Syncing...' : 'Sync Now'}
                     </button>
                     <button
                       onClick={handleAniListLogout}
@@ -593,6 +783,97 @@ export default function SettingsPage() {
                   <p className="text-xs text-muted-foreground">
                     Your favorites and watchlist sync with AniList automatically.
                   </p>
+
+                  {/* AniList Media List */}
+                  {anilistMediaList.length > 0 && (
+                    <div className="mt-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-semibold">Your AniList ({anilistMediaList.length})</h3>
+                        <select
+                          value={anilistFilter}
+                          onChange={(e) => setAnilistFilter(e.target.value as 'all' | 'watching' | 'completed' | 'planning' | 'paused' | 'dropped')}
+                          className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                        >
+                          <option value="all">All</option>
+                          <option value="watching">Watching</option>
+                          <option value="completed">Completed</option>
+                          <option value="planning">Plan to Watch</option>
+                          <option value="paused">Paused</option>
+                          <option value="dropped">Dropped</option>
+                        </select>
+                      </div>
+                      <div className="max-h-96 overflow-y-auto space-y-2 pr-2">
+                        {anilistMediaList
+                          .filter((entry) => {
+                            if (anilistFilter === 'all') return true;
+                            if (anilistFilter === 'watching') return entry.status === 'CURRENT';
+                            if (anilistFilter === 'completed') return entry.status === 'COMPLETED';
+                            if (anilistFilter === 'planning') return entry.status === 'PLANNING';
+                            if (anilistFilter === 'paused') return entry.status === 'PAUSED';
+                            if (anilistFilter === 'dropped') return entry.status === 'DROPPED';
+                            return true;
+                          })
+                          .slice(0, 20)
+                          .map((entry) => (
+                            <Link
+                              key={entry.mediaId}
+                              href={`/anime/${entry.mediaId}`}
+                              className="flex items-center gap-3 p-3 bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
+                            >
+                              {entry.media?.coverImage?.large && (
+                                <img
+                                  src={entry.media.coverImage.large}
+                                  alt={entry.media.title?.romaji || ''}
+                                  className="w-12 h-16 object-cover rounded"
+                                />
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-medium text-sm truncate">
+                                  {entry.media?.title?.romaji || entry.media?.title?.english || `Anime ${entry.mediaId}`}
+                                </h4>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className={`text-xs px-2 py-0.5 rounded ${
+                                    entry.status === 'COMPLETED' ? 'bg-green-500/20 text-green-400' :
+                                    entry.status === 'CURRENT' ? 'bg-blue-500/20 text-blue-400' :
+                                    entry.status === 'PLANNING' ? 'bg-purple-500/20 text-purple-400' :
+                                    entry.status === 'PAUSED' ? 'bg-yellow-500/20 text-yellow-400' :
+                                    entry.status === 'DROPPED' ? 'bg-red-500/20 text-red-400' :
+                                    'bg-gray-500/20 text-gray-400'
+                                  }`}>
+                                    {entry.status === 'CURRENT' ? 'Watching' :
+                                     entry.status === 'COMPLETED' ? 'Completed' :
+                                     entry.status === 'PLANNING' ? 'Plan to Watch' :
+                                     entry.status === 'PAUSED' ? 'Paused' :
+                                     entry.status === 'DROPPED' ? 'Dropped' : entry.status}
+                                  </span>
+                                  {entry.progress > 0 && (
+                                    <span className="text-xs text-muted-foreground">
+                                      Ep {entry.progress}/{entry.media?.episodes || '?'}
+                                    </span>
+                                  )}
+                                  {entry.score > 0 && (
+                                    <span className="text-xs text-yellow-400">
+                                      ★ {entry.score}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </Link>
+                          ))}
+                        {anilistMediaList.filter((entry) => {
+                          if (anilistFilter === 'all') return true;
+                          if (anilistFilter === 'watching') return entry.status === 'CURRENT';
+                          if (anilistFilter === 'completed') return entry.status === 'COMPLETED';
+                          if (anilistFilter === 'planning') return entry.status === 'PLANNING';
+                          if (anilistFilter === 'paused') return entry.status === 'PAUSED';
+                          if (anilistFilter === 'dropped') return entry.status === 'DROPPED';
+                          return true;
+                        }).length === 0 && (
+                          <p className="text-sm text-muted-foreground text-center py-4">No anime in this category</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -602,13 +883,81 @@ export default function SettingsPage() {
                     <p className="text-sm text-muted-foreground mb-4">
                       Sync your anime list, favorites, and watch history with AniList
                     </p>
-                    <button
-                      onClick={handleAniListLogin}
-                      className="w-full px-6 py-3 bg-primary hover:bg-primary/90 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
-                    >
-                      <LogIn className="w-4 h-4" />
-                      Login with AniList
-                    </button>
+
+                    {!showTokenInput ? (
+                      <div className="space-y-4">
+                        {/* Configuration Help */}
+                        <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-left">
+                          <p className="text-xs font-medium text-yellow-400 mb-2">⚠️ Required Configuration</p>
+                          <p className="text-xs text-muted-foreground mb-2">
+                            Make sure your AniList app has this exact <strong>Redirect URL</strong>:
+                          </p>
+                          <code className="block w-full px-2 py-1.5 bg-black/30 rounded text-xs font-mono text-green-400 break-all">
+                            {typeof window !== 'undefined' ? `${window.location.origin}/auth/anilist/callback` : 'http://localhost:3000/auth/anilist/callback'}
+                          </code>
+                          <a
+                            href="https://anilist.co/settings/developer"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-primary hover:underline mt-2 inline-block"
+                          >
+                            Open AniList Developer Settings →
+                          </a>
+                        </div>
+
+                        <button
+                          onClick={handleAniListLogin}
+                          className="w-full px-6 py-3 bg-primary hover:bg-primary/90 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                        >
+                          <LogIn className="w-4 h-4" />
+                          Login with AniList
+                        </button>
+                        <p className="text-xs text-muted-foreground">
+                          You&apos;ll be redirected to AniList to authorize
+                        </p>
+                        <button
+                          onClick={() => setShowTokenInput(true)}
+                          className="text-xs text-muted-foreground hover:text-foreground underline"
+                        >
+                          Or enter access token manually
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3 text-left">
+                        <p className="text-sm text-muted-foreground">
+                          <strong className="text-white">Manual Token Entry:</strong><br />
+                          Paste your AniList access token below. You can get one from the
+                          <a href="https://anilist.co/settings/developer" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline mx-1">AniList Developer Settings</a>
+                        </p>
+                        <div>
+                          <label className="text-xs text-muted-foreground block mb-1">Access Token:</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="password"
+                              value={accessToken}
+                              onChange={(e) => setAccessToken(e.target.value)}
+                              placeholder="Paste your AniList access token"
+                              className="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm font-mono text-xs"
+                            />
+                            <button
+                              onClick={handleTokenSubmit}
+                              className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition-colors text-sm whitespace-nowrap"
+                            >
+                              Connect
+                            </button>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setShowTokenInput(false);
+                            setAccessToken('');
+                          }}
+                          className="text-sm text-muted-foreground hover:text-foreground underline"
+                        >
+                          Back to OAuth Login
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex items-start gap-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">

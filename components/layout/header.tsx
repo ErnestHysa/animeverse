@@ -26,6 +26,9 @@ import {
   Moon,
   User,
   LogOut,
+  List as ListIcon,
+  Trophy,
+  BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -45,7 +48,7 @@ const NavLink = memo(function NavLink({ href, icon, children, className = "" }: 
   return (
     <Link
       href={href}
-      className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors ${className}`}
+      className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors whitespace-nowrap ${className}`}
     >
       {icon}
       <span className="hidden xl:inline">{children}</span>
@@ -116,9 +119,9 @@ export const Header = memo(function Header() {
   return (
     <>
       {/* Main Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-background/80 backdrop-blur-xl overflow-hidden">
+      <header className="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-background/80 backdrop-blur-xl">
         <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between h-16 min-w-0">
+          <div className="flex items-center justify-between h-14 min-w-0">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-2 group">
               <div className="relative w-8 h-8">
@@ -133,7 +136,7 @@ export const Header = memo(function Header() {
             </Link>
 
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-0.5 min-w-0 flex-1">
+            <nav className="hidden md:flex items-center gap-0.5 min-w-0 flex-1 overflow-x-auto">
               <NavLink href="/" icon={<TrendingUp className="w-4 h-4" />}>
                 Trending
               </NavLink>
@@ -155,20 +158,29 @@ export const Header = memo(function Header() {
               <NavLink href="/favorites" icon={<Heart className="w-4 h-4" />} className="hidden xl:flex">
                 Favorites
               </NavLink>
-              <NavLink href="/watchlist" icon={<Clock className="w-4 h-4" />} className="hidden xl:flex">
+              <NavLink href="/watchlist" icon={<Clock className="w-4 h-4" />} className="hidden 2xl:flex">
                 Watchlist
+              </NavLink>
+              <NavLink href="/lists" icon={<ListIcon className="w-4 h-4" />} className="hidden 2xl:flex">
+                Lists
+              </NavLink>
+              <NavLink href="/achievements" icon={<Trophy className="w-4 h-4" />} className="hidden 2xl:flex">
+                Achievements
+              </NavLink>
+              <NavLink href="/stats" icon={<BarChart3 className="w-4 h-4" />} className="hidden 2xl:flex">
+                Stats
               </NavLink>
             </nav>
 
             {/* Actions */}
-            <div className="flex items-center gap-1 flex-shrink-0">
+            <div className="flex items-center gap-0.5 flex-shrink-0">
               {/* Search Button */}
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={toggleSearch}
                 aria-label="Search"
-                className="h-9 w-9"
+                className="h-8 w-8"
               >
                 <Search className="w-4 h-4" />
               </Button>
@@ -179,7 +191,7 @@ export const Header = memo(function Header() {
                 size="icon"
                 onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
                 aria-label="Toggle theme"
-                className="h-9 w-9"
+                className="h-8 w-8"
               >
                 {resolvedTheme === "dark" ? (
                   <Sun className="w-4 h-4" />
@@ -188,16 +200,16 @@ export const Header = memo(function Header() {
                 )}
               </Button>
 
-              {/* Discord Community */}
+              {/* Discord Community - hidden on smaller screens */}
               <a
                 href="https://discord.gg/animeverse"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hidden lg:inline-flex items-center justify-center rounded-lg text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 h-9 px-2.5 gap-1.5 transition-colors text-sm font-medium"
+                className="hidden 2xl:inline-flex items-center justify-center rounded-lg text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 h-8 px-2 gap-1 transition-colors text-xs font-medium"
                 aria-label="Join Discord"
               >
-                <MessageSquare className="w-4 h-4" />
-                <span className="hidden xl:inline">Discord</span>
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span>Discord</span>
               </a>
 
               {/* Episode Notifications */}
@@ -208,24 +220,24 @@ export const Header = memo(function Header() {
                 <div className="relative">
                   <button
                     onClick={() => setUserMenuOpen((prev) => !prev)}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
                   >
                     {anilistUser.avatar ? (
                       <img
                         src={anilistUser.avatar.medium || anilistUser.avatar.large}
                         alt={anilistUser.name}
-                        className="w-7 h-7 rounded-full object-cover"
+                        className="w-6 h-6 rounded-full object-cover"
                       />
                     ) : (
-                      <User className="w-4 h-4" />
+                      <User className="w-3.5 h-3.5" />
                     )}
-                    <span className="hidden md:inline text-sm font-medium max-w-[100px] truncate">
+                    <span className="hidden xl:inline text-xs font-medium max-w-[80px] truncate">
                       {anilistUser.name}
                     </span>
                   </button>
 
                   {userMenuOpen && (
-                    <div className="user-menu-container absolute right-0 top-full mt-2 w-48 bg-popover border border-white/10 rounded-lg shadow-xl overflow-hidden animate-fadeIn">
+                    <div className="user-menu-container absolute right-0 top-full mt-2 w-48 bg-popover border border-white/10 rounded-lg shadow-xl overflow-hidden animate-fadeIn z-50">
                       <div className="p-2 border-b border-white/10">
                         <p className="text-xs text-muted-foreground px-2 py-1">
                           Signed in as
@@ -250,18 +262,18 @@ export const Header = memo(function Header() {
               ) : (
                 <button
                   onClick={() => router.push("/settings")}
-                  className="hidden md:inline-flex items-center justify-center rounded-lg text-primary hover:text-primary/80 hover:bg-primary/10 h-9 px-3 gap-1.5 transition-colors text-sm font-medium"
+                  className="hidden lg:inline-flex items-center justify-center rounded-lg text-primary hover:text-primary/80 hover:bg-primary/10 h-8 px-2 gap-1 transition-colors text-xs font-medium"
                   title="Connect AniList"
                 >
-                  <User className="w-4 h-4" />
-                  <span className="hidden xl:inline">Connect</span>
+                  <User className="w-3.5 h-3.5" />
+                  <span className="hidden 2xl:inline">Connect</span>
                 </button>
               )}
 
               {/* Settings */}
               <button
                 onClick={() => router.push("/settings")}
-                className="inline-flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/5 h-9 w-9 transition-colors"
+                className="inline-flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/5 h-8 w-8 transition-colors"
                 aria-label="Settings"
               >
                 <Settings className="w-4 h-4" />
@@ -271,7 +283,7 @@ export const Header = memo(function Header() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="md:hidden h-9 w-9"
+                className="md:hidden h-8 w-8"
                 onClick={toggleMobileMenu}
                 aria-label="Menu"
               >
@@ -288,7 +300,7 @@ export const Header = memo(function Header() {
 
       {/* Search Bar Overlay */}
       {searchOpen && (
-        <div className="fixed top-16 left-0 right-0 z-40 bg-background/95 backdrop-blur-xl border-b border-white/10 animate-slideDown">
+        <div className="fixed top-14 left-0 right-0 z-40 bg-background/95 backdrop-blur-xl border-b border-white/10 animate-slideDown">
           <div className="container mx-auto px-4 py-4">
             <form onSubmit={handleSearch} className="max-w-2xl mx-auto">
               <div className="relative flex items-center gap-2">
@@ -327,7 +339,7 @@ export const Header = memo(function Header() {
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={closeMobileMenu}
           />
-          <GlassCard className="absolute top-16 right-4 left-4 p-4 animate-slideDown">
+          <GlassCard className="absolute top-14 right-4 left-4 p-4 animate-slideDown">
             <nav className="flex flex-col gap-2">
               <MobileNavLink href="/" icon={<TrendingUp className="w-5 h-5" />}>
                 Trending
@@ -352,6 +364,15 @@ export const Header = memo(function Header() {
               </MobileNavLink>
               <MobileNavLink href="/watchlist" icon={<Clock className="w-5 h-5" />}>
                 Watchlist
+              </MobileNavLink>
+              <MobileNavLink href="/lists" icon={<ListIcon className="w-5 h-5" />}>
+                Lists
+              </MobileNavLink>
+              <MobileNavLink href="/achievements" icon={<Trophy className="w-5 h-5" />}>
+                Achievements
+              </MobileNavLink>
+              <MobileNavLink href="/stats" icon={<BarChart3 className="w-5 h-5" />}>
+                Stats
               </MobileNavLink>
               <MobileNavLink href="/settings" icon={<Settings className="w-5 h-5" />}>
                 Settings

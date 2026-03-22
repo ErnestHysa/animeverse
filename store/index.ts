@@ -7,6 +7,10 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { Media } from "@/types/anilist";
 import { STORAGE_KEYS, DEFAULT_PREFERENCES } from "@/lib/constants";
+import { ACHIEVEMENTS, getAchievementRequirement } from "@/lib/achievements";
+
+// Re-export achievements list for use in components
+export const ACHIEVEMENTS_LIST = ACHIEVEMENTS;
 
 // ===================================
 // Types
@@ -31,6 +35,51 @@ export interface AniListUser {
   };
 }
 
+// AniList media list entry status
+export type AniListStatus =
+  | "CURRENT"   // Currently watching
+  | "PLANNING"   // Plan to watch
+  | "COMPLETED"  // Completed
+  | "DROPPED"    // Dropped
+  | "PAUSED"     // On hold
+  | "REPEATING"; // Re-watching
+
+export interface AniListMediaEntry {
+  mediaId: number;
+  status: AniListStatus;
+  progress: number; // episodes watched
+  score: number;
+  startDate?: number;
+  completedAt?: number;
+  media?: {
+    id: number;
+    idMal?: number;
+    title?: { romaji?: string; english?: string };
+    coverImage?: { large?: string; extraLarge?: string };
+    status?: string;
+    episodes?: number;
+    genres?: string[];
+    averageScore?: number;
+    format?: string;
+    duration?: number; // in minutes
+    description?: string;
+    studios?: { nodes: { name: string }[] };
+  };
+}
+
+export interface SubtitleStyle {
+  fontSize: number; // 16-32px
+  fontFamily: string; // Arial, Roboto, etc.
+  fontColor: string; // hex color
+  backgroundColor: string; // hex color with opacity
+  backgroundOpacity: number; // 0-100
+  position: "top" | "middle" | "bottom";
+  edgeStyle: "none" | "raised" | "depressed" | "uniform" | "drop-shadow";
+  textShadow: boolean;
+  windowColor: string;
+  windowOpacity: number; // 0-100
+}
+
 export interface UserPreferences {
   defaultQuality: "360p" | "480p" | "720p" | "1080p" | "auto";
   autoplay: boolean;
@@ -41,6 +90,8 @@ export interface UserPreferences {
   autoSkipOutro: boolean;
   hideAdultContent: boolean; // NSFW filter
   showFillerEpisodes: boolean; // Filler episode visibility
+  subtitleStyle: SubtitleStyle;
+  subtitleLanguage: string; // Default subtitle language code
 }
 
 export interface StoreState {
@@ -83,9 +134,19 @@ export interface StoreState {
   anilistUser: AniListUser | null;
   anilistToken: string | null;
   isAuthenticated: boolean;
+  anilistMediaList: AniListMediaEntry[]; // Full AniList media list with status
   setAniListAuth: (user: AniListUser, token: string) => void;
   clearAniListAuth: () => void;
   syncAniListData: (mediaList: unknown[]) => void;
+  migrateAniListData: (mediaList: AniListMediaEntry[]) => void;
+  getAniListEntry: (mediaId: number) => AniListMediaEntry | undefined;
+
+  // Achievements
+  achievements: { [key: string]: number }; // achievementId -> progress
+  unlockedAchievements: string[]; // achievementIds
+  unlockAchievement: (achievementId: string) => void;
+  updateAchievementProgress: (achievementId: string, progress: number) => void;
+  checkAndUnlockAchievements: () => void;
 }
 
 // ===================================
@@ -109,6 +170,7 @@ export const useStore = create<StoreState>()(
       anilistUser: null,
       anilistToken: null,
       isAuthenticated: false,
+      anilistMediaList: [],
 
       // ===================================
       // Favorites Actions
@@ -261,34 +323,393 @@ export const useStore = create<StoreState>()(
 
       syncAniListData: (mediaList: unknown[]) =>
         set((state) => {
-          // Sync AniList data with local state
+          // Process AniList media list - preserve full status data
+          const entries: AniListMediaEntry[] = [];
           const favoriteIds: number[] = [];
           const watchlistIds: number[] = [];
+          const watchingIds: number[] = [];
+          const completedIds: number[] = [];
 
           // Process AniList media list
           for (const item of mediaList as Array<{
-            mediaId: number;
+            mediaId?: number;
             status: string;
-            media: { id: number };
+            progress?: number;
+            score?: number;
+            startedAt?: { year?: number; month?: number; day?: number };
+            completedAt?: { year?: number; month?: number; day?: number };
+            media?: {
+              id: number;
+              idMal?: number;
+              title?: { romaji?: string; english?: string };
+              coverImage?: { large?: string; extraLarge?: string };
+              status?: string;
+              episodes?: number;
+              genres?: string[];
+              averageScore?: number;
+              format?: string;
+              duration?: number;
+              description?: string;
+              studios?: { nodes: { name: string }[] };
+            };
           }>) {
             if (!item.media) continue;
 
-            const mediaId = item.mediaId || item.media.id;
+            const mediaId = item.mediaId ?? item.media.id;
+            const entry: AniListMediaEntry = {
+              mediaId,
+              status: item.status as AniListStatus,
+              progress: item.progress ?? 0,
+              score: item.score ?? 0,
+              startDate: item.startedAt ? Date.parse(`${item.startedAt.year}-${item.startedAt.month || 1}-${item.startedAt.day || 1}`) : undefined,
+              completedAt: item.completedAt ? Date.parse(`${item.completedAt.year}-${item.completedAt.month || 1}-${item.completedAt.day || 1}`) : undefined,
+              media: item.media,
+            };
 
+            entries.push(entry);
+
+            // Also update legacy lists for backwards compatibility
             switch (item.status) {
               case "COMPLETED":
+                completedIds.push(mediaId);
+                favoriteIds.push(mediaId);
+                break;
               case "CURRENT":
+                watchingIds.push(mediaId);
                 favoriteIds.push(mediaId);
                 break;
               case "PLANNING":
                 watchlistIds.push(mediaId);
                 break;
+              case "PAUSED":
+                watchlistIds.push(mediaId);
+                break;
+              case "REPEATING":
+                favoriteIds.push(mediaId);
+                break;
             }
           }
 
           return {
+            // Store full AniList media list with proper status
+            anilistMediaList: entries,
+            // Update legacy lists
             favorites: [...new Set([...state.favorites, ...favoriteIds])],
             watchlist: [...new Set([...state.watchlist, ...watchlistIds])],
+          };
+        }),
+
+      /**
+       * Migrate AniList data to app's data structures
+       * - Generates watch history entries from completed/current anime
+       * - Populates mediaCache with anime details
+       * - Calculates and updates user stats
+       */
+      migrateAniListData: (mediaList: AniListMediaEntry[]) =>
+        set((state) => {
+          const newWatchHistory: WatchHistoryItem[] = [...state.watchHistory];
+          const newMediaCache: Record<number, Media> = { ...state.mediaCache };
+
+          // Track existing history keys to avoid duplicates
+          const existingHistoryKeys = new Set(state.watchHistory.map((item) => `${item.mediaId}-${item.episodeNumber}`));
+
+          // Stats tracking
+          let totalEpisodesWatched = 0;
+          let totalMinutesWatched = 0;
+          const genreCounts: Record<string, number> = {};
+          const completedCount = { CURRENT: 0, COMPLETED: 0, REPEATING: 0 };
+          const uniqueAnimeWatched = new Set<number>();
+
+          // Process each AniList entry
+          for (const entry of mediaList) {
+            if (!entry.media) continue;
+
+            const mediaId = entry.mediaId;
+            uniqueAnimeWatched.add(mediaId);
+
+            // Populate mediaCache with full anime data
+            newMediaCache[mediaId] = {
+              id: entry.media.id,
+              idMal: entry.media.idMal || null,
+              title: entry.media.title || { romaji: "", english: null, native: null, userPreferred: null },
+              format: entry.media.format || null,
+              type: "ANIME" as const,
+              status: (entry.media.status === "RELEASING" ? "RELEASING" : entry.media.status === "FINISHED" ? "FINISHED" : entry.media.status === "NOT_YET_RELEASED" ? "NOT_YET_RELEASED" : entry.media.status === "CANCELLED" ? "CANCELLED" : "UNKNOWN"),
+              description: entry.media.description || null,
+              synonyms: null,
+              isLicensed: null,
+              source: null,
+              countryOfOrigin: "JP",
+              isAdult: false,
+              genres: entry.media.genres || null,
+              tags: null,
+              studios: entry.media.studios || null,
+              startDate: { year: null, month: null, day: null },
+              endDate: null,
+              season: null,
+              seasonYear: null,
+              seasonInt: null,
+              averageScore: entry.media.averageScore || null,
+              meanScore: null,
+              popularity: 0,
+              favourites: 0,
+              trending: 0,
+              episodes: entry.media.episodes || null,
+              duration: entry.media.duration || null,
+              chapters: null,
+              volumes: null,
+              coverImage: {
+                large: entry.media.coverImage?.large || entry.media.coverImage?.extraLarge || "",
+                medium: entry.media.coverImage?.large || entry.media.coverImage?.extraLarge || ""
+              },
+              bannerImage: null,
+              trailer: null,
+              relations: null,
+              characters: null,
+              staff: null,
+              externalLinks: null,
+              streamingEpisodes: null,
+              nextAiringEpisode: null,
+              airingSchedule: null,
+            } as Media;
+
+            // Count genres for stats
+            if (entry.media.genres) {
+              for (const genre of entry.media.genres) {
+                genreCounts[genre] = (genreCounts[genre] || 0) + 1;
+              }
+            }
+
+            // Update status-based counts
+            if (entry.status === "CURRENT") completedCount.CURRENT++;
+            if (entry.status === "COMPLETED") completedCount.COMPLETED++;
+            if (entry.status === "REPEATING") completedCount.REPEATING++;
+
+            // Generate watch history entries for anime with progress
+            const episodesWatched = entry.progress || 0;
+
+            if (episodesWatched > 0) {
+              const totalEpisodes = entry.media.episodes || entry.progress || 12;
+              const duration = entry.media.duration || 24; // minutes per episode
+
+              // Create entries for watched episodes
+              // For completed anime, create entry for all episodes
+              // For in-progress, create entry for current progress
+              const episodesToCreate = entry.status === "COMPLETED" || entry.status === "REPEATING"
+                ? totalEpisodes
+                : episodesWatched;
+
+              for (let ep = 1; ep <= episodesToCreate; ep++) {
+                const historyKey = `${mediaId}-${ep}`;
+
+                // Skip if already exists in watch history
+                if (existingHistoryKeys.has(historyKey)) continue;
+
+                const isCompleted = entry.status === "COMPLETED" || entry.status === "REPEATING" || ep < episodesWatched;
+
+                newWatchHistory.push({
+                  mediaId,
+                  episodeNumber: ep,
+                  timestamp: entry.completedAt || entry.startDate || Date.now(),
+                  progress: isCompleted ? duration * 60 : duration * 30, // Estimate progress (seconds)
+                  completed: isCompleted,
+                });
+
+                totalEpisodesWatched++;
+                totalMinutesWatched += duration;
+              }
+            }
+          }
+
+          // Calculate final stats
+          const totalHoursWatched = Math.floor(totalMinutesWatched / 60);
+          const totalDaysWatched = Math.floor(totalHoursWatched / 24);
+
+          // Sort genres by count
+          const topGenres = Object.entries(genreCounts)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 10)
+            .map(([genre, count]) => ({ genre, count }));
+
+          // Update localStorage stats
+          if (typeof window !== "undefined") {
+            try {
+              const statsData = {
+                totalEpisodesWatched: totalEpisodesWatched + (state.watchHistory.length),
+                totalMinutesWatched: totalMinutesWatched,
+                totalHoursWatched,
+                totalDaysWatched,
+                topGenres,
+                completedAnime: completedCount.COMPLETED + completedCount.REPEATING,
+                uniqueAnimeWatched: uniqueAnimeWatched.size,
+                currentStreak: 0, // Would need more complex calculation
+                longestStreak: 0, // Would need more complex calculation
+              };
+              localStorage.setItem("animeverse_stats", JSON.stringify(statsData));
+            } catch (error) {
+              console.error("Failed to save stats:", error);
+            }
+          }
+
+          return {
+            watchHistory: newWatchHistory.sort((a, b) => b.timestamp - a.timestamp),
+            mediaCache: newMediaCache,
+          };
+        }),
+
+      getAniListEntry: (mediaId: number) => {
+        return get().anilistMediaList.find((entry) => entry.mediaId === mediaId);
+      },
+
+      // ===================================
+      // Achievements
+      // ===================================
+
+      achievements: {},
+      unlockedAchievements: [],
+
+      unlockAchievement: (achievementId: string) =>
+        set((state) => {
+          if (state.unlockedAchievements.includes(achievementId)) return state;
+
+          // Save to localStorage
+          if (typeof window !== "undefined") {
+            try {
+              const allAchievements = {
+                ...state.achievements,
+                [achievementId]: (state.achievements[achievementId] || 0) + 1,
+              };
+              localStorage.setItem("animeverse_achievements", JSON.stringify({
+                achievements: allAchievements,
+                unlocked: [...state.unlockedAchievements, achievementId],
+              }));
+            } catch (error) {
+              console.error("Failed to save achievement:", error);
+            }
+          }
+
+          return {
+            achievements: {
+              ...state.achievements,
+              [achievementId]: (state.achievements[achievementId] || 0) + 1,
+            },
+            unlockedAchievements: [...state.unlockedAchievements, achievementId],
+          };
+        }),
+
+      updateAchievementProgress: (achievementId: string, progress: number) =>
+        set((state) => {
+          const currentProgress = state.achievements[achievementId] || 0;
+
+          // Check if achievement should be unlocked
+          if (currentProgress < progress && progress >= getAchievementRequirement(achievementId)) {
+            // Trigger unlock
+            const action = get().unlockAchievement;
+            action(achievementId);
+            return state;
+          }
+
+          return {
+            achievements: {
+              ...state.achievements,
+              [achievementId]: progress,
+            },
+          };
+        }),
+
+      checkAndUnlockAchievements: () =>
+        set((state) => {
+          const newAchievements = { ...state.achievements };
+          const newUnlocked: string[] = [...state.unlockedAchievements];
+
+          // Calculate stats for achievement checking
+          const totalEpisodes = state.watchHistory.length;
+          const uniqueAnime = new Set(state.watchHistory.map((item) => item.mediaId));
+          const completedAnime = state.watchHistory.filter((item) => item.completed).length;
+          const favoritesCount = state.favorites.length;
+
+          // Check each achievement
+          for (const achievement of ACHIEVEMENTS_LIST) {
+            if (newUnlocked.includes(achievement.id)) continue;
+
+            let shouldUnlock = false;
+            let currentProgress = newAchievements[achievement.id] || 0;
+
+            switch (achievement.id) {
+              case "first-anime":
+                shouldUnlock = totalEpisodes >= 1;
+                currentProgress = totalEpisodes;
+                break;
+              case "episode-10":
+                shouldUnlock = totalEpisodes >= 10;
+                currentProgress = totalEpisodes;
+                break;
+              case "episode-50":
+                shouldUnlock = totalEpisodes >= 50;
+                currentProgress = totalEpisodes;
+                break;
+              case "episode-100":
+                shouldUnlock = totalEpisodes >= 100;
+                currentProgress = totalEpisodes;
+                break;
+              case "episode-500":
+                shouldUnlock = totalEpisodes >= 500;
+                currentProgress = totalEpisodes;
+                break;
+              case "anime-10":
+                shouldUnlock = uniqueAnime.size >= 10;
+                currentProgress = uniqueAnime.size;
+                break;
+              case "anime-50":
+                shouldUnlock = uniqueAnime.size >= 50;
+                currentProgress = uniqueAnime.size;
+                break;
+              case "completed-5":
+                shouldUnlock = completedAnime >= 5;
+                currentProgress = completedAnime;
+                break;
+              case "completed-25":
+                shouldUnlock = completedAnime >= 25;
+                currentProgress = completedAnime;
+                break;
+              case "favorites-10":
+                shouldUnlock = favoritesCount >= 10;
+                currentProgress = favoritesCount;
+                break;
+              case "favorites-50":
+                shouldUnlock = favoritesCount >= 50;
+                currentProgress = favoritesCount;
+                break;
+              case "list-creator":
+                // This is handled elsewhere when creating a list
+                continue;
+              default:
+                // Genre-specific achievements would need genre tracking
+                continue;
+            }
+
+            newAchievements[achievement.id] = currentProgress;
+
+            if (shouldUnlock) {
+              newUnlocked.push(achievement.id);
+            }
+          }
+
+          // Save to localStorage
+          if (typeof window !== "undefined") {
+            try {
+              localStorage.setItem("animeverse_achievements", JSON.stringify({
+                achievements: newAchievements,
+                unlocked: newUnlocked,
+              }));
+            } catch (error) {
+              console.error("Failed to save achievements:", error);
+            }
+          }
+
+          return {
+            achievements: newAchievements,
+            unlockedAchievements: newUnlocked,
           };
         }),
     }),
@@ -332,6 +753,7 @@ export const useStore = create<StoreState>()(
         anilistUser: state.anilistUser,
         anilistToken: state.anilistToken,
         isAuthenticated: state.isAuthenticated,
+        anilistMediaList: state.anilistMediaList,
       }),
     }
   )
@@ -444,17 +866,40 @@ export const useMediaCache = () => {
 export const useAniListAuth = () => {
   const anilistUser = useStore((state) => state.anilistUser);
   const anilistToken = useStore((state) => state.anilistToken);
+  const anilistMediaList = useStore((state) => state.anilistMediaList);
   const isAuthenticated = useStore((state) => state.isAuthenticated);
   const setAniListAuth = useStore((state) => state.setAniListAuth);
   const clearAniListAuth = useStore((state) => state.clearAniListAuth);
   const syncAniListData = useStore((state) => state.syncAniListData);
+  const migrateAniListData = useStore((state) => state.migrateAniListData);
 
   return {
     anilistUser,
     anilistToken,
+    anilistMediaList,
     isAuthenticated,
     setAniListAuth,
     clearAniListAuth,
     syncAniListData,
+    migrateAniListData,
+  };
+};
+
+/**
+ * Hook for Achievements
+ */
+export const useAchievements = () => {
+  const achievements = useStore((state) => state.achievements);
+  const unlockedAchievements = useStore((state) => state.unlockedAchievements);
+  const unlockAchievement = useStore((state) => state.unlockAchievement);
+  const updateAchievementProgress = useStore((state) => state.updateAchievementProgress);
+  const checkAndUnlockAchievements = useStore((state) => state.checkAndUnlockAchievements);
+
+  return {
+    achievements,
+    unlockedAchievements,
+    unlockAchievement,
+    updateAchievementProgress,
+    checkAndUnlockAchievements,
   };
 };

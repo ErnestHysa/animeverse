@@ -11,9 +11,10 @@ import { Button } from "@/components/ui/button";
 import { AnimeCard } from "@/components/anime/anime-card";
 import { GlassCard } from "@/components/ui/glass-card";
 import { formatDistanceToNow } from "@/lib/utils";
+import Link from "next/link";
 
 export default function HistoryPage() {
-  const { watchHistory, mediaCache, clearWatchHistory, clearMediaHistory } = useStore();
+  const { watchHistory, mediaCache, clearWatchHistory, clearMediaHistory, anilistMediaList, isAuthenticated } = useStore();
 
   // Get unique anime from watch history (most recent first)
   const uniqueHistory = watchHistory
@@ -46,12 +47,28 @@ export default function HistoryPage() {
             <Clock className="w-12 h-12 text-muted-foreground" />
           </div>
           <h2 className="text-2xl font-bold mb-3">No Watch History</h2>
-          <p className="text-muted-foreground mb-8">
+          <p className="text-muted-foreground mb-6">
             Start watching anime to build your history. Your progress will be automatically saved.
           </p>
-          <a href="/">
-            <Button>Browse Anime</Button>
-          </a>
+          {isAuthenticated && anilistMediaList.length > 0 ? (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                You have {anilistMediaList.length} anime synced from AniList.
+              </p>
+              <div className="flex gap-3 justify-center">
+                <Link href="/">
+                  <Button>Browse Anime</Button>
+                </Link>
+                <Link href="/settings">
+                  <Button variant="outline">Go to Settings</Button>
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <Link href="/">
+              <Button>Browse Anime</Button>
+            </Link>
+          )}
         </GlassCard>
       </div>
     );
@@ -76,7 +93,7 @@ export default function HistoryPage() {
       </div>
 
       {/* Continue Watching */}
-      {inProgress.length > 0 && (
+      {inProgress.length > 0 ? (
         <section className="mb-12">
           <div className="flex items-center gap-3 mb-6">
             <Play className="w-6 h-6 text-primary" />
@@ -127,6 +144,16 @@ export default function HistoryPage() {
                 </div>
               );
             })}
+          </div>
+        </section>
+      ) : completed.length > 0 && (
+        <section className="mb-12">
+          <div className="flex items-center gap-3 mb-6">
+            <Play className="w-6 h-6 text-primary" />
+            <h2 className="text-2xl font-bold">Continue Watching</h2>
+          </div>
+          <div className="text-center py-12 bg-white/5 rounded-lg">
+            <p className="text-muted-foreground">No anime in progress. Start watching something to see it here!</p>
           </div>
         </section>
       )}

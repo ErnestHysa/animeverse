@@ -188,6 +188,19 @@ export const DEFAULT_PREFERENCES = {
   autoSkipOutro: false,
   hideAdultContent: false, // NSFW filter off by default
   showFillerEpisodes: true, // Show filler episodes by default
+  subtitleStyle: {
+    fontSize: 20,
+    fontFamily: "Arial, sans-serif",
+    fontColor: "#FFFFFF",
+    backgroundColor: "#000000",
+    backgroundOpacity: 50,
+    position: "bottom" as const,
+    edgeStyle: "drop-shadow" as const,
+    textShadow: true,
+    windowColor: "#000000",
+    windowOpacity: 0,
+  },
+  subtitleLanguage: "en",
 } as const;
 
 // ===================================

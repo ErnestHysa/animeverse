@@ -9,7 +9,7 @@ import { useState, useEffect } from "react";
 import { Download, Check, X, Trash2, HardDrive } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/ui/glass-card";
-import { downloadManager, formatBytes, isVideoDownloaded } from "@/lib/downloads";
+import { downloadManager, formatBytes, isVideoDownloaded, type DownloadItem } from "@/lib/downloads";
 import { toast } from "react-hot-toast";
 
 interface DownloadButtonProps {
@@ -31,7 +31,7 @@ export function DownloadButton({
   const [isDownloading, setIsDownloading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [showManager, setShowManager] = useState(false);
-  const [downloads, setDownloads] = useState<any[]>([]);
+  const [downloads, setDownloads] = useState<DownloadItem[]>([]);
   const [storageSize, setStorageSize] = useState(0);
 
   useEffect(() => {
@@ -185,7 +185,7 @@ export function DownloadButton({
 }
 
 interface DownloadManagerProps {
-  downloads: any[];
+  downloads: DownloadItem[];
   storageSize: number;
   onClose: () => void;
   onDelete: (id: string) => void;

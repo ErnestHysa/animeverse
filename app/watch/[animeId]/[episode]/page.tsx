@@ -19,6 +19,7 @@ import Link from "next/link";
 import type { Media } from "@/types/anilist";
 import { Suspense } from "react";
 import { VideoPlayerSkeleton, EpisodeListSkeleton, AnimeGridSkeleton } from "@/components/ui/skeleton";
+import { EpisodeCommentsSection } from "@/components/watch/episode-comments-section";
 
 // ===================================
 // Link Button Wrappers
@@ -350,6 +351,9 @@ export default async function WatchPage({ params }: PageProps) {
               <Suspense fallback={<AnimeGridSkeleton count={8} />}>
                 <RecommendedSection animeId={anime.id} />
               </Suspense>
+
+              {/* Episode Comments */}
+              <EpisodeCommentsSection animeId={anime.id} episodeNumber={episodeNum} />
             </div>
 
             {/* Sidebar */}

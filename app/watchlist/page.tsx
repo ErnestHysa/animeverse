@@ -11,7 +11,7 @@ export const runtime = "nodejs";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { AnimeCard } from "@/components/anime/anime-card";
-import { useWatchlist } from "@/store";
+import { useWatchlist, useStore } from "@/store";
 import { Clock } from "lucide-react";
 import { anilist } from "@/lib/anilist";
 import Link from "next/link";
@@ -20,23 +20,49 @@ import type { Media } from "@/types/anilist";
 
 export default function WatchlistPage() {
   const { watchlist } = useWatchlist();
+  const { mediaCache } = useStore();
   const [anime, setAnime] = useState<Media[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadWatchlist() {
-      if (watchlist.length > 0) {
-        const result = await anilist.getByIds(watchlist);
-        const fetchedAnime = result.data?.Page.media.filter((m: Media) =>
-          watchlist.includes(m.id)
-        ) ?? [];
-        setAnime(fetchedAnime);
+      if (watchlist.length === 0) {
+        setLoading(false);
+        return;
       }
+
+      // First, try to get from mediaCache (populated by AniList sync)
+      const cachedAnime: Media[] = [];
+      const missingIds: number[] = [];
+
+      for (const id of watchlist) {
+        if (mediaCache[id]) {
+          cachedAnime.push(mediaCache[id]);
+        } else {
+          missingIds.push(id);
+        }
+      }
+
+      // Fetch missing anime from AniList API
+      let fetchedAnime: Media[] = [];
+      if (missingIds.length > 0) {
+        try {
+          const result = await anilist.getByIds(missingIds);
+          fetchedAnime = result.data?.Page.media.filter((m: Media) =>
+            watchlist.includes(m.id)
+          ) ?? [];
+        } catch (error) {
+          console.error("Failed to fetch watchlist from AniList:", error);
+        }
+      }
+
+      // Combine cached and fetched anime
+      setAnime([...cachedAnime, ...fetchedAnime]);
       setLoading(false);
     }
 
     loadWatchlist();
-  }, [watchlist]);
+  }, [watchlist, mediaCache]);
 
   return (
     <>
@@ -81,6 +107,22 @@ export default function WatchlistPage() {
                 className="px-6 py-2 bg-primary rounded-lg hover:bg-primary/90 transition-colors inline-block"
               >
                 Browse Anime
+              </Link>
+            </div>
+          ) : anime.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <div className="w-16 h-16 rounded-full bg-yellow-500/20 flex items-center justify-center mb-4">
+                <Clock className="w-8 h-8 text-yellow-500" />
+              </div>
+              <h3 className="text-lg font-medium mb-2">Sync Your Watchlist</h3>
+              <p className="text-muted-foreground max-w-sm mb-6">
+                Sync your AniList account to see your plan to watch anime here.
+              </p>
+              <Link
+                href="/settings"
+                className="px-6 py-2 bg-primary rounded-lg hover:bg-primary/90 transition-colors inline-block"
+              >
+                Go to Settings
               </Link>
             </div>
           ) : (
