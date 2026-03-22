@@ -144,32 +144,32 @@ export function SubtitleSettings({ className = "" }: SubtitleSettingsProps) {
     const bgColor = subtitleStyle.backgroundColor +
       Math.round((subtitleStyle.backgroundOpacity / 100) * 255).toString(16).padStart(2, "0");
 
-    let edgeStyle = "";
+    let textShadowValue = "";
     switch (subtitleStyle.edgeStyle) {
       case "raised":
-        edgeStyle = `text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;`;
+        textShadowValue = "-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000";
         break;
       case "depressed":
-        edgeStyle = `text-shadow: 1px 1px 0 #FFF, -1px -1px 0 #FFF, 1px -1px 0 #FFF, -1px 1px 0 #FFF;`;
+        textShadowValue = "1px 1px 0 #FFF, -1px -1px 0 #FFF, 1px -1px 0 #FFF, -1px 1px 0 #FFF";
         break;
       case "uniform":
-        edgeStyle = `text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;`;
+        textShadowValue = "2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000";
         break;
       case "drop-shadow":
-        edgeStyle = `text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);`;
+        textShadowValue = "2px 2px 4px rgba(0, 0, 0, 0.8)";
+        break;
+      case "none":
+      default:
+        textShadowValue = subtitleStyle.textShadow ? "2px 2px 4px rgba(0, 0, 0, 0.8)" : "none";
         break;
     }
-
-    const additionalShadow = subtitleStyle.textShadow && subtitleStyle.edgeStyle === "none"
-      ? "text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);"
-      : edgeStyle;
 
     return {
       fontSize: `${subtitleStyle.fontSize}px`,
       fontFamily: subtitleStyle.fontFamily,
       color: subtitleStyle.fontColor,
       backgroundColor: bgColor,
-      textShadow: additionalShadow,
+      textShadow: textShadowValue,
       padding: "8px 16px",
       borderRadius: "4px",
       maxWidth: "80%",
