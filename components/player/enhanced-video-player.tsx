@@ -33,6 +33,7 @@ import {
   getEstimatedTimestamps,
   type IntroOutroTimestamps,
 } from "@/lib/aniskip";
+import Hls from "hls.js";
 
 // Dynamic import for watch party controls to reduce initial bundle
 const WatchPartyControls = dynamic(
@@ -119,6 +120,7 @@ export function EnhancedVideoPlayer({
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
   const settingsDropdownRef = useRef<HTMLDivElement>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const hlsRef = useRef<Hls | null>(null);
 
   // State
   const [isPlaying, setIsPlaying] = useState(false);
@@ -275,6 +277,12 @@ export function EnhancedVideoPlayer({
     const video = videoRef.current;
     if (!video) return;
 
+    // Clean up previous HLS instance if exists
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+
     setIsLoading(true);
 
     // Timeout fallback to prevent infinite loading
@@ -282,32 +290,86 @@ export function EnhancedVideoPlayer({
       setIsLoading(false);
     }, 30000); // 30 seconds max
 
+    const handleLoad = () => {
+      clearTimeout(loadingTimeout);
+      setIsLoading(false);
+      // Auto-play based on preferences
+      if (preferences.autoplay) {
+        play();
+      }
+    };
+
+    const handleError = (e?: Event) => {
+      clearTimeout(loadingTimeout);
+      setIsLoading(false);
+      if (e) {
+        console.error("Video error:", e);
+      }
+      onError?.(new Error("Failed to load video"));
+    };
+
     if (source.type === "direct") {
-      video.src = sources[0].url;
+      const isHls = source.url.includes(".m3u8") || source.type === "hls";
 
-      const handleLoad = () => {
-        clearTimeout(loadingTimeout);
-        setIsLoading(false);
-        // Auto-play based on preferences
-        if (preferences.autoplay) {
-          play();
-        }
-      };
+      if (isHls && Hls.isSupported()) {
+        // Use HLS.js for browsers that don't support HLS natively
+        const hls = new Hls({
+          enableWorker: true,
+          lowLatencyMode: true,
+        });
 
-      const handleError = () => {
-        clearTimeout(loadingTimeout);
-        setIsLoading(false);
-        onError?.(new Error("Failed to load video"));
-      };
+        hlsRef.current = hls;
 
-      video.addEventListener("loadeddata", handleLoad, { once: true });
-      video.addEventListener("error", handleError, { once: true });
+        hls.loadSource(source.url);
+        hls.attachMedia(video);
 
-      return () => {
-        clearTimeout(loadingTimeout);
-        video.removeEventListener("loadeddata", handleLoad);
-        video.removeEventListener("error", handleError);
-      };
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          handleLoad();
+        });
+
+        hls.on(Hls.Events.ERROR, (event, data) => {
+          if (data.fatal) {
+            switch (data.type) {
+              case Hls.ErrorTypes.NETWORK_ERROR:
+                hls.startLoad();
+                break;
+              case Hls.ErrorTypes.MEDIA_ERROR:
+                hls.recoverMediaError();
+                break;
+              default:
+                handleError();
+                break;
+            }
+          }
+        });
+
+        return () => {
+          clearTimeout(loadingTimeout);
+          hls.destroy();
+        };
+      } else if (isHls && video.canPlayType("application/vnd.apple.mpegurl")) {
+        // Native HLS support (Safari)
+        video.src = source.url;
+        video.addEventListener("loadeddata", handleLoad, { once: true });
+        video.addEventListener("error", handleError, { once: true });
+
+        return () => {
+          clearTimeout(loadingTimeout);
+          video.removeEventListener("loadeddata", handleLoad);
+          video.removeEventListener("error", handleError);
+        };
+      } else {
+        // Regular MP4 video
+        video.src = source.url;
+        video.addEventListener("loadeddata", handleLoad, { once: true });
+        video.addEventListener("error", handleError, { once: true });
+
+        return () => {
+          clearTimeout(loadingTimeout);
+          video.removeEventListener("loadeddata", handleLoad);
+          video.removeEventListener("error", handleError);
+        };
+      }
     } else {
       // WebTorrent handling (simplified for now)
       import("@/lib/webtorrent").then(({ webTorrentManager }) => {
@@ -325,7 +387,7 @@ export function EnhancedVideoPlayer({
         });
       });
     }
-  }, [source, sources]);
+  }, [source.url]);
 
   // ===================================
   // Update sources when source.qualities changes
