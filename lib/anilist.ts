@@ -184,9 +184,46 @@ class AniListClient {
   async getByGenre(genre: string, page: number = 1, perPage: number = 24): Promise<APIResult<TrendingResponse>> {
     return this.query<TrendingResponse>(QUERIES.byGenre, { genre, page, perPage });
   }
+
+  /**
+   * Get upcoming anime (not yet aired)
+   */
+  async getUpcoming(page: number = 1, perPage: number = 24): Promise<APIResult<TrendingResponse>> {
+    const query = `query Upcoming($page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME, status: NOT_YET_RELEASED, sort: POPULARITY_DESC) { ${MEDIA_FULL_FRAGMENT} } } }`;
+    return this.query<TrendingResponse>(query, { page, perPage });
+  }
+
+  /**
+   * Get popular studios (sorted by favorites)
+   */
+  async getPopularStudios(page: number = 1, perPage: number = 50): Promise<APIResult<StudioListResponse>> {
+    return this.query<StudioListResponse>(QUERIES.studios, { page, perPage });
+  }
+
+  /**
+   * Get anime by multiple genres
+   */
+  async getByGenres(genres: string[], page: number = 1, perPage: number = 24): Promise<APIResult<TrendingResponse>> {
+    const query = `query ByGenres($genres: [String!], $page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME, genre_in: $genres, sort: POPULARITY_DESC) { ${MEDIA_FULL_FRAGMENT} } } }`;
+    return this.query<TrendingResponse>(query, { genres, page, perPage });
+  }
+
+  /**
+   * Get anime by tag
+   */
+  async getByTag(tag: string, page: number = 1, perPage: number = 24): Promise<APIResult<TrendingResponse>> {
+    const query = `query ByTag($tag: String!, $page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME, tag_in: [$tag], sort: POPULARITY_DESC) { ${MEDIA_FULL_FRAGMENT} } } }`;
+    return this.query<TrendingResponse>(query, { tag, page, perPage });
+  }
 }
 
 export const anilist = new AniListClient();
+
+// Export convenience functions for backward compatibility
+export const searchByGenre = anilist.getByGenre.bind(anilist);
+export const searchByStudio = anilist.getByStudio.bind(anilist);
+export const getUpcoming = anilist.getUpcoming.bind(anilist);
+export const getPopularStudios = anilist.getPopularStudios.bind(anilist);
 
 // ===================================
 // Helper Functions

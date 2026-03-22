@@ -25,6 +25,7 @@ import {
   RefreshCw,
   Bell,
   Check,
+  Shield,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { cn } from "@/lib/utils";
@@ -284,6 +285,54 @@ export default function SettingsPage() {
                       className={cn(
                         "absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform",
                         preferences.autoSkipOutro ? "translate-x-6" : ""
+                      )}
+                    />
+                  </button>
+                </div>
+
+                {/* Hide Adult Content */}
+                <div className="flex items-center justify-between py-3 border-b border-white/10">
+                  <div>
+                    <p className="font-medium">Hide Adult Content</p>
+                    <p className="text-sm text-muted-foreground">
+                      Filter out mature and NSFW anime from browsing
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleSavePreference("hideAdultContent", !("hideAdultContent" in preferences && (preferences as unknown as Record<string, unknown>).hideAdultContent as boolean))}
+                    className={cn(
+                      "w-12 h-6 rounded-full transition-colors relative",
+                      "hideAdultContent" in preferences && (preferences as unknown as Record<string, unknown>).hideAdultContent ? "bg-primary" : "bg-white/10"
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        "absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform",
+                        "hideAdultContent" in preferences && (preferences as unknown as Record<string, unknown>).hideAdultContent ? "translate-x-6" : ""
+                      )}
+                    />
+                  </button>
+                </div>
+
+                {/* Show Filler Episodes */}
+                <div className="flex items-center justify-between py-3 border-b border-white/10">
+                  <div>
+                    <p className="font-medium">Show Filler Episodes</p>
+                    <p className="text-sm text-muted-foreground">
+                      Display filler episodes in episode lists
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleSavePreference("showFillerEpisodes", !("showFillerEpisodes" in preferences ? false : (preferences as unknown as Record<string, unknown>).showFillerEpisodes as boolean))}
+                    className={cn(
+                      "w-12 h-6 rounded-full transition-colors relative",
+                      !("showFillerEpisodes" in preferences) || (preferences as unknown as Record<string, unknown>).showFillerEpisodes ? "bg-primary" : "bg-white/10"
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        "absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform",
+                        !("showFillerEpisodes" in preferences) || (preferences as unknown as Record<string, unknown>).showFillerEpisodes ? "translate-x-6" : ""
                       )}
                     />
                   </button>

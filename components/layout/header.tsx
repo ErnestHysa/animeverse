@@ -22,10 +22,13 @@ import {
   Shuffle,
   MessageSquare,
   Tags,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/ui/glass-card";
 import { EpisodeNotifications } from "@/components/notifications/episode-notifications";
+import { useTheme } from "@/components/providers/theme-provider";
 
 interface NavLinkProps {
   href: string;
@@ -64,6 +67,7 @@ export const Header = memo(function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const router = useRouter();
+  const { theme, setTheme, resolvedTheme } = useTheme();
 
   const handleSearch = useCallback(
     (e: React.FormEvent) => {
@@ -147,6 +151,21 @@ export const Header = memo(function Header() {
                 className="h-9 w-9"
               >
                 <Search className="w-4 h-4" />
+              </Button>
+
+              {/* Theme Toggle */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+                aria-label="Toggle theme"
+                className="h-9 w-9"
+              >
+                {resolvedTheme === "dark" ? (
+                  <Sun className="w-4 h-4" />
+                ) : (
+                  <Moon className="w-4 h-4" />
+                )}
               </Button>
 
               {/* Discord Community */}

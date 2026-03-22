@@ -186,6 +186,8 @@ export const DEFAULT_PREFERENCES = {
   subtitles: true,
   autoSkipIntro: false,
   autoSkipOutro: false,
+  hideAdultContent: false, // NSFW filter off by default
+  showFillerEpisodes: true, // Show filler episodes by default
 } as const;
 
 // ===================================

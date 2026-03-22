@@ -28,6 +28,8 @@ export interface UserPreferences {
   subtitles: boolean;
   autoSkipIntro: boolean;
   autoSkipOutro: boolean;
+  hideAdultContent: boolean; // NSFW filter
+  showFillerEpisodes: boolean; // Filler episode visibility
 }
 
 export interface StoreState {
