@@ -1,6 +1,7 @@
 /**
  * PWA Service Worker Registration
  * Registers the service worker for offline support
+ * DISABLED in development mode to prevent caching issues
  */
 
 "use client";
@@ -12,11 +13,22 @@ export function ServiceWorkerRegister() {
   const [showUpdate, setShowUpdate] = useState(false);
 
   useEffect(() => {
+    // Disable service worker in development
+    if (process.env.NODE_ENV === "development") {
+      // Unregister any existing service workers in development
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+          registrations.forEach((registration) => registration.unregister());
+        });
+      }
+      return;
+    }
+
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
       return;
     }
 
-    // Register service worker
+    // Register service worker only in production
     navigator.serviceWorker
       .register("/sw.js")
       .then((registration) => {
@@ -36,7 +48,7 @@ export function ServiceWorkerRegister() {
         });
       })
       .catch((error) => {
-        console.error("Service Worker registration failed:", error);
+        // Silently fail - service worker is not critical for app functionality
       });
 
     // Listen for controlling service worker
