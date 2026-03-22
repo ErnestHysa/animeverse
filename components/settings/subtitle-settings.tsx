@@ -115,7 +115,19 @@ export function SubtitleSettings({ className = "" }: SubtitleSettingsProps) {
   const { preferences, updatePreferences } = useStore();
   const [previewText, setPreviewText] = useState("This is how your subtitles will look");
 
-  const subtitleStyle = preferences.subtitleStyle;
+  // Provide default values for existing users without subtitleStyle
+  const subtitleStyle = preferences.subtitleStyle || {
+    fontSize: 20,
+    fontFamily: "Arial, sans-serif",
+    fontColor: "#FFFFFF",
+    backgroundColor: "#000000",
+    backgroundOpacity: 50,
+    position: "bottom" as const,
+    edgeStyle: "drop-shadow" as const,
+    textShadow: true,
+    windowColor: "#000000",
+    windowOpacity: 0,
+  };
 
   const updateStyle = (updates: Partial<typeof subtitleStyle>) => {
     updatePreferences({
