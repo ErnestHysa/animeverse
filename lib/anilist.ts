@@ -186,14 +186,6 @@ class AniListClient {
   }
 
   /**
-   * Get upcoming anime (not yet aired)
-   */
-  async getUpcoming(page: number = 1, perPage: number = 24): Promise<APIResult<TrendingResponse>> {
-    const query = `query Upcoming($page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME, status: NOT_YET_RELEASED, sort: POPULARITY_DESC) { ${MEDIA_FULL_FRAGMENT} } } }`;
-    return this.query<TrendingResponse>(query, { page, perPage });
-  }
-
-  /**
    * Get popular studios (sorted by favorites)
    */
   async getPopularStudios(page: number = 1, perPage: number = 50): Promise<APIResult<StudioListResponse>> {
@@ -222,7 +214,7 @@ export const anilist = new AniListClient();
 // Export convenience functions for backward compatibility
 export const searchByGenre = anilist.getByGenre.bind(anilist);
 export const searchByStudio = anilist.getByStudio.bind(anilist);
-export const getUpcoming = anilist.getUpcoming.bind(anilist);
+// Note: getUpcoming functionality is handled by /coming-soon page using status: "NOT_YET_RELEASED"
 export const getPopularStudios = anilist.getPopularStudios.bind(anilist);
 
 // ===================================

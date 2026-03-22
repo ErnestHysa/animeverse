@@ -1,6 +1,20 @@
 /**
  * AniList OAuth Callback Handler
- * Handles the OAuth callback from AniList after user authorization
+ *
+ * ⚠️ INCOMPLETE IMPLEMENTATION ⚠️
+ *
+ * This callback route exists but the OAuth flow is NOT fully wired up:
+ * - Missing: Login button/UI to initiate the OAuth flow
+ * - Missing: User state management for authenticated users
+ * - Missing: UI to show logged-in state and logout option
+ *
+ * To complete OAuth integration:
+ * 1. Add "Login with AniList" button in settings/header
+ * 2. Use lib/anilist-sync.ts getAnilistAuthUrl() to initiate flow
+ * 3. Store and display authenticated user state
+ * 4. Add logout functionality
+ *
+ * Current state: Callback works if somehow reached, but no way to reach it.
  */
 
 import { NextRequest, NextResponse } from "next/server";
