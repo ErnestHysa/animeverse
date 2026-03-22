@@ -44,13 +44,12 @@ export default function SettingsPage() {
   const { watchlist, clearWatchlist: clearList } = useWatchlist();
   const { favorites, clearFavorites } = useFavorites();
   const { theme, setTheme, resolvedTheme } = useTheme();
-  const { mediaCache } = useStore();
+  const { mediaCache, watchHistory, clearWatchHistory } = useStore();
 
   const [historyCount, setHistoryCount] = useState(() => {
     // Initialize with 0 on server, actual count on client
     if (typeof window !== "undefined") {
-      const history = JSON.parse(localStorage.getItem("animeverse_watch_history") || "[]");
-      return history.length;
+      return watchHistory.length;
     }
     return 0;
   });
@@ -70,27 +69,18 @@ export default function SettingsPage() {
   const calculateAndSetStats = () => {
     if (typeof window === "undefined") return;
 
-    const history = JSON.parse(localStorage.getItem("animeverse_watch_history") || "[]");
-    const stats = calculateStats(history, mediaCache);
+    // Use watchHistory from Zustand store (includes all watch data)
+    const stats = calculateStats(watchHistory, mediaCache);
     setUserStats(stats);
     saveStats(stats);
   };
 
   useEffect(() => {
     calculateAndSetStats();
+    // Update history count when watchHistory changes
+    setHistoryCount(watchHistory.length);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [historyCount, mediaCache]);
-
-  useEffect(() => {
-    // Re-sync history count when localStorage changes (e.g., after clearing)
-    const handleStorageChange = () => {
-      const history = JSON.parse(localStorage.getItem("animeverse_watch_history") || "[]");
-      setHistoryCount(history.length);
-    };
-
-    window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
-  }, []);
+  }, [watchHistory, mediaCache]);
 
   const handleSavePreference = async (key: string, value: unknown) => {
     updatePreferences({ [key]: value });
@@ -105,23 +95,25 @@ export default function SettingsPage() {
   };
 
   const handleClearHistory = () => {
+    clearWatchHistory();
+    // Also clear the stats from localStorage
     if (typeof window !== "undefined") {
-      localStorage.removeItem("animeverse_watch_history");
       localStorage.removeItem("animeverse_stats");
-      setHistoryCount(0);
-      setUserStats({
-        totalEpisodesWatched: 0,
-        totalMinutesWatched: 0,
-        totalHoursWatched: 0,
-        totalDaysWatched: 0,
-        topGenres: [],
-        completedAnime: 0,
-        uniqueAnimeWatched: 0,
-        currentStreak: 0,
-        longestStreak: 0,
-      });
-      toast.success("Watch history cleared");
     }
+    // Reset stats display
+    setUserStats({
+      totalEpisodesWatched: 0,
+      totalMinutesWatched: 0,
+      totalHoursWatched: 0,
+      totalDaysWatched: 0,
+      topGenres: [],
+      completedAnime: 0,
+      uniqueAnimeWatched: 0,
+      currentStreak: 0,
+      longestStreak: 0,
+    });
+    setHistoryCount(0);
+    toast.success("Watch history cleared");
   };
 
   const handleClearCache = async () => {
@@ -133,10 +125,6 @@ export default function SettingsPage() {
   };
 
   const exportData = () => {
-    const watchHistory = typeof window !== "undefined"
-      ? JSON.parse(localStorage.getItem("animeverse_watch_history") || "[]")
-      : [];
-
     const statsData = typeof window !== "undefined"
       ? JSON.parse(localStorage.getItem("animeverse_stats") || "null")
       : null;

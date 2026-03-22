@@ -22,7 +22,7 @@ import {
   X,
 } from "lucide-react";
 import { cn, formatTime } from "@/lib/utils";
-import { usePreferences } from "@/store";
+import { usePreferences, useStore } from "@/store";
 import { toast } from "react-hot-toast";
 import { ServerSelector, LanguageSelector } from "@/components/player/server-selector";
 import dynamic from "next/dynamic";
@@ -225,6 +225,9 @@ export function EnhancedVideoPlayer({
   // User preferences
   const { preferences, updatePreferences } = usePreferences();
 
+  // Store for watch history
+  const { addToWatchHistory } = useStore();
+
   // Dynamic intro/outro timestamps from AniSkip API
   const [skipTimestamps, setSkipTimestamps] = useState<IntroOutroTimestamps>({});
 
@@ -233,6 +236,36 @@ export function EnhancedVideoPlayer({
   const introEnd = skipTimestamps.intro?.end ?? 170;
   const outroStart = skipTimestamps.outro?.start ?? 1320;
   const outroEnd = skipTimestamps.outro?.end ?? 1410;
+
+  // ===================================
+  // Helper Functions
+  // ===================================
+
+  const saveWatchProgress = useCallback(
+    (mediaId: number, epNumber: number, progress: number, completed: boolean = false) => {
+      try {
+        // Save to Zustand store (this persists to localStorage automatically)
+        addToWatchHistory({
+          mediaId,
+          episodeNumber: epNumber,
+          progress,
+          completed,
+        });
+
+        // Also save to individual progress localStorage for quick resume
+        const key = `watch_progress_${mediaId}`;
+        const data = JSON.parse(localStorage.getItem(key) || "{}");
+        data[epNumber] = {
+          progress,
+          timestamp: Date.now(),
+        };
+        localStorage.setItem(key, JSON.stringify(data));
+      } catch (e) {
+        // Silently fail - app will work without persistence
+      }
+    },
+    [addToWatchHistory]
+  );
 
   // ===================================
   // Video Loading
@@ -724,9 +757,9 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
     const handleEnded = () => {
       setIsPlaying(false);
 
-      // Save watch progress
+      // Save watch progress - episode completed
       if (animeId && episodeNumber) {
-        saveWatchProgress(animeId, episodeNumber, video.duration);
+        saveWatchProgress(animeId, episodeNumber, video.duration, true);
       }
 
       // Handle next episode autoplay
@@ -897,20 +930,6 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
     }
   };
 
-  // Save watch progress periodically
-  useEffect(() => {
-    if (!isPlaying || !animeId || !episodeNumber) return;
-
-    const interval = setInterval(() => {
-      const video = videoRef.current;
-      if (video) {
-        saveWatchProgress(animeId, episodeNumber, video.currentTime);
-      }
-    }, 10000);
-
-    return () => clearInterval(interval);
-  }, [isPlaying, animeId, episodeNumber]);
-
   // Apply playback rate
   useEffect(() => {
     const video = videoRef.current;
@@ -972,40 +991,6 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
   // ===================================
   // Helper Functions
   // ===================================
-
-  const saveWatchProgress = (mediaId: number, epNumber: number, progress: number) => {
-    try {
-      const key = `watch_progress_${mediaId}`;
-      const data = JSON.parse(localStorage.getItem(key) || "{}");
-      data[epNumber] = {
-        progress,
-        timestamp: Date.now(),
-      };
-      localStorage.setItem(key, JSON.stringify(data));
-
-      // Also update global watch history
-      const historyKey = "animeverse_watch_history";
-      const history = JSON.parse(localStorage.getItem(historyKey) || "[]");
-      const existingIndex = history.findIndex((h: any) => h.mediaId === mediaId);
-      const entry = {
-        mediaId,
-        episodeNumber: epNumber,
-        progress,
-        timestamp: Date.now(),
-      };
-
-      if (existingIndex >= 0) {
-        history[existingIndex] = entry;
-      } else {
-        history.unshift(entry);
-      }
-
-      // Keep only last 100 entries
-      localStorage.setItem(historyKey, JSON.stringify(history.slice(0, 100)));
-    } catch (e) {
-      console.error("Failed to save watch progress:", e);
-    }
-  };
 
   const formatBytes = (bytes: number): string => {
     if (bytes === 0) return "0 B";
