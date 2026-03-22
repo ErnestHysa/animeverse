@@ -11,7 +11,7 @@ import { useState, useEffect } from "react";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { GlassCard } from "@/components/ui/glass-card";
-import { usePreferences, useWatchlist, useFavorites } from "@/store";
+import { usePreferences, useWatchlist, useFavorites, useAniListAuth } from "@/store";
 import { useTheme } from "@/components/providers/theme-provider";
 import {
   Settings,
@@ -26,6 +26,10 @@ import {
   Bell,
   Check,
   Shield,
+  LogOut,
+  LogIn,
+  User,
+  Link as LinkIcon,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { cn } from "@/lib/utils";
@@ -46,6 +50,14 @@ export default function SettingsPage() {
   const { favorites, clearFavorites } = useFavorites();
   const { theme, setTheme, resolvedTheme } = useTheme();
   const { mediaCache, watchHistory, clearWatchHistory } = useStore();
+  const {
+    anilistUser,
+    anilistToken,
+    isAuthenticated,
+    setAniListAuth,
+    clearAniListAuth,
+    syncAniListData,
+  } = useAniListAuth();
 
   const [historyCount, setHistoryCount] = useState(() => {
     // Initialize with 0 on server, actual count on client
@@ -146,6 +158,98 @@ export default function SettingsPage() {
     a.click();
     URL.revokeObjectURL(url);
     toast.success("Data exported");
+  };
+
+  // ===================================
+  // AniList OAuth Handlers
+  // ===================================
+
+  // Handle OAuth callback from URL hash
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    const authStatus = params.get("auth");
+
+    if (authStatus === "success") {
+      // Get auth data from URL hash
+      try {
+        const hashData = JSON.parse(decodeURIComponent(window.location.hash.slice(1)));
+        if (hashData.token && hashData.user) {
+          setAniListAuth(hashData.user, hashData.token);
+          toast.success(`Welcome back, ${hashData.user.name}!`);
+
+          // Fetch and sync AniList data
+          fetchAniListData(hashData.token);
+        }
+      } catch (error) {
+        console.error("Error parsing auth data:", error);
+      }
+
+      // Clean up URL
+      window.history.replaceState({}, "", "/settings");
+    } else if (authStatus === "error") {
+      const message = params.get("message");
+      toast.error(`Authentication failed: ${message}`);
+      window.history.replaceState({}, "", "/settings");
+    }
+  }, [setAniListAuth]);
+
+  // Fetch user's AniList data and sync with local state
+  const fetchAniListData = async (token: string) => {
+    try {
+      const response = await fetch("https://graphql.anilist.co", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          query: `
+            query {
+              MediaListCollection(userId: $userId, type: ANIME) {
+                mediaId
+                status
+                progress
+                score
+                media {
+                  id
+                  idMal
+                  title { romaji english }
+                  coverImage { large }
+                  status
+                  episodes
+                }
+              }
+            }
+          `,
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        const mediaList = result.data?.MediaListCollection || [];
+        syncAniListData(mediaList);
+        toast.success("AniList data synced!");
+      }
+    } catch (error) {
+      console.error("Error fetching AniList data:", error);
+    }
+  };
+
+  // Login with AniList
+  const handleAniListLogin = () => {
+    const clientId = process.env.NEXT_PUBLIC_ANILIST_CLIENT_ID || "16500";
+    const redirectUri = `${window.location.origin}/auth/anilist/callback`;
+    const authUrl = `https://anilist.co/api/v2/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
+    window.location.href = authUrl;
+  };
+
+  // Logout from AniList
+  const handleAniListLogout = () => {
+    clearAniListAuth();
+    toast.success("Logged out from AniList");
   };
 
   return (
@@ -433,6 +537,92 @@ export default function SettingsPage() {
                   </p>
                 </div>
               </div>
+            </GlassCard>
+
+            {/* AniList Integration */}
+            <GlassCard>
+              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                <LinkIcon className="w-5 h-5 text-primary" />
+                AniList Integration
+              </h2>
+
+              {isAuthenticated && anilistUser ? (
+                <div className="space-y-4">
+                  {/* User Profile */}
+                  <div className="flex items-center gap-4 p-4 bg-white/5 rounded-lg">
+                    {anilistUser.avatar && (
+                      <img
+                        src={anilistUser.avatar.large || anilistUser.avatar.medium}
+                        alt={anilistUser.name}
+                        className="w-16 h-16 rounded-full object-cover"
+                      />
+                    )}
+                    <div className="flex-1">
+                      <p className="font-medium">{anilistUser.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Connected to AniList
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleAniListLogout}
+                      className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg flex items-center gap-2 transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Logout
+                    </button>
+                  </div>
+
+                  {/* Sync Options */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => fetchAniListData(anilistToken || "")}
+                      className="px-4 py-3 bg-white/5 hover:bg-white/10 rounded-lg flex items-center justify-center gap-2 transition-colors"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      Sync Now
+                    </button>
+                    <button
+                      onClick={handleAniListLogout}
+                      className="px-4 py-3 bg-white/5 hover:bg-white/10 rounded-lg flex items-center justify-center gap-2 transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Disconnect
+                    </button>
+                  </div>
+
+                  <p className="text-xs text-muted-foreground">
+                    Your favorites and watchlist sync with AniList automatically.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="p-4 bg-white/5 rounded-lg text-center">
+                    <User className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+                    <p className="font-medium mb-1">Connect to AniList</p>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Sync your anime list, favorites, and watch history with AniList
+                    </p>
+                    <button
+                      onClick={handleAniListLogin}
+                      className="w-full px-6 py-3 bg-primary hover:bg-primary/90 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                    >
+                      <LogIn className="w-4 h-4" />
+                      Login with AniList
+                    </button>
+                  </div>
+
+                  <div className="flex items-start gap-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                    <LinkIcon className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm">
+                      <p className="font-medium text-blue-400 mb-1">What is AniList?</p>
+                      <p className="text-muted-foreground">
+                        AniList is a platform to track anime, manga, and discover new series.
+                        Connecting allows you to sync your progress between AnimeVerse and AniList.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </GlassCard>
 
             {/* Notifications */}

@@ -20,6 +20,17 @@ export interface WatchHistoryItem {
   completed: boolean;
 }
 
+export interface AniListUser {
+  id: number;
+  name: string;
+  avatar: { large: string; medium: string };
+  options: { displayAdultContent: boolean };
+  mediaListOptions: {
+    scoreFormat: string;
+    rowOrder: string;
+  };
+}
+
 export interface UserPreferences {
   defaultQuality: "360p" | "480p" | "720p" | "1080p" | "auto";
   autoplay: boolean;
@@ -67,6 +78,14 @@ export interface StoreState {
   setMediaCache: (media: Media) => void;
   getMediaCache: (id: number) => Media | undefined;
   clearMediaCache: () => void;
+
+  // AniList Authentication
+  anilistUser: AniListUser | null;
+  anilistToken: string | null;
+  isAuthenticated: boolean;
+  setAniListAuth: (user: AniListUser, token: string) => void;
+  clearAniListAuth: () => void;
+  syncAniListData: (mediaList: unknown[]) => void;
 }
 
 // ===================================
@@ -85,6 +104,11 @@ export const useStore = create<StoreState>()(
       watchHistory: [],
       preferences: DEFAULT_PREFERENCES,
       mediaCache: {},
+
+      // AniList Auth State
+      anilistUser: null,
+      anilistToken: null,
+      isAuthenticated: false,
 
       // ===================================
       // Favorites Actions
@@ -216,6 +240,57 @@ export const useStore = create<StoreState>()(
       },
 
       clearMediaCache: () => set({ mediaCache: {} }),
+
+      // ===================================
+      // AniList Auth Actions
+      // ===================================
+
+      setAniListAuth: (user: AniListUser, token: string) =>
+        set({
+          anilistUser: user,
+          anilistToken: token,
+          isAuthenticated: true,
+        }),
+
+      clearAniListAuth: () =>
+        set({
+          anilistUser: null,
+          anilistToken: null,
+          isAuthenticated: false,
+        }),
+
+      syncAniListData: (mediaList: unknown[]) =>
+        set((state) => {
+          // Sync AniList data with local state
+          const favoriteIds: number[] = [];
+          const watchlistIds: number[] = [];
+
+          // Process AniList media list
+          for (const item of mediaList as Array<{
+            mediaId: number;
+            status: string;
+            media: { id: number };
+          }>) {
+            if (!item.media) continue;
+
+            const mediaId = item.mediaId || item.media.id;
+
+            switch (item.status) {
+              case "COMPLETED":
+              case "CURRENT":
+                favoriteIds.push(mediaId);
+                break;
+              case "PLANNING":
+                watchlistIds.push(mediaId);
+                break;
+            }
+          }
+
+          return {
+            favorites: [...new Set([...state.favorites, ...favoriteIds])],
+            watchlist: [...new Set([...state.watchlist, ...watchlistIds])],
+          };
+        }),
     }),
     {
       name: "animeverse-stream-storage",
@@ -254,6 +329,9 @@ export const useStore = create<StoreState>()(
         watchlist: state.watchlist,
         watchHistory: state.watchHistory,
         preferences: state.preferences,
+        anilistUser: state.anilistUser,
+        anilistToken: state.anilistToken,
+        isAuthenticated: state.isAuthenticated,
       }),
     }
   )
@@ -357,5 +435,26 @@ export const useMediaCache = () => {
     setMediaCache,
     getMediaCache,
     clearMediaCache,
+  };
+};
+
+/**
+ * Hook for AniList authentication
+ */
+export const useAniListAuth = () => {
+  const anilistUser = useStore((state) => state.anilistUser);
+  const anilistToken = useStore((state) => state.anilistToken);
+  const isAuthenticated = useStore((state) => state.isAuthenticated);
+  const setAniListAuth = useStore((state) => state.setAniListAuth);
+  const clearAniListAuth = useStore((state) => state.clearAniListAuth);
+  const syncAniListData = useStore((state) => state.syncAniListData);
+
+  return {
+    anilistUser,
+    anilistToken,
+    isAuthenticated,
+    setAniListAuth,
+    clearAniListAuth,
+    syncAniListData,
   };
 };

@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useCallback, memo } from "react";
+import { useState, useCallback, memo, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -24,11 +24,14 @@ import {
   Tags,
   Sun,
   Moon,
+  User,
+  LogOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/ui/glass-card";
 import { EpisodeNotifications } from "@/components/notifications/episode-notifications";
 import { useTheme } from "@/components/providers/theme-provider";
+import { useAniListAuth } from "@/store";
 
 interface NavLinkProps {
   href: string;
@@ -66,8 +69,10 @@ export const Header = memo(function Header() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const router = useRouter();
   const { theme, setTheme, resolvedTheme } = useTheme();
+  const { anilistUser, isAuthenticated, clearAniListAuth } = useAniListAuth();
 
   const handleSearch = useCallback(
     (e: React.FormEvent) => {
@@ -92,6 +97,21 @@ export const Header = memo(function Header() {
   const closeMobileMenu = useCallback(() => {
     setMobileMenuOpen(false);
   }, []);
+
+  // Close user menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (userMenuOpen && !target.closest(".user-menu-container")) {
+        setUserMenuOpen(false);
+      }
+    };
+
+    if (userMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [userMenuOpen]);
 
   return (
     <>
@@ -182,6 +202,61 @@ export const Header = memo(function Header() {
 
               {/* Episode Notifications */}
               <EpisodeNotifications />
+
+              {/* AniList User Profile */}
+              {isAuthenticated && anilistUser ? (
+                <div className="relative">
+                  <button
+                    onClick={() => setUserMenuOpen((prev) => !prev)}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                  >
+                    {anilistUser.avatar ? (
+                      <img
+                        src={anilistUser.avatar.medium || anilistUser.avatar.large}
+                        alt={anilistUser.name}
+                        className="w-7 h-7 rounded-full object-cover"
+                      />
+                    ) : (
+                      <User className="w-4 h-4" />
+                    )}
+                    <span className="hidden md:inline text-sm font-medium max-w-[100px] truncate">
+                      {anilistUser.name}
+                    </span>
+                  </button>
+
+                  {userMenuOpen && (
+                    <div className="user-menu-container absolute right-0 top-full mt-2 w-48 bg-popover border border-white/10 rounded-lg shadow-xl overflow-hidden animate-fadeIn">
+                      <div className="p-2 border-b border-white/10">
+                        <p className="text-xs text-muted-foreground px-2 py-1">
+                          Signed in as
+                        </p>
+                        <p className="text-sm font-medium px-2 py-1 truncate">
+                          {anilistUser.name}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          clearAniListAuth();
+                          setUserMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-white/5 transition-colors text-left"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        Logout
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <button
+                  onClick={() => router.push("/settings")}
+                  className="hidden md:inline-flex items-center justify-center rounded-lg text-primary hover:text-primary/80 hover:bg-primary/10 h-9 px-3 gap-1.5 transition-colors text-sm font-medium"
+                  title="Connect AniList"
+                >
+                  <User className="w-4 h-4" />
+                  <span className="hidden xl:inline">Connect</span>
+                </button>
+              )}
 
               {/* Settings */}
               <button
