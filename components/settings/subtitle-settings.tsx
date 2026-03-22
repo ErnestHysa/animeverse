@@ -116,7 +116,8 @@ export function SubtitleSettings({ className = "" }: SubtitleSettingsProps) {
   const [previewText, setPreviewText] = useState("This is how your subtitles will look");
 
   // Provide default values for existing users without subtitleStyle
-  const subtitleStyle = preferences.subtitleStyle || {
+  // Also handle case where preferences might be undefined during hydration
+  const subtitleStyle = preferences?.subtitleStyle || {
     fontSize: 20,
     fontFamily: "Arial, sans-serif",
     fontColor: "#FFFFFF",

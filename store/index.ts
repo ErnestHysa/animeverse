@@ -715,6 +715,7 @@ export const useStore = create<StoreState>()(
     }),
     {
       name: "animeverse-stream-storage",
+      version: 1,
       storage: createJSONStorage(() => ({
         getItem: (name) => {
           try {
@@ -744,6 +745,27 @@ export const useStore = create<StoreState>()(
           }
         },
       })),
+      // Migration: Ensure subtitleStyle exists for existing users
+      migrate: (persistedState: any, version: number) => {
+        if (version === 0) {
+          // Initial migration - ensure preferences has subtitleStyle
+          if (persistedState?.preferences && !persistedState.preferences.subtitleStyle) {
+            persistedState.preferences.subtitleStyle = {
+              fontSize: 20,
+              fontFamily: "Arial, sans-serif",
+              fontColor: "#FFFFFF",
+              backgroundColor: "#000000",
+              backgroundOpacity: 50,
+              position: "bottom",
+              edgeStyle: "drop-shadow",
+              textShadow: true,
+              windowColor: "#000000",
+              windowOpacity: 0,
+            };
+          }
+        }
+        return persistedState;
+      },
       // Only persist certain fields
       partialize: (state) => ({
         favorites: state.favorites,
