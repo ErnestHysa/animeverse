@@ -331,7 +331,14 @@ export function EnhancedVideoPlayer({
         const createProxyUrl = (originalUrl: string) => {
           const isManifest = originalUrl.includes(".m3u8");
           const type = isManifest ? "manifest" : "segment";
-          return `/api/proxy-hls?url=${encodeURIComponent(originalUrl)}&type=${type}`;
+          let proxyUrl = `/api/proxy-hls?url=${encodeURIComponent(originalUrl)}&type=${type}`;
+
+          // Add referer if available from the provider
+          if (source.referer) {
+            proxyUrl += `&referer=${encodeURIComponent(source.referer)}`;
+          }
+
+          return proxyUrl;
         };
 
         // Configure XHR loader to route through proxy (for manifest loading)

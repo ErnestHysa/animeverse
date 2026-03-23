@@ -16,7 +16,7 @@ const MAX_SEGMENT_SIZE = 50 * 1024 * 1024; // 50MB for individual segments
 const TIMEOUT_MS = 30000; // 30 second timeout for video segments
 
 /**
- * GET /api/proxy-hls?url=<encoded_url>&type=<manifest|segment>
+ * GET /api/proxy-hls?url=<encoded_url>&type=<manifest|segment>&referer=<optional_referer>
  * Proxies HLS content requests to bypass CORS and hotlink protection
  */
 export async function GET(request: NextRequest) {
@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const encodedUrl = searchParams.get("url");
     const type = searchParams.get("type") || "manifest";
+    const customReferer = searchParams.get("referer");
 
     if (!encodedUrl) {
       return NextResponse.json(
@@ -34,13 +35,21 @@ export async function GET(request: NextRequest) {
 
     const targetUrl = decodeURIComponent(encodedUrl);
 
-    // Validate URL
+    // Validate URL and determine referer
     let refererOrigin = "";
+    let refererHeader = "";
     let contentType = "application/vnd.apple.mpegurl";
 
     try {
       const parsedUrl = new URL(targetUrl);
       refererOrigin = `${parsedUrl.protocol}//${parsedUrl.host}`;
+
+      // Use custom referer if provided, otherwise use the origin
+      if (customReferer) {
+        refererHeader = decodeURIComponent(customReferer);
+      } else {
+        refererHeader = refererOrigin;
+      }
 
       // Only allow http/https protocols
       if (!["http:", "https:"].includes(parsedUrl.protocol)) {
@@ -80,12 +89,15 @@ export async function GET(request: NextRequest) {
         "Accept": "*/*",
         "Accept-Language": "en-US,en;q=0.9",
         "Accept-Encoding": "gzip, deflate, br",
-        "Referer": refererOrigin,
+        "Referer": refererHeader,
         "Origin": refererOrigin,
         "Connection": "keep-alive",
         "Sec-Fetch-Dest": "empty",
         "Sec-Fetch-Mode": "cors",
         "Sec-Fetch-Site": "cross-site",
+        "Sec-Ch-Ua": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"Windows"',
       },
       signal: controller.signal,
     });
