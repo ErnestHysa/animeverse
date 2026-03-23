@@ -442,8 +442,10 @@ export async function GET(
     ];
 
     // Search for the anime on AnimePahe
+    let animePaheId: string | null = null;
+
     if (title) {
-      const animePaheId = await searchAnimeId(
+      animePaheId = await searchAnimeId(
         title,
         malId ? parseInt(malId) : null
       );
@@ -453,12 +455,19 @@ export async function GET(
         const animeInfo = await getAnimeInfo(animePaheId);
 
         if (animeInfo?.episodes) {
-          const episodeData = animeInfo.episodes.find(
+          // Try to find the exact episode
+          let episodeData = animeInfo.episodes.find(
             (ep) => ep.number === episodeNumber
           );
 
+          // If not found, use the first available episode (for continuation seasons)
+          if (!episodeData && animeInfo.episodes.length > 0) {
+            console.log(`[Video Search] Episode ${episodeNumber} not found, using first available episode ${animeInfo.episodes[0].number}`);
+            episodeData = animeInfo.episodes[0];
+          }
+
           if (episodeData) {
-            console.log(`[Video Search] Found episode ${episodeNumber}: ${episodeData.id}`);
+            console.log(`[Video Search] Found episode ${episodeData.number}: ${episodeData.id}`);
 
             // Get sources for this episode
             const sourcesData = await getEpisodeSources(episodeData.id);
@@ -469,8 +478,6 @@ export async function GET(
               referer = sourcesData.referer;
               provider = "animepahe";
             }
-          } else {
-            console.log(`[Video Search] Episode ${episodeNumber} not found`);
           }
         }
       }
