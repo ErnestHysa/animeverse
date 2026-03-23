@@ -1,10 +1,13 @@
 /**
  * Video Sources API Route
  * Fetches video sources from the local Consumet API
- * Primary: AnimeKai (more reliable, fewer CORS issues)
- * Fallback: AnimePahe (alternative provider)
+ * Primary: AnimeSaturn (CDN works with HLS proxy)
+ * Fallback 1: AnimeKai (alternative provider)
+ * Fallback 2: AnimePahe (alternative provider)
+ * Fallback 3: Demo video (final fallback)
  *
- * Note: AnimeKai is used as primary provider based on user feedback
+ * Note: AnimeSaturn is the primary provider because its CDN (nezumi.streampeaker.org)
+ * works correctly with the HLS proxy, unlike AnimeKai/AnimePahe CDNs which return 403 Forbidden.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -80,6 +83,45 @@ interface AnimeKaiSourcesResponse {
     isM3U8?: boolean;
     isDefault?: boolean;
     label?: string;
+  }>;
+}
+
+// ============================================
+// AnimeSaturn Provider Interfaces
+// ============================================
+
+interface AnimeSaturnSearchResult {
+  id: string;
+  title: string;
+  image?: string;
+  episodes?: AnimeSaturnEpisode[];
+}
+
+interface AnimeSaturnEpisode {
+  id: string;
+  number: number;
+  title?: string;
+  url?: string;
+}
+
+interface AnimeSaturnInfo {
+  id: string;
+  title: string;
+  episodes?: AnimeSaturnEpisode[];
+}
+
+interface AnimeSaturnSourcesResponse {
+  headers?: {
+    Referer?: string;
+  };
+  sources?: Array<{
+    url: string;
+    isM3U8?: boolean;
+    quality?: string;
+  }>;
+  subtitles?: Array<{
+    url: string;
+    lang?: string;
   }>;
 }
 
@@ -258,6 +300,200 @@ async function getAnimeKaiEpisodeSources(
       lang: string;
       label: string;
     }> = [];
+
+    return {
+      sources,
+      subtitles,
+      referer: data.headers?.Referer,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ============================================
+// AnimeSaturn Provider Functions
+// ============================================
+
+/**
+ * Search for anime on AnimeSaturn by title
+ * Returns the anime ID if found
+ * AnimeSaturn is the PRIMARY provider as its CDN works with HLS proxy
+ */
+async function searchAnimeSaturnId(
+  title: string,
+  malId: number | null
+): Promise<{ id: string; episodes?: AnimeSaturnEpisode[] } | null> {
+  const searchStrategies: string[] = [];
+
+  if (title) {
+    const cleaned = cleanTitle(title);
+    if (cleaned.length > 3) {
+      searchStrategies.push(cleaned);
+    }
+
+    const mainTitle = extractMainTitle(title);
+    if (mainTitle && mainTitle !== cleaned) {
+      searchStrategies.unshift(mainTitle);
+    }
+
+    searchStrategies.push(title);
+  }
+
+  console.log(`[AnimeSaturn] Searching with strategies:`, searchStrategies);
+
+  for (const searchTerm of searchStrategies) {
+    try {
+      const url = `${API_BASE_URL}/anime/animesaturn/${encodeURIComponent(searchTerm)}`;
+      console.log(`[AnimeSaturn] Searching: "${searchTerm}" -> ${url}`);
+
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 10000);
+      const searchResponsePromise = fetch(url, { signal: ctrl.signal });
+      const searchResponse = await searchResponsePromise;
+      clearTimeout(tid);
+
+      if (!searchResponse.ok) continue;
+
+      const data = await searchResponse.json();
+
+      if (data.results && data.results.length > 0) {
+        console.log(`[AnimeSaturn] Found ${data.results.length} results for "${searchTerm}"`);
+
+        // Find best match using scoring
+        const searchTermLower = searchTerm.toLowerCase();
+        const searchWords = searchTermLower.split(" ").filter(w => w.length > 2);
+
+        const scoredResults = data.results.map((r: { title?: string; id: string }) => {
+          const resultTitle = (r.title || "").toLowerCase();
+          const cleanedResult = cleanTitle(r.title || "");
+          const resultWords = resultTitle.split(" ").filter(w => w.length > 2);
+          let score = 0;
+
+          if (resultTitle === searchTermLower || cleanedResult === searchTermLower) {
+            score += 100;
+          } else if (resultTitle.includes(searchTermLower) || cleanedResult.includes(searchTermLower)) {
+            score += 50;
+          }
+
+          if (searchWords.length >= 2 && resultWords.length >= 2) {
+            const searchPrefix = searchWords.slice(0, 2).join(" ");
+            const resultPrefix = resultWords.slice(0, 2).join(" ");
+            if (searchPrefix === resultPrefix) {
+              score += 40;
+            }
+          }
+
+          const matchingWords = searchWords.filter(w =>
+            resultWords.some(rw => rw.includes(w) || w.includes(rw))
+          );
+          score += matchingWords.length * 15;
+
+          const lengthDiff = Math.abs(resultTitle.length - searchTermLower.length);
+          score -= lengthDiff / 20;
+
+          return { result: r, score };
+        });
+
+        scoredResults.sort((a: { result: { title?: string; id: string }; score: number }, b: { result: { title?: string; id: string }; score: number }) => b.score - a.score);
+        let bestMatch = scoredResults[0]?.result;
+
+        if (!bestMatch) {
+          bestMatch = data.results[0];
+        }
+
+        console.log(`[AnimeSaturn] Selected: "${bestMatch.title}" (${bestMatch.id})`);
+
+        // Get episode info to have episodes list
+        const episodeInfo = await getAnimeSaturnInfo(bestMatch.id);
+        return {
+          id: bestMatch.id,
+          episodes: episodeInfo?.episodes
+        };
+      }
+    } catch (error) {
+      console.log(`[AnimeSaturn] Error searching for "${searchTerm}":`, error);
+      continue;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Get anime info from AnimeSaturn including episode list
+ */
+async function getAnimeSaturnInfo(animeId: string): Promise<AnimeSaturnInfo | null> {
+  try {
+    const url = `${API_BASE_URL}/anime/animesaturn/info?id=${encodeURIComponent(animeId)}`;
+
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 10000);
+    const infoResponsePromise = fetch(url, { signal: ctrl.signal });
+    const infoResponse = await infoResponsePromise;
+    clearTimeout(tid);
+
+    if (!infoResponse.ok) return null;
+
+    return await infoResponse.json();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Get episode sources from AnimeSaturn
+ * AnimeSaturn uses nezumi.streampeaker.org CDN which works with HLS proxy
+ */
+async function getAnimeSaturnEpisodeSources(
+  episodeId: string
+): Promise<{
+  sources: Array<{
+    url: string;
+    quality: "360p" | "480p" | "720p" | "1080p" | "auto";
+    label: string;
+    provider: string;
+    type: "mp4" | "hls" | "webm";
+  }>;
+  subtitles: Array<{
+    url: string;
+    lang: string;
+    label: string;
+  }>;
+  referer?: string;
+} | null> {
+  try {
+    const url = `${API_BASE_URL}/anime/animesaturn/watch/${encodeURIComponent(episodeId)}`;
+
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 15000);
+    const sourcesResponsePromise = fetch(url, { signal: ctrl.signal });
+    const sourcesResponse = await sourcesResponsePromise;
+    clearTimeout(tid);
+
+    if (!sourcesResponse.ok) return null;
+
+    const data: AnimeSaturnSourcesResponse = await sourcesResponse.json();
+
+    if (!data.sources || data.sources.length === 0) return null;
+
+    // Map sources to our format
+    const sources = data.sources
+      .filter(s => !s.url.includes("thumbnails.vtt")) // Filter out thumbnail source
+      .map((s) => ({
+        url: s.url,
+        quality: mapQuality(s.quality || "auto"),
+        label: s.quality || "Auto",
+        provider: "AnimeSaturn",
+        type: (s.isM3U8 ? "hls" : "mp4") as "mp4" | "hls" | "webm",
+      }));
+
+    // Map subtitles if available
+    const subtitles = (data.subtitles || []).map((s) => ({
+      url: s.url,
+      lang: s.lang || "Unknown",
+      label: s.lang || "Unknown",
+    }));
 
     return {
       sources,
@@ -666,10 +902,51 @@ export async function GET(
     ];
 
     // ============================================
-    // Try AnimeKai first (primary provider)
+    // Try AnimeSaturn first (primary provider)
+    // AnimeSaturn's CDN (nezumi.streampeaker.org) works with HLS proxy
     // ============================================
     if (title && sources.length === 0) {
-      console.log(`[Video Sources] Trying AnimeKai provider...`);
+      console.log(`[Video Sources] Trying AnimeSaturn provider (primary)...`);
+
+      const animeSaturnData = await searchAnimeSaturnId(
+        title,
+        malId ? parseInt(malId) : null
+      );
+
+      if (animeSaturnData?.episodes) {
+        // Try to find the exact episode
+        let episodeData = animeSaturnData.episodes.find(
+          (ep) => ep.number === episodeNumber
+        );
+
+        // If not found, use the first available episode
+        if (!episodeData && animeSaturnData.episodes.length > 0) {
+          console.log(`[AnimeSaturn] Episode ${episodeNumber} not found, using first available episode ${animeSaturnData.episodes[0].number}`);
+          episodeData = animeSaturnData.episodes[0];
+        }
+
+        if (episodeData) {
+          console.log(`[AnimeSaturn] Found episode ${episodeData.number}: ${episodeData.id}`);
+
+          // Get sources for this episode
+          const sourcesData = await getAnimeSaturnEpisodeSources(episodeData.id);
+
+          if (sourcesData && sourcesData.sources.length > 0) {
+            sources = sourcesData.sources;
+            subtitles.push(...sourcesData.subtitles);
+            referer = sourcesData.referer;
+            provider = "animesaturn";
+            console.log(`[AnimeSaturn] Successfully loaded ${sources.length} sources`);
+          }
+        }
+      }
+    }
+
+    // ============================================
+    // Fallback to AnimeKai if AnimeSaturn failed
+    // ============================================
+    if (title && sources.length === 0) {
+      console.log(`[Video Sources] AnimeSaturn failed, trying AnimeKai fallback...`);
 
       const animeKaiData = await searchAnimeKaiId(
         title,
@@ -793,7 +1070,7 @@ export async function GET(
         intro: null,
         outro: null,
         isFallback: true,
-        message: `Showing demo video. The anime might not be available on AnimePahe yet.`,
+        message: `Showing demo video. The anime might not be available on any provider yet.`,
       });
     }
 
