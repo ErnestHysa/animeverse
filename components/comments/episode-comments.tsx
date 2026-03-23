@@ -67,6 +67,8 @@ export function EpisodeComments({
     addComment({
       animeId,
       episodeNumber,
+      userId: "local",
+      userName: "You",
       content: newComment,
       timestamp,
       isSpoiler,

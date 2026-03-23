@@ -21,7 +21,7 @@ export interface CustomList {
 
 interface CustomListsState {
   lists: CustomList[];
-  addList: (list: Omit<CustomList, "id" "createdAt" "updatedAt">) => void;
+  addList: (list: Omit<CustomList, "id" | "createdAt" | "updatedAt">) => void;
   updateList: (id: string, updates: Partial<CustomList>) => void;
   deleteList: (id: string) => void;
   addAnimeToList: (listId: string, animeId: number) => void;
@@ -112,6 +112,14 @@ export const useCustomLists = create<CustomListsState>()(
             localStorage.setItem(name, JSON.stringify(value));
           } catch (error) {
             console.error("Failed to save custom lists:", error);
+          }
+        },
+        removeItem: (name) => {
+          try {
+            if (typeof window === "undefined") return;
+            localStorage.removeItem(name);
+          } catch (error) {
+            console.error("Failed to remove custom lists:", error);
           }
         },
       })),

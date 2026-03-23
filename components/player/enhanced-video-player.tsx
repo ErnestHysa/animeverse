@@ -318,26 +318,26 @@ export function EnhancedVideoPlayer({
     };
 
     if (source.type === "direct") {
-      const isHls = source.url.includes(".m3u8") || source.type === "hls";
+      const isHls = source.url.includes(".m3u8");
 
-      if (isHls && Hls.isSupported()) {
+      if (isHls && typeof Hls !== "undefined" && Hls.isSupported()) {
         // Use HLS.js for browsers that don't support HLS natively
-        const hlsConfig: Hls.Config = {
+        const hlsConfig: any = {
           enableWorker: true,
           lowLatencyMode: true,
         };
 
         // Add referer header if provided (for protected streams like AnimePahe)
         if (source.referer) {
-          hlsConfig.xhrSetup = (xhr, url) => {
-            xhr.setRequestHeader("Referer", source.referer);
+          hlsConfig.xhrSetup = (xhr: XMLHttpRequest, url: string | undefined) => {
+            xhr.setRequestHeader("Referer", source.referer || "");
           };
-          hlsConfig.fetchSetup = (fetchContext, initParams) => {
+          hlsConfig.fetchSetup = (fetchContext: { url: string }, initParams: RequestInit) => {
             return new Request(fetchContext.url, {
               ...initParams,
               headers: {
-                ...initParams.headers,
-                Referer: source.referer,
+                ...(initParams.headers as Record<string, string>),
+                Referer: source.referer || "",
               },
             });
           };

@@ -108,13 +108,13 @@ export default function StatsPage() {
     const now = Date.now();
     const oneWeekAgo = now - 7 * 24 * 60 * 60 * 1000;
     const weeklyEpisodes = watchHistory.filter(
-      (item) => item.watchedAt >= oneWeekAgo
+      (item) => item.timestamp >= oneWeekAgo
     ).length;
 
     // Calculate monthly activity
     const oneMonthAgo = now - 30 * 24 * 60 * 60 * 1000;
     const monthlyEpisodes = watchHistory.filter(
-      (item) => item.watchedAt >= oneMonthAgo
+      (item) => item.timestamp >= oneMonthAgo
     ).length;
 
     // Genre distribution
@@ -156,8 +156,8 @@ export default function StatsPage() {
     }
 
     watchHistory.forEach((item) => {
-      const watchDate = new Date(item.watchedAt);
-      const daysDiff = Math.floor((now - item.watchedAt) / (24 * 60 * 60 * 1000));
+      const watchDate = new Date(item.timestamp);
+      const daysDiff = Math.floor((now - item.timestamp) / (24 * 60 * 60 * 1000));
       if (daysDiff < 7) {
         const dateStr = watchDate.toLocaleDateString("en-US", { weekday: "short" });
         if (dailyActivity.hasOwnProperty(dateStr)) {
@@ -296,7 +296,7 @@ export default function StatsPage() {
                     #{index + 1}
                   </span>
                   <img
-                    src={item.anime.coverImage.large}
+                    src={item.anime.coverImage.large || "/placeholder.jpg"}
                     alt={item.anime.title.userPreferred || ""}
                     className="w-12 h-16 object-cover rounded"
                   />

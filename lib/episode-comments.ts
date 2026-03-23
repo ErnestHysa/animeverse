@@ -14,7 +14,7 @@ export interface EpisodeComment {
   userName: string;
   userAvatar?: string;
   content: string;
-  timestamp: number; // Video timestamp in seconds (optional, null for general comment)
+  timestamp: number | null; // Video timestamp in seconds (null for general comment)
   createdAt: number;
   updatedAt: number;
   likes: number;

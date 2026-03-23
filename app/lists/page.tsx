@@ -13,7 +13,7 @@ import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
-import { useCustomLists } from "@/lib/custom-lists";
+import { useCustomLists, type CustomList } from "@/lib/custom-lists";
 import { useStore } from "@/store";
 import { AnimeCard } from "@/components/anime/anime-card";
 import { toast } from "react-hot-toast";

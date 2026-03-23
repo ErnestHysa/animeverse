@@ -13,7 +13,7 @@ import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { GlassCard } from "@/components/ui/glass-card";
 import { useStore } from "@/store";
-import { ACHIEVEMENTS_LIST, RARITY_COLORS, RARITY_BADGES, getAchievementRequirement } from "@/lib/achievements";
+import { ACHIEVEMENTS, RARITY_COLORS, RARITY_BADGES, getAchievementRequirement } from "@/lib/achievements";
 
 export default function AchievementsPage() {
   const { achievements, unlockedAchievements, watchHistory, favorites } = useStore();
@@ -26,15 +26,15 @@ export default function AchievementsPage() {
   const favoritesCount = favorites.length;
 
   // Group achievements by category
-  const groupedAchievements = ACHIEVEMENTS_LIST.reduce((acc, achievement) => {
+  const groupedAchievements = ACHIEVEMENTS.reduce((acc, achievement) => {
     if (!acc[achievement.category]) acc[achievement.category] = [];
     acc[achievement.category].push(achievement);
     return acc;
-  }, {} as Record<string, typeof ACHIEVEMENTS_LIST>);
+  }, {} as Record<string, typeof ACHIEVEMENTS>);
 
   // Filter by category
   const filteredAchievements = selectedCategory === "all"
-    ? ACHIEVEMENTS_LIST
+    ? ACHIEVEMENTS
     : (groupedAchievements[selectedCategory] || []);
 
   // Sort by rarity (legendary first)
@@ -44,7 +44,7 @@ export default function AchievementsPage() {
   );
 
   // Calculate progress for each achievement
-  const getProgress = (achievement: typeof ACHIEVEMENTS_LIST[0]) => {
+  const getProgress = (achievement: typeof ACHIEVEMENTS[0]) => {
     const progress = achievements[achievement.id] || 0;
     const requirement = achievement.requirement;
     return Math.min(100, (progress / requirement) * 100);
@@ -63,7 +63,7 @@ export default function AchievementsPage() {
             <div>
               <h1 className="text-3xl font-display font-bold">Achievements</h1>
               <p className="text-muted-foreground">
-                {unlockedAchievements.length} / {ACHIEVEMENTS_LIST.length} unlocked
+                {unlockedAchievements.length} / {ACHIEVEMENTS.length} unlocked
               </p>
             </div>
           </div>
@@ -219,7 +219,7 @@ export default function AchievementsPage() {
           </div>
 
           {/* Empty State (if no achievements) */}
-          {ACHIEVEMENTS_LIST.length === 0 && (
+          {ACHIEVEMENTS.length === 0 && (
             <GlassCard className="max-w-2xl mx-auto p-12 text-center">
               <Target className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
               <h2 className="text-xl font-semibold mb-2">Start Your Journey</h2>

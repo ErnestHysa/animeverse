@@ -216,7 +216,7 @@ async function searchAnimeId(
         });
 
         // Sort by score descending and pick the best
-        scoredResults.sort((a, b) => b.score - a.score);
+        scoredResults.sort((a: { result: { title?: string; id: string }; score: number }, b: { result: { title?: string; id: string }; score: number }) => b.score - a.score);
         let bestMatch = scoredResults[0]?.result;
 
         // Fallback to first result
