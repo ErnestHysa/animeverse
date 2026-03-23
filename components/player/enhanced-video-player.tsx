@@ -327,21 +327,27 @@ export function EnhancedVideoPlayer({
           lowLatencyMode: true,
         };
 
-        // Add referer header if provided (for protected streams like AnimePahe)
-        if (source.referer) {
-          hlsConfig.xhrSetup = (xhr: XMLHttpRequest, url: string | undefined) => {
-            xhr.setRequestHeader("Referer", source.referer || "");
-          };
-          hlsConfig.fetchSetup = (fetchContext: { url: string }, initParams: RequestInit) => {
-            return new Request(fetchContext.url, {
-              ...initParams,
-              headers: {
-                ...(initParams.headers as Record<string, string>),
-                Referer: source.referer || "",
-              },
-            });
-          };
-        }
+        // Custom fetch loader that routes through our HLS proxy to bypass CORS
+        // This fixes the "Refused to set unsafe header 'Referer'" error
+        // and CORS blocking from external video servers
+        hlsConfig.fetchSetup = (fetchContext: { url: string }, initParams: RequestInit) => {
+          const originalUrl = fetchContext.url;
+
+          // Determine if this is a manifest or segment request
+          const isManifest = originalUrl.includes(".m3u8");
+          const type = isManifest ? "manifest" : "segment";
+
+          // Route through our proxy API
+          const proxyUrl = `/api/proxy-hls?url=${encodeURIComponent(originalUrl)}&type=${type}`;
+
+          return new Request(proxyUrl, {
+            ...initParams,
+            headers: {
+              // Don't forward Referer - the proxy will add it
+              ...(initParams.headers as Record<string, string>),
+            },
+          });
+        };
 
         const hls = new Hls(hlsConfig);
 
@@ -386,7 +392,9 @@ export function EnhancedVideoPlayer({
         };
       } else if (isHls && video.canPlayType("application/vnd.apple.mpegurl")) {
         // Native HLS support (Safari)
-        video.src = source.url;
+        // Use proxied URL to bypass CORS - segments will also be fetched through proxy
+        const proxyUrl = `/api/proxy-hls?url=${encodeURIComponent(source.url)}&type=manifest`;
+        video.src = proxyUrl;
         video.addEventListener("loadeddata", handleLoad, { once: true });
         video.addEventListener("error", handleError, { once: true });
 
