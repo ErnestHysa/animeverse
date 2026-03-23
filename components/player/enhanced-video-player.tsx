@@ -327,26 +327,25 @@ export function EnhancedVideoPlayer({
           lowLatencyMode: true,
         };
 
-        // Custom fetch loader that routes through our HLS proxy to bypass CORS
-        // This fixes the "Refused to set unsafe header 'Referer'" error
-        // and CORS blocking from external video servers
-        hlsConfig.fetchSetup = (fetchContext: { url: string }, initParams: RequestInit) => {
-          const originalUrl = fetchContext.url;
-
-          // Determine if this is a manifest or segment request
+        // Helper function to create proxy URL
+        const createProxyUrl = (originalUrl: string) => {
           const isManifest = originalUrl.includes(".m3u8");
           const type = isManifest ? "manifest" : "segment";
+          return `/api/proxy-hls?url=${encodeURIComponent(originalUrl)}&type=${type}`;
+        };
 
-          // Route through our proxy API
-          const proxyUrl = `/api/proxy-hls?url=${encodeURIComponent(originalUrl)}&type=${type}`;
+        // Configure XHR loader to route through proxy (for manifest loading)
+        // This is CRITICAL because hls.js uses XHR for manifest, not fetch
+        hlsConfig.xhrSetup = (xhr: XMLHttpRequest, url: string) => {
+          // Override the URL to go through our proxy
+          const proxyUrl = createProxyUrl(url);
+          xhr.open("GET", proxyUrl, true);
+        };
 
-          return new Request(proxyUrl, {
-            ...initParams,
-            headers: {
-              // Don't forward Referer - the proxy will add it
-              ...(initParams.headers as Record<string, string>),
-            },
-          });
+        // Configure fetch loader to route through proxy (for segment loading)
+        hlsConfig.fetchSetup = (fetchContext: { url: string }, initParams: RequestInit) => {
+          const proxyUrl = createProxyUrl(fetchContext.url);
+          return new Request(proxyUrl, initParams);
         };
 
         const hls = new Hls(hlsConfig);
