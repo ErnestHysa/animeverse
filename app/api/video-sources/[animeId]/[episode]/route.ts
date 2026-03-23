@@ -1,9 +1,9 @@
 /**
  * Video Sources API Route
- * Fetches video sources from the local Consumet API (AnimeSaturn provider)
+ * Fetches video sources from the local Consumet API (AnimePahe provider)
  * Proxies requests to avoid CORS issues
  *
- * Note: AnimeSaturn is used as the primary provider as AnimeKai is blocked by Cloudflare
+ * Note: AnimePahe is used as the primary provider for English content and better quality options
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -14,34 +14,39 @@ export const dynamic = "force-dynamic";
 // Get API base URL from environment or use localhost
 const API_BASE_URL = process.env.VIDEO_API_BASE_URL || "http://localhost:3001";
 
-interface AnimeSaturnEpisode {
+interface AnimePaheEpisode {
   id: string;
   number: number;
+  title?: string;
+  image?: string;
+  duration?: string;
+  url?: string;
 }
 
-interface AnimeSaturnInfo {
+interface AnimePaheInfo {
   id: string;
   title: string;
-  episodes?: AnimeSaturnEpisode[];
+  episodes?: AnimePaheEpisode[];
 }
 
-interface AnimeSaturnSourcesResponse {
+interface AnimePaheSourcesResponse {
   headers?: {
     Referer?: string;
   };
   sources?: Array<{
     url: string;
     isM3U8?: boolean;
-    quality?: string;
+    quality: string;
+    isDub?: boolean;
   }>;
-  subtitles?: Array<{
+  download?: Array<{
     url: string;
-    lang: string;
+    quality: string;
   }>;
 }
 
 /**
- * Search for anime on AnimeSaturn by title
+ * Search for anime on AnimePahe by title
  * Returns the anime ID if found
  */
 async function searchAnimeId(
@@ -95,7 +100,7 @@ async function searchAnimeId(
   // Try each search strategy
   for (const searchTerm of uniqueStrategies) {
     try {
-      const searchUrl = `${API_BASE_URL}/anime/animesaturn/${encodeURIComponent(searchTerm)}`;
+      const searchUrl = `${API_BASE_URL}/anime/animepahe/${encodeURIComponent(searchTerm)}`;
       const response = await fetch(searchUrl, {
         signal: AbortSignal.timeout(10000),
       });
@@ -145,7 +150,7 @@ async function searchAnimeId(
           for (const titleData of jikanTitles) {
             const searchTerm = titleData.title?.toLowerCase().replace(/[^\w\s]/g, " ").trim();
             if (searchTerm && searchTerm.length > 3) {
-              const searchUrl = `${API_BASE_URL}/anime/animesaturn/${encodeURIComponent(searchTerm)}`;
+              const searchUrl = `${API_BASE_URL}/anime/animepahe/${encodeURIComponent(searchTerm)}`;
               const response = await fetch(searchUrl, { signal: AbortSignal.timeout(5000) });
               if (response.ok) {
                 const data = await response.json();
@@ -168,9 +173,10 @@ async function searchAnimeId(
 /**
  * Get anime info including episode list
  */
-async function getAnimeInfo(animeId: string): Promise<AnimeSaturnInfo | null> {
+async function getAnimeInfo(animeId: string): Promise<AnimePaheInfo | null> {
   try {
-    const url = `${API_BASE_URL}/anime/animesaturn/info?id=${encodeURIComponent(animeId)}`;
+    // AnimePahe uses path parameter for info endpoint
+    const url = `${API_BASE_URL}/anime/animepahe/info/${encodeURIComponent(animeId)}`;
     const response = await fetch(url, {
       signal: AbortSignal.timeout(10000),
     });
@@ -184,7 +190,7 @@ async function getAnimeInfo(animeId: string): Promise<AnimeSaturnInfo | null> {
 }
 
 /**
- * Get episode sources from AnimeSaturn
+ * Get episode sources from AnimePahe
  */
 async function getEpisodeSources(
   episodeId: string
@@ -204,7 +210,8 @@ async function getEpisodeSources(
   referer?: string;
 } | null> {
   try {
-    const url = `${API_BASE_URL}/anime/animesaturn/watch/${encodeURIComponent(episodeId)}`;
+    // AnimePahe uses query parameter for episodeId
+    const url = `${API_BASE_URL}/anime/animepahe/watch?episodeId=${encodeURIComponent(episodeId)}`;
 
     const response = await fetch(url, {
       signal: AbortSignal.timeout(15000),
@@ -212,27 +219,31 @@ async function getEpisodeSources(
 
     if (!response.ok) return null;
 
-    const data: AnimeSaturnSourcesResponse = await response.json();
+    const data: AnimePaheSourcesResponse = await response.json();
 
-    if (!data.sources || data.sources.length === 0) return null;
+    // Combine streaming and download sources
+    const allSources = [
+      ...(data.sources || []),
+      ...(data.download || [])
+    ];
+
+    if (allSources.length === 0) return null;
 
     // Map sources to our format
-    const sources = data.sources
-      .filter(s => !s.url.includes("thumbnails.vtt")) // Filter out thumbnail streams
-      .map((s) => ({
-        url: s.url,
-        quality: "auto" as const, // AnimeSaturn doesn't provide quality info
-        label: s.quality || "Auto",
-        provider: "AnimeSaturn",
-        type: (s.isM3U8 ? "hls" : "mp4") as "mp4" | "hls" | "webm",
-      }));
-
-    // Map subtitles
-    const subtitles = (data.subtitles || []).map((sub) => ({
-      url: sub.url,
-      lang: sub.lang.split(" ")[0].toLowerCase(), // Take first part of language
-      label: sub.lang,
+    const sources = allSources.map((s) => ({
+      url: s.url,
+      quality: mapQuality(s.quality),
+      label: s.quality || "Auto",
+      provider: "AnimePahe",
+      type: (s.isM3U8 ? "hls" : "mp4") as "mp4" | "hls" | "webm",
     }));
+
+    // AnimePahe doesn't provide separate subtitle files (hardcoded)
+    const subtitles: Array<{
+      url: string;
+      lang: string;
+      label: string;
+    }> = [];
 
     return {
       sources,
@@ -245,12 +256,27 @@ async function getEpisodeSources(
 }
 
 /**
+ * Map quality string to standard format
+ * AnimePahe quality format: "df68 · 360p BD" or "800p"
+ */
+function mapQuality(quality: string | undefined): "360p" | "480p" | "720p" | "1080p" | "auto" {
+  if (!quality) return "auto";
+
+  const q = quality.toLowerCase();
+  if (q.includes("1080")) return "1080p";
+  if (q.includes("720")) return "720p";
+  if (q.includes("480")) return "480p";
+  if (q.includes("360")) return "360p";
+  return "auto";
+}
+
+/**
  * GET /api/video-sources/[animeId]/[episode]
  * Returns video sources for the requested episode
  * Query params:
  * - title: Anime title for searching
  * - malId: MyAnimeList ID for better matching
- * - language: "sub" or "dub" (default: "sub") - Note: AnimeSaturn primarily has Italian subs
+ * - language: "sub" or "dub" (default: "sub")
  */
 export async function GET(
   request: NextRequest,
@@ -293,19 +319,19 @@ export async function GET(
 
     const availableLanguages: Array<{ type: "sub" | "dub"; available: boolean }> = [
       { type: "sub", available: true },
-      { type: "dub", available: false }, // AnimeSaturn primarily has subs
+      { type: "dub", available: false },
     ];
 
-    // Search for the anime on AnimeSaturn
+    // Search for the anime on AnimePahe
     if (title) {
-      const animeSaturnId = await searchAnimeId(
+      const animePaheId = await searchAnimeId(
         title,
         malId ? parseInt(malId) : null
       );
 
-      if (animeSaturnId) {
+      if (animePaheId) {
         // Get anime info to find the episode ID
-        const animeInfo = await getAnimeInfo(animeSaturnId);
+        const animeInfo = await getAnimeInfo(animePaheId);
 
         if (animeInfo?.episodes) {
           const episodeData = animeInfo.episodes.find(
@@ -320,7 +346,7 @@ export async function GET(
               sources = sourcesData.sources;
               subtitles.push(...sourcesData.subtitles);
               referer = sourcesData.referer;
-              provider = "animesaturn";
+              provider = "animepahe";
             }
           }
         }
@@ -341,7 +367,7 @@ export async function GET(
           intro: null,
           outro: null,
           error: "NO_SOURCES",
-          message: `No video sources found for episode ${episodeNumber}. The anime might not be available on AnimeSaturn.`,
+          message: `No video sources found for episode ${episodeNumber}. The anime might not be available on AnimePahe.`,
         },
         { status: 404 }
       );

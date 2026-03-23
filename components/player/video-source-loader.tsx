@@ -45,6 +45,7 @@ export function VideoSourceLoader({
     type: "magnet" | "torrent" | "direct";
     url: string;
     qualities?: VideoQuality[];
+    referer?: string;
   } | null>(null);
   const [allServers, setAllServers] = useState<Array<{
     id: string;
@@ -186,6 +187,7 @@ export function VideoSourceLoader({
         type: "direct",
         url: defaultSource.url,
         qualities,
+        referer: data.referer,
       });
 
       // CRITICAL: Extract and store subtitles
@@ -250,6 +252,7 @@ export function VideoSourceLoader({
         type: "direct",
         url: server.url,
         qualities: sources?.qualities || [],
+        referer: sources?.referer,
       });
     }
   };

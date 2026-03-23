@@ -50,6 +50,7 @@ interface VideoPlayerProps {
     type: "magnet" | "torrent" | "direct";
     url: string;
     qualities?: VideoQuality[];
+    referer?: string;
   };
   poster?: string;
   animeTitle?: string;
@@ -303,9 +304,17 @@ export function EnhancedVideoPlayer({
       clearTimeout(loadingTimeout);
       setIsLoading(false);
       if (e) {
-        console.error("Video error:", e);
+        const error = e as ErrorEvent;
+        console.error("Video error:", {
+          message: error.message,
+          filename: error.filename,
+          lineno: error.lineno,
+          colno: error.colno,
+          error: error.error?.message || error.error,
+        });
       }
-      onError?.(new Error("Failed to load video"));
+      const errorMsg = e ? `Failed to load video: ${(e as ErrorEvent).message || "Unknown error"}` : "Failed to load video";
+      onError?.(new Error(errorMsg));
     };
 
     if (source.type === "direct") {
@@ -313,10 +322,28 @@ export function EnhancedVideoPlayer({
 
       if (isHls && Hls.isSupported()) {
         // Use HLS.js for browsers that don't support HLS natively
-        const hls = new Hls({
+        const hlsConfig: Hls.Config = {
           enableWorker: true,
           lowLatencyMode: true,
-        });
+        };
+
+        // Add referer header if provided (for protected streams like AnimePahe)
+        if (source.referer) {
+          hlsConfig.xhrSetup = (xhr, url) => {
+            xhr.setRequestHeader("Referer", source.referer);
+          };
+          hlsConfig.fetchSetup = (fetchContext, initParams) => {
+            return new Request(fetchContext.url, {
+              ...initParams,
+              headers: {
+                ...initParams.headers,
+                Referer: source.referer,
+              },
+            });
+          };
+        }
+
+        const hls = new Hls(hlsConfig);
 
         hlsRef.current = hls;
 
@@ -328,15 +355,25 @@ export function EnhancedVideoPlayer({
         });
 
         hls.on(Hls.Events.ERROR, (event, data) => {
+          console.error("HLS error:", {
+            type: data.type,
+            details: data.details,
+            fatal: data.fatal,
+            response: data.response,
+            reason: data.reason,
+          });
           if (data.fatal) {
             switch (data.type) {
               case Hls.ErrorTypes.NETWORK_ERROR:
+                console.log("Attempting to recover from network error...");
                 hls.startLoad();
                 break;
               case Hls.ErrorTypes.MEDIA_ERROR:
+                console.log("Attempting to recover from media error...");
                 hls.recoverMediaError();
                 break;
               default:
+                console.error("Fatal HLS error, cannot recover");
                 handleError();
                 break;
             }
