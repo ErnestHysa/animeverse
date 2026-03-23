@@ -1379,12 +1379,15 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
       {/* Center Play Button (when paused) */}
       {!isPlaying && !isLoading && (
         <div
-          className="absolute inset-0 flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity z-20 cursor-pointer"
-          onClick={togglePlay}
+          className="absolute inset-0 flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity z-20 pointer-events-none"
         >
-          <div className="w-24 h-24 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+          <button
+            className="w-24 h-24 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center pointer-events-auto hover:bg-white/30 transition-colors"
+            onClick={togglePlay}
+            aria-label="Play"
+          >
             <Play className="w-12 h-12 text-white ml-1" fill="currentColor" />
-          </div>
+          </button>
         </div>
       )}
 

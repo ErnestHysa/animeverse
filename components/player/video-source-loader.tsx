@@ -69,6 +69,7 @@ export function VideoSourceLoader({
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [isRetrying, setIsRetrying] = useState(false);
+  const [isFallback, setIsFallback] = useState(false);
 
   // NEW: Subtitle state
   const [subtitleTracks, setSubtitleTracks] = useState<Array<{
@@ -133,6 +134,10 @@ export function VideoSourceLoader({
         const errorMessage = data.message || "No video sources found. The video API may be unavailable.";
         throw new Error(errorMessage);
       }
+
+      // Check if this is a fallback video (demo mode)
+      const isFallbackSource = data.isFallback === true;
+      setIsFallback(isFallbackSource);
 
       // Update available languages based on API response
       if (data.availableLanguages) {
@@ -383,21 +388,53 @@ export function VideoSourceLoader({
 
   // Success - render player
   return (
-    <EnhancedVideoPlayer
-      source={sources}
-      poster={poster}
-      animeTitle={animeTitle}
-      animeId={animeId}
-      episodeNumber={episodeNumber}
-      malId={malId}
-      nextEpisodeUrl={nextEpisodeUrl}
-      onError={onError}
-      onEpisodeEnd={onEpisodeEnd}
-      allServers={allServers}
-      allLanguages={allLanguages}
-      onServerChange={handleServerChange}
-      onLanguageChange={handleLanguageChange}
-      subtitles={subtitleTracks}
-    />
+    <div className="space-y-4">
+      {/* Fallback notice */}
+      {isFallback && (
+        <GlassCard className="p-4 bg-yellow-500/10 border-yellow-500/30">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-full bg-yellow-500/20 flex items-center justify-center flex-shrink-0">
+              <AlertCircle className="w-4 h-4 text-yellow-500" />
+            </div>
+            <div className="flex-1">
+              <h4 className="font-semibold text-yellow-500">Demo Mode</h4>
+              <p className="text-sm text-muted-foreground mt-1">
+                The requested anime is not currently available. Showing a demo video instead.
+                This typically happens when the anime isn't in our database yet.
+              </p>
+            </div>
+            <Button
+              onClick={() => {
+                setRetryCount(0);
+                setIsFallback(false);
+                fetchSources(currentLanguage);
+              }}
+              variant="outline"
+              size="sm"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Retry
+            </Button>
+          </div>
+        </GlassCard>
+      )}
+
+      <EnhancedVideoPlayer
+        source={sources}
+        poster={poster}
+        animeTitle={animeTitle}
+        animeId={animeId}
+        episodeNumber={episodeNumber}
+        malId={malId}
+        nextEpisodeUrl={nextEpisodeUrl}
+        onError={onError}
+        onEpisodeEnd={onEpisodeEnd}
+        allServers={allServers}
+        allLanguages={allLanguages}
+        onServerChange={handleServerChange}
+        onLanguageChange={handleLanguageChange}
+        subtitles={subtitleTracks}
+      />
+    </div>
   );
 }
