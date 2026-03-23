@@ -52,12 +52,12 @@ interface AnimePaheSourcesResponse {
 function cleanTitle(title: string): string {
   return title
     .toLowerCase()
-    // Remove "Season X:" or "Season X" at the end or middle
-    .replace(/\s+season\s+\d+(:\s*|$)/gi, " ")
-    // Remove "Part X" or "Part X:" at the end
-    .replace(/\s+part\s+\d+(:\s*|$)/gi, " ")
-    // Remove anything after colon (subtitles)
-    .replace(/:\s.*$/, "")
+    // Remove "Season X:" or "Season X" but keep the content after
+    .replace(/\s+season\s+\d+/gi, "")
+    // Remove "Part X" or "Part X:" at the end but keep content
+    .replace(/\s+part\s+\d+(:?\s*)?$/gi, "")
+    // Remove colons (but keep content)
+    .replace(/:/g, " ")
     // Remove content in parentheses
     .replace(/\s*\(.*?\)\s*/g, " ")
     // Remove common prefixes
@@ -141,13 +141,17 @@ async function searchAnimeId(
   for (const searchTerm of uniqueStrategies) {
     try {
       const searchUrl = `${API_BASE_URL}/anime/animepahe/${encodeURIComponent(searchTerm)}`;
-      const response = await fetch(searchUrl, {
-        signal: AbortSignal.timeout(10000),
-      });
 
-      if (!response.ok) continue;
+      // Add timeout using AbortController
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const responsePromise = fetch(searchUrl, { signal: controller.signal });
+      const searchResponse = await responsePromise;
+      clearTimeout(timeoutId);
 
-      const data = await response.json();
+      if (!searchResponse.ok) continue;
+
+      const data = await searchResponse.json();
 
       if (data.results && data.results.length > 0) {
         console.log(`[Video Search] Found ${data.results.length} results for "${searchTerm}"`);
@@ -163,38 +167,50 @@ async function searchAnimeId(
           const resultWords = resultTitle.split(" ").filter(w => w.length > 2);
           let score = 0;
 
+          console.log(`[Video Search] Comparing "${searchTermLower}" with "${resultTitle}"`);
+
           // Exact match - highest score
           if (resultTitle === searchTermLower || cleanedResult === searchTermLower) {
             score += 100;
+            console.log(`[Video Search] Exact match, score = ${score}`);
           }
 
-          // Result title contains search term
+          // Result title contains search term (partial match)
           if (resultTitle.includes(searchTermLower) || cleanedResult.includes(searchTermLower)) {
             score += 50;
+            console.log(`[Video Search] Result contains search term, score = ${score}`);
           }
 
-          // Search term contains result title (main title match)
-          if (searchTermLower.includes(resultTitle) || searchTermLower.includes(cleanedResult)) {
-            score += 30;
+          // Search term contains main words of result
+          if (searchWords.length >= 2 && resultWords.length >= 2) {
+            const searchPrefix = searchWords.slice(0, 2).join(" ");
+            const resultPrefix = resultWords.slice(0, 2).join(" ");
+            if (searchPrefix === resultPrefix) {
+              score += 40;
+              console.log(`[Video Search] First 2 words match, score = ${score}`);
+            }
           }
 
           // Count matching words
           const matchingWords = searchWords.filter(w =>
             resultWords.some(rw => rw.includes(w) || w.includes(rw))
           );
-          score += matchingWords.length * 10;
+          score += matchingWords.length * 15;
 
           // Bonus for matching distinctive words (culling, game, part, etc.)
-          const distinctiveWords = ["culling", "game", "part", "season", "movie", "ova"];
+          const distinctiveWords = ["culling", "game", "part", "season", "movie", "ova", "hidden", "inventory", "premature", "death"];
           for (const word of distinctiveWords) {
             if (searchWords.includes(word) && resultWords.some(rw => rw.includes(word))) {
-              score += 20;
+              score += 25;
+              console.log(`[Video Search] Distinctive word "${word}" matched, score = ${score}`);
             }
           }
 
           // Prefer shorter title differences (closer match in length)
           const lengthDiff = Math.abs(resultTitle.length - searchTermLower.length);
-          score -= lengthDiff / 10;
+          score -= lengthDiff / 20;
+
+          console.log(`[Video Search] Final score for "${resultTitle}": ${score}`);
 
           return { result: r, score };
         });
@@ -222,9 +238,12 @@ async function searchAnimeId(
     try {
       console.log(`[Video Search] Trying Jikan API fallback for MAL ID: ${malId}`);
       const jikanUrl = `https://api.jikan.moe/v4/anime/${malId}`;
-      const jikanResponse = await fetch(jikanUrl, {
-        signal: AbortSignal.timeout(10000),
-      });
+
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 10000);
+      const jikanResponsePromise = fetch(jikanUrl, { signal: ctrl.signal });
+      const jikanResponse = await jikanResponsePromise;
+      clearTimeout(tid);
 
       if (jikanResponse.ok) {
         const jikanData = await jikanResponse.json();
@@ -241,7 +260,10 @@ async function searchAnimeId(
           for (const searchTerm of [cleanedJikan, mainJikan].filter(Boolean)) {
             if (searchTerm.length > 3) {
               const searchUrl = `${API_BASE_URL}/anime/animepahe/${encodeURIComponent(searchTerm)}`;
-              const response = await fetch(searchUrl, { signal: AbortSignal.timeout(5000) });
+              const ctrl = new AbortController();
+              const tid = setTimeout(() => ctrl.abort(), 5000);
+              const response = await fetch(searchUrl, { signal: ctrl.signal });
+              clearTimeout(tid);
               if (response.ok) {
                 const data = await response.json();
                 if (data.results && data.results.length > 0) {
@@ -269,13 +291,16 @@ async function getAnimeInfo(animeId: string): Promise<AnimePaheInfo | null> {
   try {
     // AnimePahe uses path parameter for info endpoint
     const url = `${API_BASE_URL}/anime/animepahe/info/${encodeURIComponent(animeId)}`;
-    const response = await fetch(url, {
-      signal: AbortSignal.timeout(10000),
-    });
 
-    if (!response.ok) return null;
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 10000);
+    const infoResponsePromise = fetch(url, { signal: ctrl.signal });
+    const infoResponse = await infoResponsePromise;
+    clearTimeout(tid);
 
-    return await response.json();
+    if (!infoResponse.ok) return null;
+
+    return await infoResponse.json();
   } catch {
     return null;
   }
@@ -305,13 +330,15 @@ async function getEpisodeSources(
     // AnimePahe uses query parameter for episodeId
     const url = `${API_BASE_URL}/anime/animepahe/watch?episodeId=${encodeURIComponent(episodeId)}`;
 
-    const response = await fetch(url, {
-      signal: AbortSignal.timeout(15000),
-    });
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 15000);
+    const sourcesResponsePromise = fetch(url, { signal: ctrl.signal });
+    const sourcesResponse = await sourcesResponsePromise;
+    clearTimeout(tid);
 
-    if (!response.ok) return null;
+    if (!sourcesResponse.ok) return null;
 
-    const data: AnimePaheSourcesResponse = await response.json();
+    const data: AnimePaheSourcesResponse = await sourcesResponse.json();
 
     // Combine streaming and download sources
     const allSources = [
