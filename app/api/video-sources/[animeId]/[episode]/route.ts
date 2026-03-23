@@ -46,56 +46,96 @@ interface AnimePaheSourcesResponse {
 }
 
 /**
+ * Clean and normalize anime title for better search matching
+ * Removes season info, special characters, and extra details
+ */
+function cleanTitle(title: string): string {
+  return title
+    .toLowerCase()
+    // Remove "Season X:" or "Season X" at the end or middle
+    .replace(/\s+season\s+\d+(:\s*|$)/gi, " ")
+    // Remove "Part X" or "Part X:" at the end
+    .replace(/\s+part\s+\d+(:\s*|$)/gi, " ")
+    // Remove anything after colon (subtitles)
+    .replace(/:\s.*$/, "")
+    // Remove content in parentheses
+    .replace(/\s*\(.*?\)\s*/g, " ")
+    // Remove common prefixes
+    .replace(/^(the|a|an)\s+/i, "")
+    // Remove special characters but keep spaces and basic word characters
+    .replace(/[^\w\s]/g, " ")
+    // Replace multiple spaces with single space
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Extract the main title (first 2-3 words) for broader search
+ */
+function extractMainTitle(title: string): string {
+  const words = cleanTitle(title).split(" ").filter(w => w.length > 2);
+  if (words.length >= 2) {
+    return words.slice(0, 2).join(" ");
+  }
+  return words[0] || "";
+}
+
+/**
  * Search for anime on AnimePahe by title
  * Returns the anime ID if found
+ * Uses multiple search strategies with progressively simpler titles
  */
 async function searchAnimeId(
   title: string,
   malId: number | null
 ): Promise<string | null> {
-  // Build search strategies - try various title formats
+  // Build search strategies - from specific to general
   const searchStrategies: string[] = [];
 
-  // Strategy 1: Direct title
   if (title) {
-    const cleanTitle = title.toLowerCase().trim();
-    searchStrategies.push(cleanTitle);
-  }
-
-  // Strategy 2: Extract key words and try combinations
-  if (title) {
-    const words = title.split(" ").filter(w => w.length > 3);
-    if (words.length >= 2) {
-      searchStrategies.push(`${words[0]} ${words[1]}`.toLowerCase());
+    // Strategy 1: Cleaned full title (without season/part info)
+    const cleaned = cleanTitle(title);
+    if (cleaned.length > 3) {
+      searchStrategies.push(cleaned);
     }
-    if (words.length >= 3) {
-      searchStrategies.push(`${words[0]} ${words[1]} ${words[2]}`.toLowerCase());
-    }
-  }
 
-  // Strategy 3: Remove common prefixes/suffixes and search
-  if (title) {
-    const cleanMainTitle = title
-      .toLowerCase()
-      .replace(/^(the|a|an)\s+/i, "")
-      .replace(/:\s*.*$/, "") // Remove subtitles
-      .replace(/[^\w\s]/g, "")
-      .trim();
-    if (cleanMainTitle && cleanMainTitle.length > 3) {
-      searchStrategies.push(cleanMainTitle);
+    // Strategy 2: Main title only (first 2-3 words)
+    const mainTitle = extractMainTitle(title);
+    if (mainTitle && mainTitle !== cleaned && mainTitle.length > 2) {
+      searchStrategies.push(mainTitle);
     }
-  }
 
-  // Strategy 4: First word only (if distinctive)
-  if (title) {
-    const firstWord = title.split(" ")[0];
-    if (firstWord.length > 4) {
-      searchStrategies.push(firstWord.toLowerCase());
+    // Strategy 3: Try first word only if it's distinctive
+    const firstWord = title.split(" ")[0].toLowerCase();
+    if (firstWord.length > 5) {
+      searchStrategies.push(firstWord);
+    }
+
+    // Strategy 4: Try distinctive words (season, movie, culling, game, etc.)
+    const distinctiveWords = ["season", "movie", "ova", "ona", "special", "culling", "game", "part"];
+    const titleWords = title.toLowerCase().split(" ");
+    for (const dw of distinctiveWords) {
+      if (titleWords.includes(dw)) {
+        // Combine first word with distinctive word
+        const firstWordWithDistinctive = titleWords[0] + " " + dw;
+        if (!searchStrategies.includes(firstWordWithDistinctive)) {
+          searchStrategies.push(firstWordWithDistinctive);
+        }
+      }
+    }
+
+    // Strategy 5: Original title (lowercased) if different from cleaned
+    const originalLower = title.toLowerCase().trim();
+    if (originalLower !== cleaned && originalLower.length > 3) {
+      searchStrategies.push(originalLower);
     }
   }
 
   // Remove duplicates while preserving order
-  const uniqueStrategies = [...new Set(searchStrategies)];
+  const uniqueStrategies = Array.from(new Set(searchStrategies));
+
+  console.log(`[Video Search] Searching for: "${title}"`);
+  console.log(`[Video Search] Search strategies:`, uniqueStrategies);
 
   // Try each search strategy
   for (const searchTerm of uniqueStrategies) {
@@ -110,24 +150,69 @@ async function searchAnimeId(
       const data = await response.json();
 
       if (data.results && data.results.length > 0) {
-        // Try to find the best match
-        const searchTermLower = searchTerm.toLowerCase();
+        console.log(`[Video Search] Found ${data.results.length} results for "${searchTerm}"`);
 
-        // Look for exact or close title match
-        let bestMatch = data.results.find((r: { title?: string; id: string }) => {
-          const titleLower = (r.title || "").toLowerCase();
-          return titleLower.includes(searchTermLower) ||
-                 searchTermLower.includes(titleLower.split(" ")[0]);
+        // Try to find the best match using a scoring system
+        const searchTermLower = searchTerm.toLowerCase();
+        const searchWords = searchTermLower.split(" ").filter(w => w.length > 2);
+
+        // Score each result and pick the best one
+        const scoredResults = data.results.map((r: { title?: string; id: string }) => {
+          const resultTitle = (r.title || "").toLowerCase();
+          const cleanedResult = cleanTitle(r.title || "");
+          const resultWords = resultTitle.split(" ").filter(w => w.length > 2);
+          let score = 0;
+
+          // Exact match - highest score
+          if (resultTitle === searchTermLower || cleanedResult === searchTermLower) {
+            score += 100;
+          }
+
+          // Result title contains search term
+          if (resultTitle.includes(searchTermLower) || cleanedResult.includes(searchTermLower)) {
+            score += 50;
+          }
+
+          // Search term contains result title (main title match)
+          if (searchTermLower.includes(resultTitle) || searchTermLower.includes(cleanedResult)) {
+            score += 30;
+          }
+
+          // Count matching words
+          const matchingWords = searchWords.filter(w =>
+            resultWords.some(rw => rw.includes(w) || w.includes(rw))
+          );
+          score += matchingWords.length * 10;
+
+          // Bonus for matching distinctive words (culling, game, part, etc.)
+          const distinctiveWords = ["culling", "game", "part", "season", "movie", "ova"];
+          for (const word of distinctiveWords) {
+            if (searchWords.includes(word) && resultWords.some(rw => rw.includes(word))) {
+              score += 20;
+            }
+          }
+
+          // Prefer shorter title differences (closer match in length)
+          const lengthDiff = Math.abs(resultTitle.length - searchTermLower.length);
+          score -= lengthDiff / 10;
+
+          return { result: r, score };
         });
+
+        // Sort by score descending and pick the best
+        scoredResults.sort((a, b) => b.score - a.score);
+        let bestMatch = scoredResults[0]?.result;
 
         // Fallback to first result
         if (!bestMatch) {
           bestMatch = data.results[0];
         }
 
+        console.log(`[Video Search] Selected: "${bestMatch.title}" (${bestMatch.id})`);
         return bestMatch.id;
       }
-    } catch {
+    } catch (error) {
+      console.log(`[Video Search] Error searching for "${searchTerm}":`, error);
       continue;
     }
   }
@@ -135,6 +220,7 @@ async function searchAnimeId(
   // Strategy 5: Fallback - try using MAL ID via Jikan API to get better title matching
   if (malId) {
     try {
+      console.log(`[Video Search] Trying Jikan API fallback for MAL ID: ${malId}`);
       const jikanUrl = `https://api.jikan.moe/v4/anime/${malId}`;
       const jikanResponse = await fetch(jikanUrl, {
         signal: AbortSignal.timeout(10000),
@@ -145,16 +231,21 @@ async function searchAnimeId(
         const jikanTitle = jikanData.data?.title;
         const jikanTitles = jikanData.data?.titles || [];
 
+        console.log(`[Video Search] Jikan title: "${jikanTitle}"`);
+
         // Try with Jikan's main title
         if (jikanTitle) {
-          for (const titleData of jikanTitles) {
-            const searchTerm = titleData.title?.toLowerCase().replace(/[^\w\s]/g, " ").trim();
-            if (searchTerm && searchTerm.length > 3) {
+          const cleanedJikan = cleanTitle(jikanTitle);
+          const mainJikan = extractMainTitle(jikanTitle);
+
+          for (const searchTerm of [cleanedJikan, mainJikan].filter(Boolean)) {
+            if (searchTerm.length > 3) {
               const searchUrl = `${API_BASE_URL}/anime/animepahe/${encodeURIComponent(searchTerm)}`;
               const response = await fetch(searchUrl, { signal: AbortSignal.timeout(5000) });
               if (response.ok) {
                 const data = await response.json();
                 if (data.results && data.results.length > 0) {
+                  console.log(`[Video Search] Found via Jikan: "${data.results[0].title}"`);
                   return data.results[0].id;
                 }
               }
@@ -162,11 +253,12 @@ async function searchAnimeId(
           }
         }
       }
-    } catch {
-      // Silently skip Jikan fallback failures
+    } catch (error) {
+      console.log(`[Video Search] Jikan fallback failed:`, error);
     }
   }
 
+  console.log(`[Video Search] No results found for "${title}"`);
   return null;
 }
 
@@ -235,7 +327,7 @@ async function getEpisodeSources(
       quality: mapQuality(s.quality),
       label: s.quality || "Auto",
       provider: "AnimePahe",
-      type: (s.isM3U8 ? "hls" : "mp4") as "mp4" | "hls" | "webm",
+      type: (('isM3U8' in s && (s as { isM3U8?: boolean }).isM3U8) ? "hls" : "mp4") as "mp4" | "hls" | "webm",
     }));
 
     // AnimePahe doesn't provide separate subtitle files (hardcoded)
@@ -257,7 +349,7 @@ async function getEpisodeSources(
 
 /**
  * Map quality string to standard format
- * AnimePahe quality format: "df68 · 360p BD" or "800p"
+ * AnimePahe quality format: "Vodes · 360p BD" or "800p"
  */
 function mapQuality(quality: string | undefined): "360p" | "480p" | "720p" | "1080p" | "auto" {
   if (!quality) return "auto";
@@ -339,6 +431,8 @@ export async function GET(
           );
 
           if (episodeData) {
+            console.log(`[Video Search] Found episode ${episodeNumber}: ${episodeData.id}`);
+
             // Get sources for this episode
             const sourcesData = await getEpisodeSources(episodeData.id);
 
@@ -348,6 +442,8 @@ export async function GET(
               referer = sourcesData.referer;
               provider = "animepahe";
             }
+          } else {
+            console.log(`[Video Search] Episode ${episodeNumber} not found`);
           }
         }
       }
@@ -372,6 +468,8 @@ export async function GET(
         { status: 404 }
       );
     }
+
+    console.log(`[Video Search] Returning ${sources.length} sources from ${provider}`);
 
     return NextResponse.json({
       animeId: parseInt(animeId),
