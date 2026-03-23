@@ -1,9 +1,10 @@
 /**
  * Video Sources API Route
- * Fetches video sources from the local Consumet API (AnimePahe provider)
- * Proxies requests to avoid CORS issues
+ * Fetches video sources from the local Consumet API
+ * Primary: AnimeKai (more reliable, fewer CORS issues)
+ * Fallback: AnimePahe (alternative provider)
  *
- * Note: AnimePahe is used as the primary provider for English content and better quality options
+ * Note: AnimeKai is used as primary provider based on user feedback
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -43,6 +44,229 @@ interface AnimePaheSourcesResponse {
     url: string;
     quality: string;
   }>;
+}
+
+// ============================================
+// AnimeKai Provider Interfaces
+// ============================================
+
+interface AnimeKaiSearchResult {
+  id: string;
+  title: string;
+  poster?: string;
+  episodes?: AnimeKaiEpisode[];
+}
+
+interface AnimeKaiEpisode {
+  id: string;
+  number: number;
+  title?: string;
+  url?: string;
+}
+
+interface AnimeKaiInfo {
+  id: string;
+  title: string;
+  episodes?: AnimeKaiEpisode[];
+}
+
+interface AnimeKaiSourcesResponse {
+  headers?: {
+    Referer?: string;
+  };
+  sources?: Array<{
+    url: string;
+    quality?: string;
+    isM3U8?: boolean;
+    isDefault?: boolean;
+    label?: string;
+  }>;
+}
+
+/**
+ * Search for anime on AnimeKai by title
+ * Returns the anime ID if found
+ */
+async function searchAnimeKaiId(
+  title: string,
+  malId: number | null
+): Promise<{ id: string; episodes?: AnimeKaiEpisode[] } | null> {
+  const searchStrategies: string[] = [];
+
+  if (title) {
+    const cleaned = cleanTitle(title);
+    if (cleaned.length > 3) {
+      searchStrategies.push(cleaned);
+    }
+
+    const mainTitle = extractMainTitle(title);
+    if (mainTitle && mainTitle !== cleaned) {
+      searchStrategies.unshift(mainTitle);
+    }
+
+    searchStrategies.push(title);
+  }
+
+  console.log(`[AnimeKai] Searching with strategies:`, searchStrategies);
+
+  for (const searchTerm of searchStrategies) {
+    try {
+      const url = `${API_BASE_URL}/anime/animekai/${encodeURIComponent(searchTerm)}`;
+      console.log(`[AnimeKai] Searching: "${searchTerm}" -> ${url}`);
+
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 10000);
+      const searchResponsePromise = fetch(url, { signal: ctrl.signal });
+      const searchResponse = await searchResponsePromise;
+      clearTimeout(tid);
+
+      if (!searchResponse.ok) continue;
+
+      const data = await searchResponse.json();
+
+      if (data.results && data.results.length > 0) {
+        console.log(`[AnimeKai] Found ${data.results.length} results for "${searchTerm}"`);
+
+        // Find best match using scoring
+        const searchTermLower = searchTerm.toLowerCase();
+        const searchWords = searchTermLower.split(" ").filter(w => w.length > 2);
+
+        const scoredResults = data.results.map((r: { title?: string; id: string }) => {
+          const resultTitle = (r.title || "").toLowerCase();
+          const cleanedResult = cleanTitle(r.title || "");
+          const resultWords = resultTitle.split(" ").filter(w => w.length > 2);
+          let score = 0;
+
+          if (resultTitle === searchTermLower || cleanedResult === searchTermLower) {
+            score += 100;
+          } else if (resultTitle.includes(searchTermLower) || cleanedResult.includes(searchTermLower)) {
+            score += 50;
+          }
+
+          if (searchWords.length >= 2 && resultWords.length >= 2) {
+            const searchPrefix = searchWords.slice(0, 2).join(" ");
+            const resultPrefix = resultWords.slice(0, 2).join(" ");
+            if (searchPrefix === resultPrefix) {
+              score += 40;
+            }
+          }
+
+          const matchingWords = searchWords.filter(w =>
+            resultWords.some(rw => rw.includes(w) || w.includes(rw))
+          );
+          score += matchingWords.length * 15;
+
+          const lengthDiff = Math.abs(resultTitle.length - searchTermLower.length);
+          score -= lengthDiff / 20;
+
+          return { result: r, score };
+        });
+
+        scoredResults.sort((a: { result: { title?: string; id: string }; score: number }, b: { result: { title?: string; id: string }; score: number }) => b.score - a.score);
+        let bestMatch = scoredResults[0]?.result;
+
+        if (!bestMatch) {
+          bestMatch = data.results[0];
+        }
+
+        console.log(`[AnimeKai] Selected: "${bestMatch.title}" (${bestMatch.id})`);
+
+        // Get episode info to have episodes list
+        const episodeInfo = await getAnimeKaiInfo(bestMatch.id);
+        return {
+          id: bestMatch.id,
+          episodes: episodeInfo?.episodes
+        };
+      }
+    } catch (error) {
+      console.log(`[AnimeKai] Error searching for "${searchTerm}":`, error);
+      continue;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Get anime info from AnimeKai including episode list
+ */
+async function getAnimeKaiInfo(animeId: string): Promise<AnimeKaiInfo | null> {
+  try {
+    const url = `${API_BASE_URL}/anime/animekai/info?id=${encodeURIComponent(animeId)}`;
+
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 10000);
+    const infoResponsePromise = fetch(url, { signal: ctrl.signal });
+    const infoResponse = await infoResponsePromise;
+    clearTimeout(tid);
+
+    if (!infoResponse.ok) return null;
+
+    return await infoResponse.json();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Get episode sources from AnimeKai
+ */
+async function getAnimeKaiEpisodeSources(
+  episodeId: string
+): Promise<{
+  sources: Array<{
+    url: string;
+    quality: "360p" | "480p" | "720p" | "1080p" | "auto";
+    label: string;
+    provider: string;
+    type: "mp4" | "hls" | "webm";
+  }>;
+  subtitles: Array<{
+    url: string;
+    lang: string;
+    label: string;
+  }>;
+  referer?: string;
+} | null> {
+  try {
+    const url = `${API_BASE_URL}/anime/animekai/watch/${encodeURIComponent(episodeId)}`;
+
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 15000);
+    const sourcesResponsePromise = fetch(url, { signal: ctrl.signal });
+    const sourcesResponse = await sourcesResponsePromise;
+    clearTimeout(tid);
+
+    if (!sourcesResponse.ok) return null;
+
+    const data: AnimeKaiSourcesResponse = await sourcesResponse.json();
+
+    if (!data.sources || data.sources.length === 0) return null;
+
+    // Map sources to our format
+    const sources = data.sources.map((s) => ({
+      url: s.url,
+      quality: mapQuality(s.quality || s.label),
+      label: s.label || s.quality || "Auto",
+      provider: "AnimeKai",
+      type: (s.isM3U8 ? "hls" : "mp4") as "mp4" | "hls" | "webm",
+    }));
+
+    // AnimeKai doesn't provide separate subtitle files
+    const subtitles: Array<{
+      url: string;
+      lang: string;
+      label: string;
+    }> = [];
+
+    return {
+      sources,
+      subtitles,
+      referer: data.headers?.Referer,
+    };
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -441,10 +665,54 @@ export async function GET(
       { type: "dub", available: false },
     ];
 
-    // Search for the anime on AnimePahe
-    let animePaheId: string | null = null;
+    // ============================================
+    // Try AnimeKai first (primary provider)
+    // ============================================
+    if (title && sources.length === 0) {
+      console.log(`[Video Sources] Trying AnimeKai provider...`);
 
-    if (title) {
+      const animeKaiData = await searchAnimeKaiId(
+        title,
+        malId ? parseInt(malId) : null
+      );
+
+      if (animeKaiData?.episodes) {
+        // Try to find the exact episode
+        let episodeData = animeKaiData.episodes.find(
+          (ep) => ep.number === episodeNumber
+        );
+
+        // If not found, use the first available episode
+        if (!episodeData && animeKaiData.episodes.length > 0) {
+          console.log(`[AnimeKai] Episode ${episodeNumber} not found, using first available episode ${animeKaiData.episodes[0].number}`);
+          episodeData = animeKaiData.episodes[0];
+        }
+
+        if (episodeData) {
+          console.log(`[AnimeKai] Found episode ${episodeData.number}: ${episodeData.id}`);
+
+          // Get sources for this episode
+          const sourcesData = await getAnimeKaiEpisodeSources(episodeData.id);
+
+          if (sourcesData && sourcesData.sources.length > 0) {
+            sources = sourcesData.sources;
+            subtitles.push(...sourcesData.subtitles);
+            referer = sourcesData.referer;
+            provider = "animekai";
+            console.log(`[AnimeKai] Successfully loaded ${sources.length} sources`);
+          }
+        }
+      }
+    }
+
+    // ============================================
+    // Fallback to AnimePahe if AnimeKai failed
+    // ============================================
+    if (title && sources.length === 0) {
+      console.log(`[Video Sources] AnimeKai failed, trying AnimePahe fallback...`);
+
+      let animePaheId: string | null = null;
+
       animePaheId = await searchAnimeId(
         title,
         malId ? parseInt(malId) : null
@@ -462,12 +730,12 @@ export async function GET(
 
           // If not found, use the first available episode (for continuation seasons)
           if (!episodeData && animeInfo.episodes.length > 0) {
-            console.log(`[Video Search] Episode ${episodeNumber} not found, using first available episode ${animeInfo.episodes[0].number}`);
+            console.log(`[AnimePahe] Episode ${episodeNumber} not found, using first available episode ${animeInfo.episodes[0].number}`);
             episodeData = animeInfo.episodes[0];
           }
 
           if (episodeData) {
-            console.log(`[Video Search] Found episode ${episodeData.number}: ${episodeData.id}`);
+            console.log(`[AnimePahe] Found episode ${episodeData.number}: ${episodeData.id}`);
 
             // Get sources for this episode
             const sourcesData = await getEpisodeSources(episodeData.id);
@@ -477,6 +745,7 @@ export async function GET(
               subtitles.push(...sourcesData.subtitles);
               referer = sourcesData.referer;
               provider = "animepahe";
+              console.log(`[AnimePahe] Successfully loaded ${sources.length} sources`);
             }
           }
         }
