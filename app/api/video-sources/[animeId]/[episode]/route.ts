@@ -135,6 +135,10 @@ async function searchAnimeKaiId(
 ): Promise<{ id: string; episodes?: AnimeKaiEpisode[] } | null> {
   const searchStrategies: string[] = [];
 
+  // Extract season/part info from the original title for matching
+  const targetSeason = extractSeasonNumber(title);
+  const targetPart = extractPartNumber(title);
+
   if (title) {
     const cleaned = cleanTitle(title);
     if (cleaned.length > 3) {
@@ -150,6 +154,8 @@ async function searchAnimeKaiId(
   }
 
   console.log(`[AnimeKai] Searching with strategies:`, searchStrategies);
+  if (targetSeason) console.log(`[AnimeKai] Target season: ${targetSeason}`);
+  if (targetPart) console.log(`[AnimeKai] Target part: ${targetPart}`);
 
   for (const searchTerm of searchStrategies) {
     try {
@@ -169,7 +175,7 @@ async function searchAnimeKaiId(
       if (data.results && data.results.length > 0) {
         console.log(`[AnimeKai] Found ${data.results.length} results for "${searchTerm}"`);
 
-        // Find best match using scoring
+        // Find best match using scoring with season/part awareness
         const searchTermLower = searchTerm.toLowerCase();
         const searchWords = searchTermLower.split(" ").filter(w => w.length > 2);
 
@@ -179,12 +185,36 @@ async function searchAnimeKaiId(
           const resultWords = resultTitle.split(" ").filter(w => w.length > 2);
           let score = 0;
 
+          // Exact match
           if (resultTitle === searchTermLower || cleanedResult === searchTermLower) {
             score += 100;
           } else if (resultTitle.includes(searchTermLower) || cleanedResult.includes(searchTermLower)) {
             score += 50;
           }
 
+          // Season/part matching
+          const resultSeason = extractSeasonNumber(r.title || "");
+          const resultPart = extractPartNumber(r.title || "");
+
+          if (targetSeason && resultSeason) {
+            if (targetSeason === resultSeason) {
+              score += 200; // Huge bonus for matching season
+              console.log(`[AnimeKai] Season match! ${targetSeason} = ${resultSeason}, score = ${score}`);
+            } else {
+              score -= Math.abs(targetSeason - resultSeason) * 50;
+            }
+          }
+
+          if (targetPart && resultPart) {
+            if (targetPart === resultPart) {
+              score += 100; // Bonus for matching part
+              console.log(`[AnimeKai] Part match! ${targetPart} = ${resultPart}, score = ${score}`);
+            } else {
+              score -= Math.abs(targetPart - resultPart) * 30;
+            }
+          }
+
+          // First 2 words match
           if (searchWords.length >= 2 && resultWords.length >= 2) {
             const searchPrefix = searchWords.slice(0, 2).join(" ");
             const resultPrefix = resultWords.slice(0, 2).join(" ");
@@ -193,11 +223,13 @@ async function searchAnimeKaiId(
             }
           }
 
+          // Matching words
           const matchingWords = searchWords.filter(w =>
             resultWords.some(rw => rw.includes(w) || w.includes(rw))
           );
           score += matchingWords.length * 15;
 
+          // Length difference penalty
           const lengthDiff = Math.abs(resultTitle.length - searchTermLower.length);
           score -= lengthDiff / 20;
 
@@ -252,6 +284,7 @@ async function getAnimeKaiInfo(animeId: string): Promise<AnimeKaiInfo | null> {
 
 /**
  * Get episode sources from AnimeKai
+ * Now prioritizes English subtitle sources
  */
 async function getAnimeKaiEpisodeSources(
   episodeId: string
@@ -285,8 +318,34 @@ async function getAnimeKaiEpisodeSources(
 
     if (!data.sources || data.sources.length === 0) return null;
 
+    // Separate sources into English and non-English
+    const englishSources: typeof data.sources = [];
+    const otherSources: typeof data.sources = [];
+
+    for (const s of data.sources) {
+      const lang = detectSubtitleLanguage(s.url);
+      if (lang === "en" || lang === "unknown") {
+        englishSources.push(s);
+      } else {
+        otherSources.push(s);
+      }
+    }
+
+    // Prefer English sources, fall back to others if needed
+    const sourcesToUse = englishSources.length > 0 ? englishSources : otherSources;
+
+    if (sourcesToUse.length === 0) return null;
+
+    // Log what we're using
+    if (englishSources.length > 0 && otherSources.length > 0) {
+      console.log(`[AnimeKai] Using ${englishSources.length} English sources (skipped ${otherSources.length} non-English)`);
+    } else if (englishSources.length === 0 && otherSources.length > 0) {
+      const detectedLang = detectSubtitleLanguage(otherSources[0].url);
+      console.log(`[AnimeKai] No English sources found, using ${detectedLang} sources (${otherSources.length} available)`);
+    }
+
     // Map sources to our format
-    const sources = data.sources.map((s) => ({
+    const sources = sourcesToUse.map((s) => ({
       url: s.url,
       quality: mapQuality(s.quality || s.label),
       label: s.label || s.quality || "Auto",
@@ -326,6 +385,10 @@ async function searchAnimeSaturnId(
 ): Promise<{ id: string; episodes?: AnimeSaturnEpisode[] } | null> {
   const searchStrategies: string[] = [];
 
+  // Extract season/part info from the original title for matching
+  const targetSeason = extractSeasonNumber(title);
+  const targetPart = extractPartNumber(title);
+
   if (title) {
     const cleaned = cleanTitle(title);
     if (cleaned.length > 3) {
@@ -341,6 +404,8 @@ async function searchAnimeSaturnId(
   }
 
   console.log(`[AnimeSaturn] Searching with strategies:`, searchStrategies);
+  if (targetSeason) console.log(`[AnimeSaturn] Target season: ${targetSeason}`);
+  if (targetPart) console.log(`[AnimeSaturn] Target part: ${targetPart}`);
 
   for (const searchTerm of searchStrategies) {
     try {
@@ -360,7 +425,7 @@ async function searchAnimeSaturnId(
       if (data.results && data.results.length > 0) {
         console.log(`[AnimeSaturn] Found ${data.results.length} results for "${searchTerm}"`);
 
-        // Find best match using scoring
+        // Find best match using scoring with season/part awareness
         const searchTermLower = searchTerm.toLowerCase();
         const searchWords = searchTermLower.split(" ").filter(w => w.length > 2);
 
@@ -370,12 +435,37 @@ async function searchAnimeSaturnId(
           const resultWords = resultTitle.split(" ").filter(w => w.length > 2);
           let score = 0;
 
+          // Exact match - highest score
           if (resultTitle === searchTermLower || cleanedResult === searchTermLower) {
             score += 100;
           } else if (resultTitle.includes(searchTermLower) || cleanedResult.includes(searchTermLower)) {
             score += 50;
           }
 
+          // Season/part matching - CRITICAL for correct series
+          const resultSeason = extractSeasonNumber(r.title || "");
+          const resultPart = extractPartNumber(r.title || "");
+
+          if (targetSeason && resultSeason) {
+            if (targetSeason === resultSeason) {
+              score += 200; // Huge bonus for matching season
+              console.log(`[AnimeSaturn] Season match! ${targetSeason} = ${resultSeason}, score = ${score}`);
+            } else {
+              // Penalty for wrong season
+              score -= Math.abs(targetSeason - resultSeason) * 50;
+            }
+          }
+
+          if (targetPart && resultPart) {
+            if (targetPart === resultPart) {
+              score += 100; // Bonus for matching part
+              console.log(`[AnimeSaturn] Part match! ${targetPart} = ${resultPart}, score = ${score}`);
+            } else {
+              score -= Math.abs(targetPart - resultPart) * 30;
+            }
+          }
+
+          // First 2 words match
           if (searchWords.length >= 2 && resultWords.length >= 2) {
             const searchPrefix = searchWords.slice(0, 2).join(" ");
             const resultPrefix = resultWords.slice(0, 2).join(" ");
@@ -384,11 +474,21 @@ async function searchAnimeSaturnId(
             }
           }
 
+          // Matching words
           const matchingWords = searchWords.filter(w =>
             resultWords.some(rw => rw.includes(w) || w.includes(rw))
           );
           score += matchingWords.length * 15;
 
+          // Bonus for distinctive words
+          const distinctiveWords = ["culling", "game", "premature", "death", "inventory", "hidden", "shibuya"];
+          for (const word of distinctiveWords) {
+            if (searchWords.includes(word) && resultWords.some(rw => rw.includes(word))) {
+              score += 30;
+            }
+          }
+
+          // Length difference penalty
           const lengthDiff = Math.abs(resultTitle.length - searchTermLower.length);
           score -= lengthDiff / 20;
 
@@ -442,8 +542,55 @@ async function getAnimeSaturnInfo(animeId: string): Promise<AnimeSaturnInfo | nu
 }
 
 /**
+ * Detect subtitle language from source URL or metadata
+ * Returns the language code or "unknown" if not detected
+ */
+function detectSubtitleLanguage(url: string, lang?: string): string {
+  const urlLower = url.toLowerCase();
+
+  // Check explicit lang parameter first
+  if (lang) {
+    return lang.toLowerCase();
+  }
+
+  // Detect from filename patterns
+  if (urlLower.includes("_sub_eng") || urlLower.includes("_eng.") || urlLower.includes("_english")) {
+    return "en";
+  }
+  if (urlLower.includes("_sub_ita") || urlLower.includes("_ita.") || urlLower.includes("_italian")) {
+    return "it";
+  }
+  if (urlLower.includes("_sub_spa") || urlLower.includes("_spa.") || urlLower.includes("_spanish")) {
+    return "es";
+  }
+  if (urlLower.includes("_sub_por") || urlLower.includes("_por.") || urlLower.includes("_portuguese")) {
+    return "pt";
+  }
+  if (urlLower.includes("_sub_fre") || urlLower.includes("_fre.") || urlLower.includes("_french")) {
+    return "fr";
+  }
+  if (urlLower.includes("_sub_ger") || urlLower.includes("_ger.") || urlLower.includes("_german")) {
+    return "de";
+  }
+  if (urlLower.includes("_sub_jap") || urlLower.includes("_jap.") || urlLower.includes("_japanese")) {
+    return "ja";
+  }
+
+  return "unknown";
+}
+
+/**
+ * Check if a source is likely to have English subtitles
+ */
+function hasEnglishSubtitles(url: string, lang?: string): boolean {
+  const detectedLang = detectSubtitleLanguage(url, lang);
+  return detectedLang === "en" || detectedLang === "unknown";
+}
+
+/**
  * Get episode sources from AnimeSaturn
  * AnimeSaturn uses nezumi.streampeaker.org CDN which works with HLS proxy
+ * Now prioritizes English subtitle sources
  */
 async function getAnimeSaturnEpisodeSources(
   episodeId: string
@@ -477,16 +624,42 @@ async function getAnimeSaturnEpisodeSources(
 
     if (!data.sources || data.sources.length === 0) return null;
 
+    // Separate sources into English and non-English
+    const englishSources: typeof data.sources = [];
+    const otherSources: typeof data.sources = [];
+
+    for (const s of data.sources) {
+      if (s.url.includes("thumbnails.vtt")) continue; // Skip thumbnails
+
+      const lang = detectSubtitleLanguage(s.url, s.isM3U8 ? undefined : undefined);
+      if (lang === "en" || lang === "unknown") {
+        englishSources.push(s);
+      } else {
+        otherSources.push(s);
+      }
+    }
+
+    // Prefer English sources, fall back to others if needed
+    const sourcesToUse = englishSources.length > 0 ? englishSources : otherSources;
+
+    if (sourcesToUse.length === 0) return null;
+
+    // Log what we're using
+    if (englishSources.length > 0 && otherSources.length > 0) {
+      console.log(`[AnimeSaturn] Using ${englishSources.length} English sources (skipped ${otherSources.length} non-English)`);
+    } else if (englishSources.length === 0 && otherSources.length > 0) {
+      const detectedLang = detectSubtitleLanguage(otherSources[0].url);
+      console.log(`[AnimeSaturn] No English sources found, using ${detectedLang} sources (${otherSources.length} available)`);
+    }
+
     // Map sources to our format
-    const sources = data.sources
-      .filter(s => !s.url.includes("thumbnails.vtt")) // Filter out thumbnail source
-      .map((s) => ({
-        url: s.url,
-        quality: mapQuality(s.quality || "auto"),
-        label: s.quality || "Auto",
-        provider: "AnimeSaturn",
-        type: (s.isM3U8 ? "hls" : "mp4") as "mp4" | "hls" | "webm",
-      }));
+    const sources = sourcesToUse.map((s) => ({
+      url: s.url,
+      quality: mapQuality(s.quality || "auto"),
+      label: s.quality || "Auto",
+      provider: "AnimeSaturn",
+      type: (s.isM3U8 ? "hls" : "mp4") as "mp4" | "hls" | "webm",
+    }));
 
     // Map subtitles if available
     const subtitles = (data.subtitles || []).map((s) => ({
@@ -507,18 +680,15 @@ async function getAnimeSaturnEpisodeSources(
 
 /**
  * Clean and normalize anime title for better search matching
- * Removes season info, special characters, and extra details
+ * NOTE: We keep season/part info for better matching!
+ * Only removes special characters and extra formatting
  */
 function cleanTitle(title: string): string {
   return title
     .toLowerCase()
-    // Remove "Season X:" or "Season X" but keep the content after
-    .replace(/\s+season\s+\d+/gi, "")
-    // Remove "Part X" or "Part X:" at the end but keep content
-    .replace(/\s+part\s+\d+(:?\s*)?$/gi, "")
     // Remove colons (but keep content)
     .replace(/:/g, " ")
-    // Remove content in parentheses
+    // Remove content in parentheses (like "TV", "2024" etc)
     .replace(/\s*\(.*?\)\s*/g, " ")
     // Remove common prefixes
     .replace(/^(the|a|an)\s+/i, "")
@@ -527,6 +697,24 @@ function cleanTitle(title: string): string {
     // Replace multiple spaces with single space
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/**
+ * Extract season number from title for better matching
+ * Returns the season number or null if not found
+ */
+function extractSeasonNumber(title: string): number | null {
+  const seasonMatch = title.toLowerCase().match(/season\s+(\d+)/);
+  return seasonMatch ? parseInt(seasonMatch[1], 10) : null;
+}
+
+/**
+ * Extract part number from title for better matching
+ * Returns the part number or null if not found
+ */
+function extractPartNumber(title: string): number | null {
+  const partMatch = title.toLowerCase().match(/part\s+(\d+)/);
+  return partMatch ? parseInt(partMatch[1], 10) : null;
 }
 
 /**
@@ -552,8 +740,12 @@ async function searchAnimeId(
   // Build search strategies - from specific to general
   const searchStrategies: string[] = [];
 
+  // Extract season/part info from the original title for matching
+  const targetSeason = extractSeasonNumber(title);
+  const targetPart = extractPartNumber(title);
+
   if (title) {
-    // Strategy 1: Cleaned full title (without season/part info)
+    // Strategy 1: Cleaned full title (keeping season info now)
     const cleaned = cleanTitle(title);
     if (cleaned.length > 3) {
       searchStrategies.push(cleaned);
@@ -596,6 +788,8 @@ async function searchAnimeId(
 
   console.log(`[Video Search] Searching for: "${title}"`);
   console.log(`[Video Search] Search strategies:`, uniqueStrategies);
+  if (targetSeason) console.log(`[Video Search] Target season: ${targetSeason}`);
+  if (targetPart) console.log(`[Video Search] Target part: ${targetPart}`);
 
   // Try each search strategy
   for (const searchTerm of uniqueStrategies) {
@@ -616,7 +810,7 @@ async function searchAnimeId(
       if (data.results && data.results.length > 0) {
         console.log(`[Video Search] Found ${data.results.length} results for "${searchTerm}"`);
 
-        // Try to find the best match using a scoring system
+        // Try to find the best match using a scoring system with season awareness
         const searchTermLower = searchTerm.toLowerCase();
         const searchWords = searchTermLower.split(" ").filter(w => w.length > 2);
 
@@ -627,18 +821,35 @@ async function searchAnimeId(
           const resultWords = resultTitle.split(" ").filter(w => w.length > 2);
           let score = 0;
 
-          console.log(`[Video Search] Comparing "${searchTermLower}" with "${resultTitle}"`);
-
           // Exact match - highest score
           if (resultTitle === searchTermLower || cleanedResult === searchTermLower) {
             score += 100;
-            console.log(`[Video Search] Exact match, score = ${score}`);
           }
 
           // Result title contains search term (partial match)
           if (resultTitle.includes(searchTermLower) || cleanedResult.includes(searchTermLower)) {
             score += 50;
-            console.log(`[Video Search] Result contains search term, score = ${score}`);
+          }
+
+          // Season/part matching - CRITICAL for correct series
+          const resultSeason = extractSeasonNumber(r.title || "");
+          const resultPart = extractPartNumber(r.title || "");
+
+          if (targetSeason && resultSeason) {
+            if (targetSeason === resultSeason) {
+              score += 200; // Huge bonus for matching season
+              console.log(`[Video Search] Season match! ${targetSeason} = ${resultSeason}, score = ${score}`);
+            } else {
+              score -= Math.abs(targetSeason - resultSeason) * 50;
+            }
+          }
+
+          if (targetPart && resultPart) {
+            if (targetPart === resultPart) {
+              score += 100; // Bonus for matching part
+            } else {
+              score -= Math.abs(targetPart - resultPart) * 30;
+            }
           }
 
           // Search term contains main words of result
@@ -647,7 +858,6 @@ async function searchAnimeId(
             const resultPrefix = resultWords.slice(0, 2).join(" ");
             if (searchPrefix === resultPrefix) {
               score += 40;
-              console.log(`[Video Search] First 2 words match, score = ${score}`);
             }
           }
 
@@ -658,19 +868,16 @@ async function searchAnimeId(
           score += matchingWords.length * 15;
 
           // Bonus for matching distinctive words (culling, game, part, etc.)
-          const distinctiveWords = ["culling", "game", "part", "season", "movie", "ova", "hidden", "inventory", "premature", "death"];
+          const distinctiveWords = ["culling", "game", "part", "season", "movie", "ova", "hidden", "inventory", "premature", "death", "shibuya"];
           for (const word of distinctiveWords) {
             if (searchWords.includes(word) && resultWords.some(rw => rw.includes(word))) {
-              score += 25;
-              console.log(`[Video Search] Distinctive word "${word}" matched, score = ${score}`);
+              score += 30;
             }
           }
 
           // Prefer shorter title differences (closer match in length)
           const lengthDiff = Math.abs(resultTitle.length - searchTermLower.length);
           score -= lengthDiff / 20;
-
-          console.log(`[Video Search] Final score for "${resultTitle}": ${score}`);
 
           return { result: r, score };
         });
@@ -768,6 +975,7 @@ async function getAnimeInfo(animeId: string): Promise<AnimePaheInfo | null> {
 
 /**
  * Get episode sources from AnimePahe
+ * Now prioritizes English subtitle sources
  */
 async function getEpisodeSources(
   episodeId: string
@@ -808,8 +1016,34 @@ async function getEpisodeSources(
 
     if (allSources.length === 0) return null;
 
+    // Separate sources into English and non-English
+    const englishSources: typeof allSources = [];
+    const otherSources: typeof allSources = [];
+
+    for (const s of allSources) {
+      const lang = detectSubtitleLanguage(s.url);
+      if (lang === "en" || lang === "unknown") {
+        englishSources.push(s);
+      } else {
+        otherSources.push(s);
+      }
+    }
+
+    // Prefer English sources, fall back to others if needed
+    const sourcesToUse = englishSources.length > 0 ? englishSources : otherSources;
+
+    if (sourcesToUse.length === 0) return null;
+
+    // Log what we're using
+    if (englishSources.length > 0 && otherSources.length > 0) {
+      console.log(`[AnimePahe] Using ${englishSources.length} English sources (skipped ${otherSources.length} non-English)`);
+    } else if (englishSources.length === 0 && otherSources.length > 0) {
+      const detectedLang = detectSubtitleLanguage(otherSources[0].url);
+      console.log(`[AnimePahe] No English sources found, using ${detectedLang} sources (${otherSources.length} available)`);
+    }
+
     // Map sources to our format
-    const sources = allSources.map((s) => ({
+    const sources = sourcesToUse.map((s) => ({
       url: s.url,
       quality: mapQuality(s.quality),
       label: s.quality || "Auto",

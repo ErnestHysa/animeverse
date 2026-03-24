@@ -39,7 +39,11 @@ function spawnProcess(name, command, args, cwd, readyPattern, onReady) {
   const proc = spawn(command, args, {
     cwd,
     shell: true,
-    env: { ...process.env, FORCE_COLOR: '1' },
+    env: {
+      ...process.env,
+      FORCE_COLOR: '1',
+      NODE_OPTIONS: process.env.NODE_OPTIONS || '--max-old-space-size=4096',
+    },
   });
 
   proc.stdout.on('data', (data) => {
@@ -150,6 +154,14 @@ ${ANSI.reset}`);
         }
       }
     );
+
+    // Increase memory limit for Next.js to prevent OOM crashes
+    // Add --max-old-space-size=4096 to allocate 4GB of heap
+    nextProc.env.NODE_OPTIONS = '--max-old-space-size=4096';
+
+    // Disable Turbopack cache if it causes issues
+    // Or limit cache size with TURBOPACK_CACHE_DIR env var
+    nextProc.env.TURBOPACK_CACHE_DIR = path.join(rootDir, '.next', 'cache', 'turbo');
   }, 2000);
 
   // Handle graceful shutdown
