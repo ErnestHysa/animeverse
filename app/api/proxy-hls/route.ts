@@ -13,11 +13,12 @@ export const dynamic = "force-dynamic";
 
 const MAX_MANIFEST_SIZE = 10 * 1024 * 1024; // 10MB for manifests
 const MAX_SEGMENT_SIZE = 50 * 1024 * 1024; // 50MB for individual segments
+const MAX_VIDEO_SIZE = 2 * 1024 * 1024 * 1024; // 2GB for full video files
 const TIMEOUT_MS = 30000; // 30 second timeout for video segments
 
 /**
- * GET /api/proxy-hls?url=<encoded_url>&type=<manifest|segment>&referer=<optional_referer>
- * Proxies HLS content requests to bypass CORS and hotlink protection
+ * GET /api/proxy-hls?url=<encoded_url>&type=<manifest|segment|video>&referer=<optional_referer>
+ * Proxies video content requests to bypass CORS and hotlink protection
  */
 export async function GET(request: NextRequest) {
   try {
@@ -78,7 +79,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Set timeout based on content type
-    const timeout = type === "segment" ? TIMEOUT_MS : 15000;
+    const timeout = type === "segment" || type === "video" ? TIMEOUT_MS : 15000;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
@@ -112,9 +113,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check content length for segments
+    // Check content length for segments (skip for video files to allow streaming)
     const contentLength = response.headers.get("content-length");
-    const maxSize = type === "segment" ? MAX_SEGMENT_SIZE : MAX_MANIFEST_SIZE;
+    const maxSize = type === "video" ? MAX_VIDEO_SIZE : (type === "segment" ? MAX_SEGMENT_SIZE : MAX_MANIFEST_SIZE);
 
     if (contentLength && parseInt(contentLength) > maxSize) {
       return NextResponse.json(
@@ -224,14 +225,14 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // For segments, stream the response
+    // For segments and videos, stream the response
     const contentLengthHeader = response.headers.get("content-length");
     const headers: Record<string, string> = {
       "Content-Type": contentType,
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, OPTIONS",
       "Access-Control-Allow-Headers": "Range, Content-Type",
-      "Cache-Control": "public, max-age=86400", // 24 hours for segments
+      "Cache-Control": type === "video" ? "public, max-age=3600" : "public, max-age=86400", // 1 hour for videos, 24 hours for segments
       "Accept-Ranges": "bytes",
     };
 
@@ -239,9 +240,9 @@ export async function GET(request: NextRequest) {
       headers["Content-Length"] = contentLengthHeader;
     }
 
-    // Handle Range requests for seeking
+    // Handle Range requests for seeking (supports both segments and videos)
     const rangeHeader = request.headers.get("range");
-    if (rangeHeader && type === "segment") {
+    if (rangeHeader && (type === "segment" || type === "video")) {
       const range = response.headers.get("content-range");
       if (range) {
         headers["Content-Range"] = range;

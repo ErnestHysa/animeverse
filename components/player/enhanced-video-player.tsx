@@ -285,11 +285,21 @@ export function EnhancedVideoPlayer({
     }
 
     setIsLoading(true);
+    setIsBuffering(false);
 
     // Timeout fallback to prevent infinite loading
     const loadingTimeout = setTimeout(() => {
+      console.warn("Video loading timeout - clearing loading state");
       setIsLoading(false);
-    }, 30000); // 30 seconds max
+      setIsBuffering(false);
+    }, 15000); // 15 seconds max (reduced from 30 for faster UX)
+
+    // Fallback safety timeout - ensures loading state is always cleared
+    const safetyTimeout = setTimeout(() => {
+      console.warn("Video safety timeout - forcing loading state clear");
+      setIsLoading(false);
+      setIsBuffering(false);
+    }, 30000); // 30 seconds absolute max
 
     const handleLoad = () => {
       clearTimeout(loadingTimeout);
@@ -300,25 +310,42 @@ export function EnhancedVideoPlayer({
       }
     };
 
-    const handleError = (e?: Event) => {
+    const handleError = (e?: Event | Error) => {
       clearTimeout(loadingTimeout);
       setIsLoading(false);
+      setIsBuffering(false);
+
+      let errorMessage = "Failed to load video";
       if (e) {
-        const error = e as ErrorEvent;
-        console.error("Video error:", {
-          message: error.message,
-          filename: error.filename,
-          lineno: error.lineno,
-          colno: error.colno,
-          error: error.error?.message || error.error,
-        });
+        if (e instanceof ErrorEvent) {
+          errorMessage = e.message || "Unknown error";
+          console.error("Video error:", errorMessage);
+        } else if (e instanceof Error) {
+          errorMessage = e.message;
+          console.error("Video error:", errorMessage);
+        } else {
+          console.error("Video error:", JSON.stringify(e));
+        }
       }
-      const errorMsg = e ? `Failed to load video: ${(e as ErrorEvent).message || "Unknown error"}` : "Failed to load video";
-      onError?.(new Error(errorMsg));
+
+      onError?.(new Error(`Failed to load video: ${errorMessage}`));
     };
 
     if (source.type === "direct") {
       const isHls = source.url.includes(".m3u8");
+
+      // Helper function to create proxy URL for CORS-prone sources
+      const createProxyUrl = (originalUrl: string, type: "manifest" | "segment" | "video") => {
+        let proxyUrl = `/api/proxy-hls?url=${encodeURIComponent(originalUrl)}&type=${type}`;
+        // Add referer if available from the provider
+        if (source.referer) {
+          proxyUrl += `&referer=${encodeURIComponent(source.referer)}`;
+        }
+        return proxyUrl;
+      };
+
+      // Determine if we need to use proxy (has referer or external domain)
+      const needsProxy = source.referer || !source.url.includes(window.location.hostname);
 
       if (isHls && typeof Hls !== "undefined" && Hls.isSupported()) {
         // Use HLS.js for browsers that don't support HLS natively
@@ -327,33 +354,21 @@ export function EnhancedVideoPlayer({
           lowLatencyMode: true,
         };
 
-        // Helper function to create proxy URL
-        const createProxyUrl = (originalUrl: string) => {
-          const isManifest = originalUrl.includes(".m3u8");
-          const type = isManifest ? "manifest" : "segment";
-          let proxyUrl = `/api/proxy-hls?url=${encodeURIComponent(originalUrl)}&type=${type}`;
+        if (needsProxy) {
+          // Configure XHR loader to route through proxy (for manifest loading)
+          // This is CRITICAL because hls.js uses XHR for manifest, not fetch
+          hlsConfig.xhrSetup = (xhr: XMLHttpRequest, url: string) => {
+            // Override the URL to go through our proxy
+            const proxyUrl = createProxyUrl(url, "manifest");
+            xhr.open("GET", proxyUrl, true);
+          };
 
-          // Add referer if available from the provider
-          if (source.referer) {
-            proxyUrl += `&referer=${encodeURIComponent(source.referer)}`;
-          }
-
-          return proxyUrl;
-        };
-
-        // Configure XHR loader to route through proxy (for manifest loading)
-        // This is CRITICAL because hls.js uses XHR for manifest, not fetch
-        hlsConfig.xhrSetup = (xhr: XMLHttpRequest, url: string) => {
-          // Override the URL to go through our proxy
-          const proxyUrl = createProxyUrl(url);
-          xhr.open("GET", proxyUrl, true);
-        };
-
-        // Configure fetch loader to route through proxy (for segment loading)
-        hlsConfig.fetchSetup = (fetchContext: { url: string }, initParams: RequestInit) => {
-          const proxyUrl = createProxyUrl(fetchContext.url);
-          return new Request(proxyUrl, initParams);
-        };
+          // Configure fetch loader to route through proxy (for segment loading)
+          hlsConfig.fetchSetup = (fetchContext: { url: string }, initParams: RequestInit) => {
+            const proxyUrl = createProxyUrl(fetchContext.url, "segment");
+            return new Request(proxyUrl, initParams);
+          };
+        }
 
         const hls = new Hls(hlsConfig);
 
@@ -363,7 +378,12 @@ export function EnhancedVideoPlayer({
         hls.attachMedia(video);
 
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          handleLoad();
+          clearTimeout(loadingTimeout);
+          clearTimeout(safetyTimeout);
+          setIsLoading(false);
+          if (preferences.autoplay) {
+            play().catch(() => {});
+          }
         });
 
         hls.on(Hls.Events.ERROR, (event, data) => {
@@ -394,51 +414,95 @@ export function EnhancedVideoPlayer({
 
         return () => {
           clearTimeout(loadingTimeout);
+          clearTimeout(safetyTimeout);
           hls.destroy();
         };
       } else if (isHls && video.canPlayType("application/vnd.apple.mpegurl")) {
         // Native HLS support (Safari)
-        // Use proxied URL to bypass CORS - segments will also be fetched through proxy
-        const proxyUrl = `/api/proxy-hls?url=${encodeURIComponent(source.url)}&type=manifest`;
-        video.src = proxyUrl;
-        video.addEventListener("loadeddata", handleLoad, { once: true });
+        // Use proxied URL to bypass CORS if needed
+        const videoUrl = needsProxy ? createProxyUrl(source.url, "manifest") : source.url;
+        video.src = videoUrl;
+
+        // Add multiple event handlers to ensure loading state is cleared
+        const clearLoading = () => {
+          clearTimeout(loadingTimeout);
+          clearTimeout(safetyTimeout);
+          setIsLoading(false);
+        };
+
+        video.addEventListener("loadeddata", clearLoading, { once: true });
+        video.addEventListener("canplay", clearLoading, { once: true });
+        video.addEventListener("canplaythrough", clearLoading, { once: true });
         video.addEventListener("error", handleError, { once: true });
+
+        // Try autoplay if enabled
+        video.addEventListener("loadedmetadata", () => {
+          if (preferences.autoplay) {
+            video.play().catch(() => {});
+          }
+        }, { once: true });
 
         return () => {
           clearTimeout(loadingTimeout);
-          video.removeEventListener("loadeddata", handleLoad);
+          clearTimeout(safetyTimeout);
+          video.removeEventListener("loadeddata", clearLoading);
+          video.removeEventListener("canplay", clearLoading);
+          video.removeEventListener("canplaythrough", clearLoading);
           video.removeEventListener("error", handleError);
         };
       } else {
-        // Regular MP4 video
-        video.src = source.url;
-        video.addEventListener("loadeddata", handleLoad, { once: true });
+        // Regular MP4 video - use proxy if needed for CORS
+        const videoUrl = (needsProxy && source.url.includes(".mp4")) ? createProxyUrl(source.url, "video") : source.url;
+        video.src = videoUrl;
+
+        // Add multiple event handlers to ensure loading state is cleared
+        const clearLoading = () => {
+          clearTimeout(loadingTimeout);
+          clearTimeout(safetyTimeout);
+          setIsLoading(false);
+        };
+
+        video.addEventListener("loadeddata", clearLoading, { once: true });
+        video.addEventListener("canplay", clearLoading, { once: true });
+        video.addEventListener("canplaythrough", clearLoading, { once: true });
         video.addEventListener("error", handleError, { once: true });
+
+        // Try autoplay if enabled
+        video.addEventListener("loadedmetadata", () => {
+          if (preferences.autoplay) {
+            video.play().catch(() => {});
+          }
+        }, { once: true });
 
         return () => {
           clearTimeout(loadingTimeout);
-          video.removeEventListener("loadeddata", handleLoad);
+          clearTimeout(safetyTimeout);
+          video.removeEventListener("loadeddata", clearLoading);
+          video.removeEventListener("canplay", clearLoading);
+          video.removeEventListener("canplaythrough", clearLoading);
           video.removeEventListener("error", handleError);
         };
       }
     } else {
-      // WebTorrent handling (simplified for now)
+      // WebTorrent handling (magnet/torrent links)
       import("@/lib/webtorrent").then(({ webTorrentManager }) => {
         webTorrentManager.loadDirectVideo(source.url, video, {
           onReady: () => {
             clearTimeout(loadingTimeout);
+            clearTimeout(safetyTimeout);
             setIsLoading(false);
             if (preferences.autoplay) play();
           },
           onError: (err: Error) => {
             clearTimeout(loadingTimeout);
+            clearTimeout(safetyTimeout);
             setIsLoading(false);
             onError?.(err);
           },
         });
       });
     }
-  }, [source.url]);
+  }, [source.url, preferences.autoplay]);
 
   // ===================================
   // Update sources when source.qualities changes
