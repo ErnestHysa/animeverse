@@ -10,6 +10,8 @@ import { Clock, Play, Trash2, Film } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AnimeCard } from "@/components/anime/anime-card";
 import { GlassCard } from "@/components/ui/glass-card";
+import { Header } from "@/components/layout/header";
+import { Footer } from "@/components/layout/footer";
 import { formatDistanceToNow } from "@/lib/utils";
 import Link from "next/link";
 
@@ -41,41 +43,50 @@ export default function HistoryPage() {
 
   if (uniqueHistory.length === 0) {
     return (
-      <div className="container mx-auto px-4 py-16">
-        <GlassCard className="max-w-2xl mx-auto p-12 text-center">
-          <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-white/5 flex items-center justify-center">
-            <Clock className="w-12 h-12 text-muted-foreground" />
-          </div>
-          <h2 className="text-2xl font-bold mb-3">No Watch History</h2>
-          <p className="text-muted-foreground mb-6">
-            Start watching anime to build your history. Your progress will be automatically saved.
-          </p>
-          {isAuthenticated && anilistMediaList.length > 0 ? (
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                You have {anilistMediaList.length} anime synced from AniList.
+      <>
+        <Header />
+        <main className="min-h-screen">
+          <div className="container mx-auto px-4 pt-24 pb-12">
+            <GlassCard className="max-w-2xl mx-auto p-12 text-center">
+              <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-white/5 flex items-center justify-center">
+                <Clock className="w-12 h-12 text-muted-foreground" />
+              </div>
+              <h2 className="text-2xl font-bold mb-3">No Watch History</h2>
+              <p className="text-muted-foreground mb-6">
+                Start watching anime to build your history. Your progress will be automatically saved.
               </p>
-              <div className="flex gap-3 justify-center">
+              {isAuthenticated && anilistMediaList.length > 0 ? (
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    You have {anilistMediaList.length} anime synced from AniList.
+                  </p>
+                  <div className="flex gap-3 justify-center">
+                    <Link href="/">
+                      <Button>Browse Anime</Button>
+                    </Link>
+                    <Link href="/settings">
+                      <Button variant="outline">Go to Settings</Button>
+                    </Link>
+                  </div>
+                </div>
+              ) : (
                 <Link href="/">
                   <Button>Browse Anime</Button>
                 </Link>
-                <Link href="/settings">
-                  <Button variant="outline">Go to Settings</Button>
-                </Link>
-              </div>
-            </div>
-          ) : (
-            <Link href="/">
-              <Button>Browse Anime</Button>
-            </Link>
-          )}
-        </GlassCard>
-      </div>
+              )}
+            </GlassCard>
+          </div>
+        </main>
+        <Footer />
+      </>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <>
+      <Header />
+      <main className="min-h-screen">
+      <div className="container mx-auto px-4 pt-24 pb-12">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
@@ -199,5 +210,8 @@ export default function HistoryPage() {
         </section>
       )}
     </div>
+      </main>
+      <Footer />
+    </>
   );
 }

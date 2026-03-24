@@ -3,12 +3,20 @@
  * Browse anime by animation studio
  */
 
+export const dynamic = "force-dynamic";
+
 import { Header } from "@/components/layout/header";
+
 import { Footer } from "@/components/layout/footer";
+
 import { anilist } from "@/lib/anilist";
+
 import { Building2, Tv } from "lucide-react";
+
 import { GlassCard } from "@/components/ui/glass-card";
+
 import { ImageWithFallback } from "@/components/ui/image-with-fallback";
+
 import Link from "next/link";
 
 export const metadata = {

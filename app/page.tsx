@@ -2,6 +2,8 @@
  * Home Page
  * Trending anime and featured content with Continue Watching
  */
+export const dynamic = "force-dynamic";
+
 
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";

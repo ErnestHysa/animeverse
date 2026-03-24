@@ -3,12 +3,20 @@
  * Weekly anime airing schedule
  */
 
+export const dynamic = "force-dynamic";
+
 import { Header } from "@/components/layout/header";
+
 import { Footer } from "@/components/layout/footer";
+
 import { AnimeCardCompact } from "@/components/anime/anime-card";
+
 import { anilist } from "@/lib/anilist";
+
 import { Calendar, Clock } from "lucide-react";
+
 import { GlassCard } from "@/components/ui/glass-card";
+
 import type { AiringSchedule } from "@/types/anilist";
 
 // ===================================

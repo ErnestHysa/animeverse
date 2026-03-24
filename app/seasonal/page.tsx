@@ -3,12 +3,20 @@
  * Anime from current season
  */
 
+export const dynamic = "force-dynamic";
+
 import { Header } from "@/components/layout/header";
+
 import { Footer } from "@/components/layout/footer";
+
 import { AnimeGrid } from "@/components/anime/anime-grid";
+
 import { AnimeGridSkeleton } from "@/components/ui/skeleton";
+
 import { anilist, getCurrentSeason, getCurrentYear } from "@/lib/anilist";
+
 import { Calendar } from "lucide-react";
+
 import { Suspense } from "react";
 
 // ===================================
