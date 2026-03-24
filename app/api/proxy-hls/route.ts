@@ -70,6 +70,18 @@ export async function GET(request: NextRequest) {
         contentType = "video/mp4";
       } else if (pathname.endsWith(".mp4")) {
         contentType = "video/mp4";
+      } else if (pathname.endsWith(".key") || pathname.includes(".key")) {
+        // DRM encryption key files
+        contentType = "application/octet-stream";
+      } else if (pathname.endsWith(".jpg") || pathname.endsWith(".jpeg") || pathname.includes(".jpg")) {
+        // Thumbnail/preview images in HLS streams
+        contentType = "image/jpeg";
+      } else if (pathname.endsWith(".png") || pathname.includes(".png")) {
+        // Thumbnail/preview images in HLS streams
+        contentType = "image/png";
+      } else if (pathname.endsWith(".webp") || pathname.includes(".webp")) {
+        // Thumbnail/preview images in HLS streams
+        contentType = "image/webp";
       }
     } catch {
       return NextResponse.json(
@@ -173,8 +185,21 @@ export async function GET(request: NextRequest) {
           return proxyUrl;
         };
 
-        // Rewrite segment URLs (.ts, .m4s, .mp4)
-        rewrittenManifest = manifestText
+        // Step 1: Rewrite URI attributes in #EXT-X-KEY tags (DRM encryption keys)
+        // This is CRITICAL for encrypted streams! Key files are specified as:
+        // #EXT-X-KEY:METHOD=AES-128,URI="mon.key",IV=0x...
+        rewrittenManifest = manifestText.replace(
+          /(#EXT-X-KEY[^]*URI=)("([^"]+)"|'([^']+)')/gi,
+          (match, quote, uriWithSingleQuote, uriWithDoubleQuote) => {
+            const uri = uriWithSingleQuote || uriWithDoubleQuote;
+            const rewritten = rewriteUrl(uri);
+            console.log(`[HLS Proxy] Rewrote key URI: ${uri} -> ${rewritten}`);
+            return `#EXT-X-KEY${match.split(/URI=/)[0]}URI="${rewritten}"`;
+          }
+        );
+
+        // Step 2: Rewrite segment URLs (.ts, .m4s, .mp4, .key) and sub-manifests (.m3u8)
+        rewrittenManifest = rewrittenManifest
           .split("\n")
           .map(line => {
             const trimmed = line.trim();
@@ -184,15 +209,11 @@ export async function GET(request: NextRequest) {
               return line;
             }
 
-            // Check if this line is a segment URL
-            if (
-              trimmed.endsWith(".ts") ||
-              trimmed.endsWith(".m4s") ||
-              trimmed.endsWith(".mp4") ||
-              trimmed.includes(".ts?") ||
-              trimmed.includes(".m4s?") ||
-              trimmed.includes(".mp4?")
-            ) {
+            // Check if this line is a segment URL or key file
+            // CRITICAL: Must include .key files for DRM-encrypted streams!
+            // CRITICAL: Must include image files (.jpg, .png, .webp) for thumbnail segments!
+            const segmentPattern = /(\.ts|\.m4s|\.mp4|\.key|\.jpg|\.jpeg|\.png|\.webp)(\?|$)/;
+            if (segmentPattern.test(trimmed)) {
               // Extract the URL part (in case there are params after)
               const urlMatch = trimmed.split("?")[0];
               const params = trimmed.includes("?") ? "?" + trimmed.split("?")[1] : "";

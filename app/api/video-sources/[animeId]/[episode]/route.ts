@@ -324,8 +324,12 @@ async function getAnimeKaiEpisodeSources(
 
     for (const s of data.sources) {
       const lang = detectSubtitleLanguage(s.url);
+      // Prioritize English sources, completely skip Italian sources
       if (lang === "en" || lang === "unknown") {
         englishSources.push(s);
+      } else if (lang === "it") {
+        console.log(`[AnimeKai] Filtering out Italian source: ${s.url}`);
+        // Don't add Italian sources to either list - filter them out completely
       } else {
         otherSources.push(s);
       }
@@ -474,15 +478,37 @@ async function searchAnimeSaturnId(
       if (data.results && data.results.length > 0) {
         console.log(`[AnimeSaturn] Found ${data.results.length} results for "${searchTerm}"`);
 
+        // Filter OUT Italian versions (ITA) - we want English subtitles!
+        const nonItalianResults = data.results.filter((r: { title?: string; id: string }) => {
+          const title = (r.title || "").toLowerCase();
+          // Exclude if title contains "ita" (Italian) markers
+          const isItalian = title.includes("(ita)") || title.includes("ita") || title.includes("italian");
+          if (isItalian) {
+            console.log(`[AnimeSaturn] Skipping Italian version: ${r.title}`);
+          }
+          return !isItalian;
+        });
+
+        // If no non-Italian results, we might still need to use Italian ones as fallback
+        const resultsToUse = nonItalianResults.length > 0 ? nonItalianResults : data.results;
+
+        console.log(`[AnimeSaturn] After filtering: ${resultsToUse.length} results (filtered out ${data.results.length - nonItalianResults.length} Italian versions)`);
+
         // Find best match using scoring with season/part awareness
         const searchTermLower = searchTerm.toLowerCase();
         const searchWords = searchTermLower.split(" ").filter(w => w.length > 2);
 
-        const scoredResults = data.results.map((r: { title?: string; id: string }) => {
+        const scoredResults = resultsToUse.map((r: { title?: string; id: string }) => {
           const resultTitle = (r.title || "").toLowerCase();
           const cleanedResult = cleanTitle(r.title || "");
           const resultWords = resultTitle.split(" ").filter(w => w.length > 2);
           let score = 0;
+
+          // CRITICAL: Heavy penalty for Italian versions (only used as fallback)
+          if (resultTitle.includes("(ita)") || resultTitle.includes("ita") || resultTitle.includes("italian")) {
+            score -= 500; // Massive penalty - only use if absolutely nothing else
+            console.log(`[AnimeSaturn] Italian version detected, applying heavy penalty: ${r.title}`);
+          }
 
           // Exact match - highest score
           if (resultTitle === searchTermLower || cleanedResult === searchTermLower) {
@@ -593,6 +619,7 @@ async function getAnimeSaturnInfo(animeId: string): Promise<AnimeSaturnInfo | nu
 /**
  * Detect subtitle language from source URL or metadata
  * Returns the language code or "unknown" if not detected
+ * Improved to better detect Italian sources (which we want to filter out)
  */
 function detectSubtitleLanguage(url: string, lang?: string): string {
   const urlLower = url.toLowerCase();
@@ -602,12 +629,18 @@ function detectSubtitleLanguage(url: string, lang?: string): string {
     return lang.toLowerCase();
   }
 
-  // Detect from filename patterns
-  if (urlLower.includes("_sub_eng") || urlLower.includes("_eng.") || urlLower.includes("_english")) {
-    return "en";
-  }
-  if (urlLower.includes("_sub_ita") || urlLower.includes("_ita.") || urlLower.includes("_italian")) {
+  // Detect Italian sources (priority - we want to filter these out)
+  if (urlLower.includes("_sub_ita") || urlLower.includes("_ita.") ||
+      urlLower.includes("_italian") || urlLower.includes("(ita)") ||
+      urlLower.includes("-ita-") || urlLower.includes("ita.")) {
     return "it";
+  }
+
+  // Detect English sources (what we want)
+  if (urlLower.includes("_sub_eng") || urlLower.includes("_eng.") ||
+      urlLower.includes("_english") || urlLower.includes("(eng)") ||
+      urlLower.includes("-eng-") || urlLower.includes("eng.")) {
+    return "en";
   }
   if (urlLower.includes("_sub_spa") || urlLower.includes("_spa.") || urlLower.includes("_spanish")) {
     return "es";
@@ -623,6 +656,15 @@ function detectSubtitleLanguage(url: string, lang?: string): string {
   }
   if (urlLower.includes("_sub_jap") || urlLower.includes("_jap.") || urlLower.includes("_japanese")) {
     return "ja";
+  }
+
+  // For AnimeSaturn: Check if the URL contains Italian language indicators
+  // AnimeSaturn URLs often contain "ita" for Italian versions
+  if (urlLower.includes("animesaturn")) {
+    // Check for Italian version markers in the path
+    if (urlLower.includes("/ita/") || urlLower.includes("sub-ita") || urlLower.includes("subita")) {
+      return "it";
+    }
   }
 
   return "unknown";
@@ -726,8 +768,12 @@ async function getAnimeSaturnEpisodeSources(
       if (s.url.includes("thumbnails.vtt")) continue; // Skip thumbnails
 
       const lang = detectSubtitleLanguage(s.url, s.isM3U8 ? undefined : undefined);
+      // Prioritize English sources, completely skip Italian sources
       if (lang === "en" || lang === "unknown") {
         englishSources.push(s);
+      } else if (lang === "it") {
+        console.log(`[AnimeSaturn] Filtering out Italian source: ${s.url}`);
+        // Don't add Italian sources to either list - filter them out completely
       } else {
         otherSources.push(s);
       }
@@ -1166,8 +1212,12 @@ async function getEpisodeSources(
 
     for (const s of allSources) {
       const lang = detectSubtitleLanguage(s.url);
+      // Prioritize English sources, completely skip Italian sources
       if (lang === "en" || lang === "unknown") {
         englishSources.push(s);
+      } else if (lang === "it") {
+        console.log(`[AnimePahe] Filtering out Italian source: ${s.url}`);
+        // Don't add Italian sources to either list - filter them out completely
       } else {
         otherSources.push(s);
       }

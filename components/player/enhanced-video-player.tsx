@@ -135,6 +135,8 @@ export function EnhancedVideoPlayer({
   const [isLoading, setIsLoading] = useState(true);
   const [isBuffering, setIsBuffering] = useState(false);
   const [bufferProgress, setBufferProgress] = useState(0);
+  const [hlsReady, setHlsReady] = useState(false);
+  const [userInitiatedPlay, setUserInitiatedPlay] = useState(false);
 
   // Throttled time update to improve performance
   const lastTimeUpdateRef = useRef(0);
@@ -293,6 +295,8 @@ export function EnhancedVideoPlayer({
 
     setIsLoading(true);
     setIsBuffering(false);
+    setHlsReady(false); // Reset HLS ready state
+    setUserInitiatedPlay(false); // Reset user initiated play state
 
     // Timeout fallback to prevent infinite loading
     const loadingTimeout = setTimeout(() => {
@@ -369,9 +373,11 @@ export function EnhancedVideoPlayer({
           lowLatencyMode: false,
           // Progressive download - more compatible
           progressive: true,
-          // Increase buffer tolerance
+          // Increase buffer tolerance for better seeking
           maxBufferLength: 30,
           maxMaxBufferLength: 60,
+          // Critical for seeking - allow more lenient fragment lookup
+          maxFragLookUpTolerance: 0.5,
           // Don't automatically switch levels (can cause parsing issues)
           autoStartLoad: true,
           // Cap level to player size to avoid unsupported resolutions
@@ -386,6 +392,8 @@ export function EnhancedVideoPlayer({
           // Use fetch API for all requests (more reliable than XHR)
           // This allows us to intercept and proxy all requests uniformly
           loader: Hls.DefaultConfig.loader,
+          // Add seek handling settings
+          maxBufferHole: 0.5,
         };
 
         // Determine the actual URL to load
@@ -446,7 +454,11 @@ export function EnhancedVideoPlayer({
           clearTimeout(loadingTimeout);
           clearTimeout(safetyTimeout);
           setIsLoading(false);
-          if (preferences.autoplay) {
+          setHlsReady(true);
+
+          // Play if autoplay is enabled OR if user initiated playback
+          if (preferences.autoplay || userInitiatedPlay) {
+            console.log("[HLS] Starting playback (autoplay:", preferences.autoplay, "userInitiated:", userInitiatedPlay, ")");
             play().catch(() => {});
           }
         });
@@ -465,6 +477,11 @@ export function EnhancedVideoPlayer({
 
         hls.on(Hls.Events.FRAG_LOADED, (event, data) => {
           console.log("[HLS] Fragment loaded:", data);
+          // If user initiated play and we have the first fragment, try to play
+          if (userInitiatedPlay && video.paused && video.readyState >= 2) {
+            console.log("[HLS] Fragment loaded and user wants to play, starting playback...");
+            video.play().catch(() => {});
+          }
         });
 
         // Track repeated non-fatal media errors to trigger fallback
@@ -1098,6 +1115,14 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
         video.playbackRate = playbackRate;
       }
     };
+    const handleSeeking = () => {
+      console.log(`[Video Player] Seeking to ${video.currentTime}s`);
+      setIsBuffering(true);
+    };
+    const handleSeeked = () => {
+      console.log(`[Video Player] Seeked to ${video.currentTime}s`);
+      setIsBuffering(false);
+    };
 
     video.addEventListener("timeupdate", handleTimeUpdate);
     video.addEventListener("durationchange", handleDurationChange);
@@ -1108,11 +1133,15 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
     video.addEventListener("waiting", handleWaiting);
     video.addEventListener("canplay", handleCanPlay);
     video.addEventListener("ratechange", handleRateChange);
+    video.addEventListener("seeking", handleSeeking);
+    video.addEventListener("seeked", handleSeeked);
 
     return () => {
       video.removeEventListener("timeupdate", handleTimeUpdate);
       video.removeEventListener("durationchange", handleDurationChange);
       video.removeEventListener("ended", handleEnded);
+      video.removeEventListener("seeking", handleSeeking);
+      video.removeEventListener("seeked", handleSeeked);
       video.removeEventListener("play", handlePlay);
       video.removeEventListener("pause", handlePause);
       video.removeEventListener("progress", handleProgress);
@@ -1317,11 +1346,85 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
 
   const play = async () => {
     const video = videoRef.current;
-    if (!video) return;
+    const hls = hlsRef.current;
+
+    if (!video) {
+      console.warn("[play] No video element available");
+      return;
+    }
+
+    console.log("[play] Called - video.paused:", video.paused, "hlsReady:", hlsReady, "hls exists:", !!hls, "readyState:", video.readyState);
+
+    // Mark that user initiated playback
+    setUserInitiatedPlay(true);
+
+    // Check if HLS is being used but not ready yet
+    if (hls && !hlsReady) {
+      console.log("[play] HLS exists but not ready, waiting for MANIFEST_PARSED...");
+      setIsLoading(true);
+      toast("Loading stream...", { icon: "⏳", duration: 2000 });
+
+      // Set up a one-time listener to play when ready
+      const onManifestParsed = () => {
+        console.log("[play] Manifest parsed, starting playback...");
+        video.play().catch((err) => {
+          console.error("[play] Play failed after manifest parsed:", err);
+        });
+      };
+
+      // Listen for MANIFEST_PARSED if not already ready
+      hls.once(Hls.Events.MANIFEST_PARSED, onManifestParsed);
+
+      // Also try to play after a short delay as fallback
+      setTimeout(() => {
+        if (video.paused && video.readyState >= 2) {
+          console.log("[play] Fallback: Video has data, attempting play...");
+          video.play().catch(() => {});
+        }
+      }, 2000);
+
+      return;
+    }
+
+    // Check video readyState before attempting to play
+    if (video.readyState < 2) { // HAVE_CURRENT_DATA
+      console.log(`[play] Video not ready (readyState: ${video.readyState}), waiting...`);
+      setIsLoading(true);
+
+      // Wait for video to be ready
+      let retries = 0;
+      const checkReady = () => {
+        if (video.readyState >= 2) {
+          console.log("[play] Video is now ready, playing...");
+          setIsLoading(false);
+          video.play().catch((err) => {
+            console.error("[play] Play failed:", err);
+            toast("Click to play video", { icon: "🎬", duration: 2000 });
+          });
+        } else {
+          // Check again in 100ms (max 50 retries = 5 seconds)
+          if (retries < 50) {
+            retries++;
+            setTimeout(checkReady, 100);
+          } else {
+            console.error("[play] Gave up waiting for video to be ready");
+            setIsLoading(false);
+            toast("Video failed to load. Try refreshing.", { icon: "⚠️", duration: 3000 });
+          }
+        }
+      };
+
+      checkReady();
+      return;
+    }
+
     try {
+      console.log("[play] Playing video (readyState:", video.readyState, "paused:", video.paused, ")");
       await video.play();
-    } catch {
-      // Auto-play was blocked
+      setIsLoading(false);
+    } catch (e) {
+      console.error("[play] Failed to play:", e);
+      // Auto-play was blocked or other error
       toast("Click to play video", { icon: "🎬", duration: 2000 });
     }
   };
@@ -1399,7 +1502,17 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
   const seek = (time: number) => {
     const video = videoRef.current;
     if (video) {
-      video.currentTime = Math.max(0, Math.min(duration, time));
+      // Use video.duration directly instead of state to avoid stale values
+      const videoDuration = video.duration || duration;
+      const seekTime = Math.max(0, Math.min(videoDuration, time));
+      console.log(`[Video Player] Seeking to ${seekTime}s (current: ${video.currentTime}s, duration: ${videoDuration}s)`);
+
+      // For HLS, we need to ensure we don't trigger a reload
+      // HLS.js should handle seeking natively
+      video.currentTime = seekTime;
+
+      // Store the seek time for recovery if needed
+      (video as any).__lastSeekTime = seekTime;
     }
   };
 
@@ -1520,9 +1633,14 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
   // ===================================
 
   const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const video = videoRef.current;
+    if (!video || !video.duration) {
+      console.warn("[handleProgressClick] No video or duration available");
+      return;
+    }
     const rect = e.currentTarget.getBoundingClientRect();
     const pos = (e.clientX - rect.left) / rect.width;
-    seek(pos * duration);
+    seek(pos * video.duration);
   };
 
   // ===================================
@@ -1667,18 +1785,15 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
             aria-valuetext={`${formatTime(currentTime)} of ${formatTime(duration || 0)}`}
             tabIndex={0}
             onKeyDown={(e) => {
+              const video = videoRef.current;
+              if (!video) return;
               if (e.key === 'ArrowLeft') {
-                const video = videoRef.current;
-                if (video) {
-                  video.currentTime = Math.max(0, video.currentTime - 5);
-                  e.preventDefault();
-                }
+                video.currentTime = Math.max(0, video.currentTime - 5);
+                e.preventDefault();
               } else if (e.key === 'ArrowRight') {
-                const video = videoRef.current;
-                if (video) {
-                  video.currentTime = Math.min(duration || 0, video.currentTime + 5);
-                  e.preventDefault();
-                }
+                const videoDuration = video.duration || duration;
+                video.currentTime = Math.min(videoDuration, video.currentTime + 5);
+                e.preventDefault();
               }
             }}
           >
