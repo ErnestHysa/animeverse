@@ -188,9 +188,17 @@ export function VideoSourceLoader({
         data.sources[0];
 
       setAllServers(serverOptions);
+      const sourceUrl = defaultSource.url;
+      console.log("[VideoSourceLoader] Setting video source:", {
+        url: sourceUrl,
+        quality: defaultSource.quality,
+        provider: data.provider,
+        hasReferer: !!data.referer,
+        needsProxy: !!data.referer || !sourceUrl.includes(window.location.hostname),
+      });
       setSources({
         type: "direct",
-        url: defaultSource.url,
+        url: sourceUrl,
         qualities,
         referer: data.referer,
       });
@@ -247,12 +255,17 @@ export function VideoSourceLoader({
     fetchSources(currentLanguage);
   }, [fetchSources, currentLanguage]);
 
+  // Track current server index for automatic fallback
+  const [currentServerIndex, setCurrentServerIndex] = useState(0);
+
   /**
    * Server change handler - switches video source within current quality options
    */
   const handleServerChange = (serverId: string) => {
     const server = allServers.find((s) => s.id === serverId);
     if (server) {
+      const serverIndex = allServers.findIndex((s) => s.id === serverId);
+      setCurrentServerIndex(serverIndex);
       setSources({
         type: "direct",
         url: server.url,
@@ -260,6 +273,42 @@ export function VideoSourceLoader({
         referer: sources?.referer,
       });
     }
+  };
+
+  /**
+   * Video player error handler - tries next server automatically on media errors
+   */
+  const handleVideoError = (error: Error) => {
+    const errorMessage = error.message.toLowerCase();
+
+    // Check if this is a media/parsing error (should try next server)
+    const isMediaError =
+      errorMessage.includes("media") ||
+      errorMessage.includes("parsing") ||
+      errorMessage.includes("transmuxer") ||
+      errorMessage.includes("fragment");
+
+    if (isMediaError && currentServerIndex < allServers.length - 1) {
+      // Try the next server in the list
+      const nextServer = allServers[currentServerIndex + 1];
+      console.log(`[VideoSourceLoader] Media error detected, trying next server: ${nextServer.name}`);
+      toast.loading(`Trying next server...`, { id: "server-fallback" });
+
+      setCurrentServerIndex(currentServerIndex + 1);
+      setSources({
+        type: "direct",
+        url: nextServer.url,
+        qualities: sources?.qualities || [],
+        referer: sources?.referer,
+      });
+
+      toast.success(`Switched to ${nextServer.name}`, { id: "server-fallback" });
+      return; // Don't propagate error - we're handling it
+    }
+
+    // If we've tried all servers or it's not a media error, propagate to parent
+    console.error("[VideoSourceLoader] All servers failed or non-recoverable error");
+    onError?.(error);
   };
 
   /**
@@ -427,7 +476,7 @@ export function VideoSourceLoader({
         episodeNumber={episodeNumber}
         malId={malId}
         nextEpisodeUrl={nextEpisodeUrl}
-        onError={onError}
+        onError={handleVideoError}
         onEpisodeEnd={onEpisodeEnd}
         allServers={allServers}
         allLanguages={allLanguages}

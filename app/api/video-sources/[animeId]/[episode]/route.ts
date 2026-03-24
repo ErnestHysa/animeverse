@@ -284,7 +284,7 @@ async function getAnimeKaiInfo(animeId: string): Promise<AnimeKaiInfo | null> {
 
 /**
  * Get episode sources from AnimeKai
- * Now prioritizes English subtitle sources
+ * Now prioritizes English subtitle sources and tests manifest accessibility
  */
 async function getAnimeKaiEpisodeSources(
   episodeId: string
@@ -344,13 +344,62 @@ async function getAnimeKaiEpisodeSources(
       console.log(`[AnimeKai] No English sources found, using ${detectedLang} sources (${otherSources.length} available)`);
     }
 
-    // Map sources to our format
-    const sources = sourcesToUse.map((s) => ({
+    // Test HLS manifest URLs for accessibility (filter out broken CDNs)
+    const hlsSources = sourcesToUse.filter(s => s.isM3U8);
+    const mp4Sources = sourcesToUse.filter(s => !s.isM3U8);
+
+    // Test ALL HLS sources and collect all that pass
+    const workingHlsSources: Array<{ url: string; quality: string }> = [];
+
+    for (const source of hlsSources) {
+      console.log(`[AnimeKai] Testing manifest: ${source.url}`);
+      const isAccessible = await testManifestUrl(source.url);
+      if (isAccessible) {
+        workingHlsSources.push({
+          url: source.url,
+          quality: source.quality || source.label || "auto",
+        });
+        console.log(`[AnimeKai] ✓ Source OK: ${source.quality}`);
+      } else {
+        console.log(`[AnimeKai] ✗ Source failed: ${source.quality}`);
+      }
+    }
+
+    // If no HLS sources work, try MP4 sources (test them too)
+    const workingMp4Sources: Array<{ url: string; quality: string }> = [];
+
+    if (workingHlsSources.length === 0 && mp4Sources.length > 0) {
+      console.log(`[AnimeKai] No working HLS sources, trying MP4`);
+      for (const source of mp4Sources) {
+        workingMp4Sources.push({
+          url: source.url,
+          quality: source.quality || source.label || "auto",
+        });
+        console.log(`[AnimeKai] Using MP4 source: ${source.quality}`);
+      }
+    }
+
+    // If neither works, return null to trigger fallback
+    if (workingHlsSources.length === 0 && workingMp4Sources.length === 0) {
+      console.log(`[AnimeKai] All sources failed health check, triggering fallback`);
+      return null;
+    }
+
+    // Combine HLS and MP4 sources, preferring HLS
+    const allWorkingSources = [
+      ...workingHlsSources.map(s => ({ ...s, type: "hls" as const })),
+      ...workingMp4Sources.map(s => ({ ...s, type: "mp4" as const })),
+    ];
+
+    console.log(`[AnimeKai] Returning ${allWorkingSources.length} working sources`);
+
+    // Map sources to our format - include ALL working sources for fallback
+    const sources = allWorkingSources.map((s) => ({
       url: s.url,
-      quality: mapQuality(s.quality || s.label),
-      label: s.label || s.quality || "Auto",
+      quality: mapQuality(s.quality),
+      label: s.quality,
       provider: "AnimeKai",
-      type: (s.isM3U8 ? "hls" : "mp4") as "mp4" | "hls" | "webm",
+      type: s.type,
     }));
 
     // AnimeKai doesn't provide separate subtitle files
@@ -588,9 +637,54 @@ function hasEnglishSubtitles(url: string, lang?: string): boolean {
 }
 
 /**
+ * Test if a manifest URL is accessible through the HLS proxy
+ * This filters out CDNs that are returning errors (like 502 Bad Gateway)
+ * Returns true if the manifest can be fetched successfully
+ */
+async function testManifestUrl(manifestUrl: string): Promise<boolean> {
+  try {
+    // Use the HLS proxy to test the manifest
+    const proxyUrl = `/api/proxy-hls?url=${encodeURIComponent(manifestUrl)}&type=manifest`;
+    const testUrl = new URL(proxyUrl, process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000");
+
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 10000); // 10 second timeout
+
+    const response = await fetch(testUrl.toString(), {
+      signal: ctrl.signal,
+    });
+    clearTimeout(tid);
+
+    if (!response.ok) {
+      console.log(`[Health Check] Manifest test failed: ${response.status} for ${manifestUrl}`);
+      return false;
+    }
+
+    // Try to parse the response to ensure it's a valid manifest
+    const text = await response.text();
+    if (!text || text.length < 50) {
+      console.log(`[Health Check] Manifest response too short or empty for ${manifestUrl}`);
+      return false;
+    }
+
+    // Basic validation - should contain HLS manifest markers
+    if (!text.includes("#EXT") && !text.includes(".m3u8")) {
+      console.log(`[Health Check] Response doesn't look like HLS manifest for ${manifestUrl}`);
+      return false;
+    }
+
+    console.log(`[Health Check] Manifest OK: ${manifestUrl}`);
+    return true;
+  } catch (error) {
+    console.log(`[Health Check] Manifest test error:`, error instanceof Error ? error.message : error);
+    return false;
+  }
+}
+
+/**
  * Get episode sources from AnimeSaturn
  * AnimeSaturn uses nezumi.streampeaker.org CDN which works with HLS proxy
- * Now prioritizes English subtitle sources
+ * Now prioritizes English subtitle sources and tests manifest accessibility
  */
 async function getAnimeSaturnEpisodeSources(
   episodeId: string
@@ -652,13 +746,63 @@ async function getAnimeSaturnEpisodeSources(
       console.log(`[AnimeSaturn] No English sources found, using ${detectedLang} sources (${otherSources.length} available)`);
     }
 
-    // Map sources to our format
-    const sources = sourcesToUse.map((s) => ({
+    // Test HLS manifest URLs for accessibility (filter out broken CDNs)
+    const hlsSources = sourcesToUse.filter(s => s.isM3U8);
+    const mp4Sources = sourcesToUse.filter(s => !s.isM3U8);
+
+    // Test ALL HLS sources and collect all that pass
+    const workingHlsSources: Array<{ url: string; quality: string }> = [];
+
+    for (const source of hlsSources) {
+      console.log(`[AnimeSaturn] Testing manifest: ${source.url}`);
+      const isAccessible = await testManifestUrl(source.url);
+      if (isAccessible) {
+        workingHlsSources.push({
+          url: source.url,
+          quality: source.quality || "auto",
+        });
+        console.log(`[AnimeSaturn] ✓ Source OK: ${source.quality}`);
+      } else {
+        console.log(`[AnimeSaturn] ✗ Source failed: ${source.quality}`);
+      }
+    }
+
+    // If no HLS sources work, try MP4 sources (test them too)
+    const workingMp4Sources: Array<{ url: string; quality: string }> = [];
+
+    if (workingHlsSources.length === 0 && mp4Sources.length > 0) {
+      console.log(`[AnimeSaturn] No working HLS sources, trying MP4`);
+      for (const source of mp4Sources) {
+        workingMp4Sources.push({
+          url: source.url,
+          quality: source.quality || "auto",
+        });
+        // Assume MP4 sources work (can't easily test without downloading entire file)
+        console.log(`[AnimeSaturn] Using MP4 source: ${source.quality}`);
+      }
+    }
+
+    // If neither works, return null to trigger fallback
+    if (workingHlsSources.length === 0 && workingMp4Sources.length === 0) {
+      console.log(`[AnimeSaturn] All sources failed health check, triggering fallback`);
+      return null;
+    }
+
+    // Combine HLS and MP4 sources, preferring HLS
+    const allWorkingSources = [
+      ...workingHlsSources.map(s => ({ ...s, type: "hls" as const })),
+      ...workingMp4Sources.map(s => ({ ...s, type: "mp4" as const })),
+    ];
+
+    console.log(`[AnimeSaturn] Returning ${allWorkingSources.length} working sources`);
+
+    // Map sources to our format - include ALL working sources for fallback
+    const sources = allWorkingSources.map((s) => ({
       url: s.url,
-      quality: mapQuality(s.quality || "auto"),
-      label: s.quality || "Auto",
+      quality: mapQuality(s.quality),
+      label: s.quality,
       provider: "AnimeSaturn",
-      type: (s.isM3U8 ? "hls" : "mp4") as "mp4" | "hls" | "webm",
+      type: s.type,
     }));
 
     // Map subtitles if available

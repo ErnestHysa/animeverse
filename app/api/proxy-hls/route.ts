@@ -165,8 +165,12 @@ export async function GET(request: NextRequest) {
             absoluteUrl = baseUrlString + urlMatch;
           }
 
-          // Now encode and route through proxy
-          return `${proxyBaseUrl}?url=${encodeURIComponent(absoluteUrl)}&type=segment`;
+          // Build proxy URL with referer if available
+          let proxyUrl = `${proxyBaseUrl}?url=${encodeURIComponent(absoluteUrl)}&type=segment`;
+          if (customReferer) {
+            proxyUrl += `&referer=${encodeURIComponent(customReferer)}`;
+          }
+          return proxyUrl;
         };
 
         // Rewrite segment URLs (.ts, .m4s, .mp4)

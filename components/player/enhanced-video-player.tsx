@@ -122,6 +122,7 @@ export function EnhancedVideoPlayer({
   const settingsDropdownRef = useRef<HTMLDivElement>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const hlsRef = useRef<Hls | null>(null);
+  const bufferingSafetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // State
   const [isPlaying, setIsPlaying] = useState(false);
@@ -278,6 +279,12 @@ export function EnhancedVideoPlayer({
     const video = videoRef.current;
     if (!video) return;
 
+    console.log("[VideoPlayer] Loading video source:", {
+      type: source.type,
+      url: source.url,
+      hasReferer: !!source.referer,
+    });
+
     // Clean up previous HLS instance if exists
     if (hlsRef.current) {
       hlsRef.current.destroy();
@@ -336,6 +343,11 @@ export function EnhancedVideoPlayer({
 
       // Helper function to create proxy URL for CORS-prone sources
       const createProxyUrl = (originalUrl: string, type: "manifest" | "segment" | "video") => {
+        // Don't double-proxy URLs that are already going through our proxy
+        // This prevents the circular reference: proxy(proxy(url))
+        if (originalUrl.includes("/api/proxy-hls")) {
+          return originalUrl;
+        }
         let proxyUrl = `/api/proxy-hls?url=${encodeURIComponent(originalUrl)}&type=${type}`;
         // Add referer if available from the provider
         if (source.referer) {
@@ -349,35 +361,88 @@ export function EnhancedVideoPlayer({
 
       if (isHls && typeof Hls !== "undefined" && Hls.isSupported()) {
         // Use HLS.js for browsers that don't support HLS natively
+        // Configure for better compatibility with various CDN formats
         const hlsConfig: any = {
-          enableWorker: true,
-          lowLatencyMode: true,
+          // Disable worker - can cause issues with some codec formats
+          enableWorker: false,
+          // Don't use low latency mode - more lenient parsing
+          lowLatencyMode: false,
+          // Progressive download - more compatible
+          progressive: true,
+          // Increase buffer tolerance
+          maxBufferLength: 30,
+          maxMaxBufferLength: 60,
+          // Don't automatically switch levels (can cause parsing issues)
+          autoStartLoad: true,
+          // Cap level to player size to avoid unsupported resolutions
+          capLevelToPlayerSize: true,
+          // Add more lenient error recovery
+          recoverMediaErrorDuration: 10000,
+          // Prefer MP4A audio codec (more compatible)
+          preferredCodecs: {
+            video: ['avc1', 'hvc1'],
+            audio: ['mp4a', 'aac'],
+          },
+          // Use fetch API for all requests (more reliable than XHR)
+          // This allows us to intercept and proxy all requests uniformly
+          loader: Hls.DefaultConfig.loader,
         };
 
-        if (needsProxy) {
-          // Configure XHR loader to route through proxy (for manifest loading)
-          // This is CRITICAL because hls.js uses XHR for manifest, not fetch
-          hlsConfig.xhrSetup = (xhr: XMLHttpRequest, url: string) => {
-            // Override the URL to go through our proxy
-            const proxyUrl = createProxyUrl(url, "manifest");
-            xhr.open("GET", proxyUrl, true);
-          };
+        // Determine the actual URL to load
+        // If proxy is needed, use the proxied manifest URL
+        // The manifest itself will contain rewritten URLs to the proxy
+        const manifestUrl = needsProxy ? createProxyUrl(source.url, "manifest") : source.url;
 
-          // Configure fetch loader to route through proxy (for segment loading)
-          hlsConfig.fetchSetup = (fetchContext: { url: string }, initParams: RequestInit) => {
-            const proxyUrl = createProxyUrl(fetchContext.url, "segment");
-            return new Request(proxyUrl, initParams);
-          };
-        }
+        console.log("[HLS] Loading manifest:", needsProxy ? "(via proxy)" : "(direct)", {
+          original: source.url,
+          proxied: manifestUrl !== source.url ? manifestUrl : "(same)",
+        });
 
         const hls = new Hls(hlsConfig);
 
         hlsRef.current = hls;
 
-        hls.loadSource(source.url);
+        // CRITICAL: Attach media BEFORE loading source
+        // This is the correct HLS.js initialization order
         hls.attachMedia(video);
 
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        // Wait for media to be attached before loading source
+        let mediaAttached = false;
+        const onMediaAttached = () => {
+          if (!mediaAttached) {
+            mediaAttached = true;
+            console.log("[HLS] Media attached, loading source:", manifestUrl);
+            hls.loadSource(manifestUrl);
+            hls.off(Hls.Events.MEDIA_ATTACHED, onMediaAttached);
+          }
+        };
+        hls.on(Hls.Events.MEDIA_ATTACHED, onMediaAttached);
+
+        // If media attach fails, try loading anyway after a short delay
+        setTimeout(() => {
+          if (hlsRef.current && !hlsRef.current.media && !mediaAttached) {
+            console.warn("[HLS] Media attach timeout, forcing source load");
+            mediaAttached = true;
+            hls.loadSource(manifestUrl);
+          }
+        }, 1000);
+
+        // Comprehensive HLS event logging for debugging
+        hls.on(Hls.Events.MEDIA_ATTACHED, (event, data) => {
+          console.log("[HLS] Media attached event fired:", data);
+        });
+
+        hls.on(Hls.Events.MANIFEST_LOADING, (event, data) => {
+          console.log("[HLS] Manifest loading:", data);
+        });
+
+        hls.on(Hls.Events.MANIFEST_LOADED, (event, data) => {
+          console.log("[HLS] Manifest loaded:", data);
+          console.log("[HLS] Levels available:", data.levels.length);
+        });
+
+        hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
+          console.log("[HLS] Manifest parsed successfully:", data);
           clearTimeout(loadingTimeout);
           clearTimeout(safetyTimeout);
           setIsLoading(false);
@@ -386,7 +451,31 @@ export function EnhancedVideoPlayer({
           }
         });
 
+        hls.on(Hls.Events.LEVEL_LOADING, (event, data) => {
+          console.log("[HLS] Level loading:", data);
+        });
+
+        hls.on(Hls.Events.LEVEL_LOADED, (event, data) => {
+          console.log("[HLS] Level loaded:", data);
+        });
+
+        hls.on(Hls.Events.FRAG_LOADING, (event, data) => {
+          console.log("[HLS] Fragment loading:", data);
+        });
+
+        hls.on(Hls.Events.FRAG_LOADED, (event, data) => {
+          console.log("[HLS] Fragment loaded:", data);
+        });
+
+        // Track repeated non-fatal media errors to trigger fallback
+        let mediaErrorCount = 0;
+        const MAX_MEDIA_ERRORS = 3; // Trigger fallback after 3 media errors
+        let lastErrorTime = 0;
+        const ERROR_RESET_TIME = 5000; // Reset counter if 5 seconds pass without errors
+
         hls.on(Hls.Events.ERROR, (event, data) => {
+          const now = Date.now();
+
           console.error("HLS error:", {
             type: data.type,
             details: data.details,
@@ -394,6 +483,28 @@ export function EnhancedVideoPlayer({
             response: data.response,
             reason: data.reason,
           });
+
+          // Track non-fatal media parsing errors (fragParsingError, etc.)
+          if (!data.fatal && data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+            // Reset counter if enough time has passed since last error
+            if (now - lastErrorTime > ERROR_RESET_TIME) {
+              mediaErrorCount = 0;
+            }
+
+            mediaErrorCount++;
+            lastErrorTime = now;
+
+            console.warn(`Media error count: ${mediaErrorCount}/${MAX_MEDIA_ERRORS}`);
+
+            // If we hit the threshold, trigger fallback to next server
+            if (mediaErrorCount >= MAX_MEDIA_ERRORS) {
+              console.error("Too many media errors, triggering server fallback");
+              onError?.(new Error(`Media parsing failed after ${MAX_MEDIA_ERRORS} attempts. Trying next server...`));
+              // Don't try to recover - let the parent component switch servers
+              return;
+            }
+          }
+
           if (data.fatal) {
             switch (data.type) {
               case Hls.ErrorTypes.NETWORK_ERROR:
@@ -959,8 +1070,26 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
     const handleWaiting = () => {
       setIsBuffering(true);
       setIsPlaying(false);
+
+      // Clear any existing buffering timeout
+      if (bufferingSafetyTimeoutRef.current) {
+        clearTimeout(bufferingSafetyTimeoutRef.current);
+      }
+
+      // Set a safety timeout to clear buffering state if it gets stuck
+      // This can happen if the video source fails after initial load
+      bufferingSafetyTimeoutRef.current = setTimeout(() => {
+        console.warn("Buffering safety timeout - forcing buffering state clear");
+        setIsBuffering(false);
+        bufferingSafetyTimeoutRef.current = null;
+      }, 30000); // 30 seconds max buffering time
     };
     const handleCanPlay = () => {
+      // Clear the buffering safety timeout since we can play now
+      if (bufferingSafetyTimeoutRef.current) {
+        clearTimeout(bufferingSafetyTimeoutRef.current);
+        bufferingSafetyTimeoutRef.current = null;
+      }
       setIsBuffering(false);
       setIsLoading(false);
     };
@@ -990,6 +1119,11 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
       video.removeEventListener("waiting", handleWaiting);
       video.removeEventListener("canplay", handleCanPlay);
       video.removeEventListener("ratechange", handleRateChange);
+      // Clean up buffering safety timeout
+      if (bufferingSafetyTimeoutRef.current) {
+        clearTimeout(bufferingSafetyTimeoutRef.current);
+        bufferingSafetyTimeoutRef.current = null;
+      }
     };
   }, [playbackRate, animeId, episodeNumber, nextEpisodeUrl, preferences.autoNext, onEpisodeEnd]);
 
@@ -1415,6 +1549,8 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
         poster={poster}
         onClick={togglePlay}
         playsInline
+        crossOrigin="anonymous"
+        preload="auto"
       />
 
       {/* Loading/Buffering Overlay */}
