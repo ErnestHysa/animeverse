@@ -489,20 +489,28 @@ export function EnhancedVideoPlayer({
 
         // Track repeated non-fatal media errors to trigger fallback
         let mediaErrorCount = 0;
-        const MAX_MEDIA_ERRORS = 3; // Trigger fallback after 3 media errors
+        const MAX_MEDIA_ERRORS = 5; // Trigger fallback after 5 media errors
         let lastErrorTime = 0;
         const ERROR_RESET_TIME = 5000; // Reset counter if 5 seconds pass without errors
+        let recoveryAttempts = 0;
+        const MAX_RECOVERY_ATTEMPTS = 2;
 
         hls.on(Hls.Events.ERROR, (event, data) => {
           const now = Date.now();
 
-          console.error("HLS error:", {
-            type: data.type,
-            details: data.details,
-            fatal: data.fatal,
-            response: data.response,
-            reason: data.reason,
-          });
+          // Use warn for non-fatal errors to reduce console noise
+          if (data.fatal) {
+            console.error("HLS fatal error:", {
+              type: data.type,
+              details: data.details,
+              reason: data.reason,
+            });
+          } else {
+            console.warn("HLS non-fatal error:", {
+              type: data.type,
+              details: data.details,
+            });
+          }
 
           // Track non-fatal media parsing errors (fragParsingError, etc.)
           if (!data.fatal && data.type === Hls.ErrorTypes.MEDIA_ERROR) {
@@ -516,9 +524,17 @@ export function EnhancedVideoPlayer({
 
             console.warn(`Media error count: ${mediaErrorCount}/${MAX_MEDIA_ERRORS}`);
 
+            // Try recovery before giving up on the server
+            if (mediaErrorCount < MAX_MEDIA_ERRORS && recoveryAttempts < MAX_RECOVERY_ATTEMPTS) {
+              recoveryAttempts++;
+              console.warn(`Attempting media error recovery (attempt ${recoveryAttempts}/${MAX_RECOVERY_ATTEMPTS})`);
+              hls.recoverMediaError();
+              return;
+            }
+
             // If we hit the threshold, trigger fallback to next server
             if (mediaErrorCount >= MAX_MEDIA_ERRORS) {
-              console.error("Too many media errors, triggering server fallback");
+              console.warn("Too many media errors, triggering server fallback");
               onError?.(new Error(`Media parsing failed after ${MAX_MEDIA_ERRORS} attempts. Trying next server...`));
               // Don't try to recover - let the parent component switch servers
               return;
@@ -1408,16 +1424,16 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
           console.log("[play] Video is now ready, playing...");
           setIsLoading(false);
           video.play().catch((err) => {
-            console.error("[play] Play failed:", err);
+            console.warn("[play] Play failed:", err);
             toast("Click to play video", { icon: "🎬", duration: 2000 });
           });
         } else {
-          // Check again in 100ms (max 50 retries = 5 seconds)
-          if (retries < 50) {
+          // Check again in 100ms (max 100 retries = 10 seconds)
+          if (retries < 100) {
             retries++;
             setTimeout(checkReady, 100);
           } else {
-            console.error("[play] Gave up waiting for video to be ready");
+            console.warn("[play] Gave up waiting for video to be ready");
             setIsLoading(false);
             toast("Video failed to load. Try refreshing.", { icon: "⚠️", duration: 3000 });
           }

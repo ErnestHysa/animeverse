@@ -307,7 +307,7 @@ export function VideoSourceLoader({
     }
 
     // If we've tried all servers or it's not a media error, propagate to parent
-    console.error("[VideoSourceLoader] All servers failed or non-recoverable error");
+    console.warn("[VideoSourceLoader] All servers failed or non-recoverable error");
     onError?.(error);
   };
 
