@@ -16,18 +16,20 @@ import { AnimeGridSkeleton } from "@/components/ui/skeleton";
 // Data Fetching
 // ===================================
 
-interface SearchPageProps {
-  searchParams: {
-    q?: string;
-    sort?: string;
-    genre?: string;
-    year?: string;
-    format?: string;
-    status?: string;
-  };
+interface SearchParamsValues {
+  q?: string;
+  sort?: string;
+  genre?: string;
+  year?: string;
+  format?: string;
+  status?: string;
 }
 
-async function searchAnime(params: SearchPageProps["searchParams"]) {
+interface SearchPageProps {
+  searchParams: Promise<SearchParamsValues>;
+}
+
+async function searchAnime(params: SearchParamsValues) {
   const query = params.q;
   const sort = params.sort || "POPULARITY_DESC";
 
@@ -104,7 +106,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 }
 
 // Separate component for search results with Suspense
-async function SearchResults({ query, params }: { query: string; params: SearchPageProps["searchParams"] }) {
+async function SearchResults({ query, params }: { query: string; params: SearchParamsValues }) {
   const anime = await searchAnime(params);
 
   if (!query) {

@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useCallback, memo, useEffect, useRef } from "react";
+import { useState, useCallback, memo, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -29,6 +29,8 @@ import {
   List as ListIcon,
   Trophy,
   BarChart3,
+  BookMarked,
+  Settings2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -237,7 +239,7 @@ export const Header = memo(function Header() {
                   </button>
 
                   {userMenuOpen && (
-                    <div className="user-menu-container absolute right-0 top-full mt-2 w-48 bg-popover border border-white/10 rounded-lg shadow-xl overflow-hidden animate-fadeIn z-50">
+                    <div className="user-menu-container absolute right-0 top-full mt-2 w-52 bg-popover border border-white/10 rounded-lg shadow-xl overflow-hidden animate-fadeIn z-50">
                       <div className="p-2 border-b border-white/10">
                         <p className="text-xs text-muted-foreground px-2 py-1">
                           Signed in as
@@ -246,16 +248,37 @@ export const Header = memo(function Header() {
                           {anilistUser.name}
                         </p>
                       </div>
-                      <button
-                        onClick={() => {
-                          clearAniListAuth();
-                          setUserMenuOpen(false);
-                        }}
-                        className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-white/5 transition-colors text-left"
-                      >
-                        <LogOut className="w-4 h-4" />
-                        Logout
-                      </button>
+                      <div className="py-1">
+                        {[
+                          { href: "/profile", icon: <User className="w-4 h-4" />, label: "Profile" },
+                          { href: "/history", icon: <Clock className="w-4 h-4" />, label: "Watch History" },
+                          { href: "/watchlist", icon: <BookMarked className="w-4 h-4" />, label: "Watchlist" },
+                          { href: "/achievements", icon: <Trophy className="w-4 h-4" />, label: "Achievements" },
+                          { href: "/stats", icon: <BarChart3 className="w-4 h-4" />, label: "Stats" },
+                          { href: "/settings", icon: <Settings2 className="w-4 h-4" />, label: "Settings" },
+                        ].map((item) => (
+                          <button
+                            key={item.href}
+                            onClick={() => { router.push(item.href); setUserMenuOpen(false); }}
+                            className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-white/5 transition-colors text-left"
+                          >
+                            <span className="text-muted-foreground">{item.icon}</span>
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="border-t border-white/10">
+                        <button
+                          onClick={() => {
+                            clearAniListAuth();
+                            setUserMenuOpen(false);
+                          }}
+                          className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-white/5 transition-colors text-left text-red-400"
+                        >
+                          <LogOut className="w-4 h-4" />
+                          Logout
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>

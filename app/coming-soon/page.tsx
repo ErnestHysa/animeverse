@@ -3,11 +3,18 @@
  * Shows upcoming anime that haven't aired yet
  */
 
+export const dynamic = "force-dynamic";
+
 import { Header } from "@/components/layout/header";
+
 import { Footer } from "@/components/layout/footer";
+
 import { AnimeGrid } from "@/components/anime/anime-grid";
+
 import { anilist } from "@/lib/anilist";
+
 import { Calendar, Info } from "lucide-react";
+
 import { GlassCard } from "@/components/ui/glass-card";
 
 export const metadata = {

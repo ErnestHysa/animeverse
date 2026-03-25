@@ -2,6 +2,8 @@
  * Anime Detail Page
  * Full anime information with episodes and recommendations
  */
+export const dynamic = "force-dynamic";
+
 
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
@@ -230,37 +232,54 @@ async function InfoSection({ anime }: { anime: Media }) {
 
         {/* Episodes */}
         <GlassCard>
-          <h2 className="text-xl font-semibold mb-4">Episodes</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">Episodes</h2>
+            {anime.episodes && (
+              <span className="text-sm text-muted-foreground">{anime.episodes} episodes</span>
+            )}
+          </div>
           {anime.episodes ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-              {Array.from({ length: Math.min(anime.episodes, 24) }).map((_, i) => {
-                const epNum = i + 1;
-                return (
+            <>
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
+                {Array.from({ length: Math.min(anime.episodes, 50) }).map((_, i) => {
+                  const epNum = i + 1;
+                  return (
+                    <Link
+                      key={epNum}
+                      href={`/watch/${anime.id}/${epNum}`}
+                      className="group relative aspect-video rounded-lg overflow-hidden bg-gradient-to-br from-primary/20 to-secondary/20 hover:ring-2 hover:ring-primary transition-all"
+                    >
+                      {(anime.bannerImage || anime.coverImage?.large) ? (
+                        <ImageWithFallback
+                          src={anime.bannerImage || anime.coverImage!.large!}
+                          alt={`Episode ${epNum}`}
+                          fill
+                          className="object-cover opacity-60 group-hover:opacity-40 transition-opacity"
+                          sizes="(max-width: 768px) 33vw, 16vw"
+                        />
+                      ) : null}
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <Play className="w-6 h-6 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                      <div className="absolute bottom-0 left-0 right-0 p-1.5 bg-gradient-to-t from-black/80 to-transparent">
+                        <span className="text-xs font-medium">Ep {epNum}</span>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+              {anime.episodes > 50 && (
+                <div className="mt-4 text-center">
                   <Link
-                    key={epNum}
-                    href={`/watch/${anime.id}/${epNum}`}
-                    className="group relative aspect-video rounded-lg overflow-hidden bg-gradient-to-br from-primary/20 to-secondary/20 hover:ring-2 hover:ring-primary transition-all"
+                    href={`/watch/${anime.id}/1`}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-primary/20 hover:bg-primary/30 text-primary rounded-lg transition-colors text-sm font-medium"
                   >
-                    {/* Episode thumbnail - prefer banner, fallback to cover large, or use gradient background */}
-                    {(anime.bannerImage || anime.coverImage?.large) ? (
-                      <ImageWithFallback
-                        src={anime.bannerImage || anime.coverImage!.large!}
-                        alt={`Episode ${epNum}`}
-                        fill
-                        className="object-cover opacity-70 group-hover:opacity-50 transition-opacity"
-                        sizes="(max-width: 768px) 50vw, 20vw"
-                      />
-                    ) : null}
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Play className="w-8 h-8 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                    <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 to-transparent">
-                      <span className="text-sm font-medium">Ep {epNum}</span>
-                    </div>
+                    <Play className="w-4 h-4" />
+                    View all {anime.episodes} episodes
                   </Link>
-                );
-              })}
-            </div>
+                </div>
+              )}
+            </>
           ) : (
             <p className="text-muted-foreground">Episode information not available.</p>
           )}

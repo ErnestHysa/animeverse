@@ -2,6 +2,8 @@
  * Watch Page
  * Enhanced video player with episode list, autoplay, and navigation
  */
+export const dynamic = "force-dynamic";
+
 
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
@@ -12,9 +14,10 @@ import { ShareButton } from "@/components/player/share-dialog";
 import { ReportButton } from "@/components/player/report-dialog";
 import { KeyboardShortcutsButton } from "@/components/player/keyboard-shortcuts";
 import { ImageWithFallback } from "@/components/ui/image-with-fallback";
+import { EpisodeList } from "@/components/player/episode-list";
 import { anilist, getAnimeTitle } from "@/lib/anilist";
 import { sanitizeDescription } from "@/lib/html-sanitizer";
-import { Play, ChevronLeft, ChevronRight, Clock } from "lucide-react";
+import { Play, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import type { Media } from "@/types/anilist";
 import { Suspense } from "react";
@@ -136,62 +139,16 @@ async function VideoSection({ anime, episodeNum }: { anime: Media; episodeNum: n
   );
 }
 
-async function EpisodesList({ anime, currentEpisode }: { anime: Media; currentEpisode: number }) {
+function EpisodesList({ anime, currentEpisode }: { anime: Media; currentEpisode: number }) {
   const totalEpisodes = anime.episodes || 12;
 
   return (
-    <GlassCard className="p-4">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="font-semibold">Episodes</h2>
-        <span className="text-sm text-muted-foreground">{totalEpisodes} episodes</span>
-      </div>
-      <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-2">
-        {Array.from({ length: totalEpisodes }, (_, i) => {
-          const epNum = i + 1;
-          const isCurrent = epNum === currentEpisode;
-          const isWatched = false; // Could be determined from watch progress
-
-          return (
-            <Link
-              key={epNum}
-              href={`/watch/${anime.id}/${epNum}`}
-              className="flex items-center gap-3 p-3 rounded-lg transition-all hover:bg-white/5"
-              style={{
-                backgroundColor: isCurrent ? "rgba(139, 92, 246, 0.2)" : undefined,
-                border: isCurrent ? "1px solid rgba(139, 92, 246, 0.3)" : undefined,
-              }}
-            >
-              <div
-                className="w-8 h-8 rounded flex items-center justify-center text-sm font-medium flex-shrink-0"
-                style={{
-                  backgroundColor: isCurrent ? "rgb(139, 92, 246)" : "rgba(255, 255, 255, 0.05)",
-                  color: isCurrent ? "white" : undefined,
-                }}
-              >
-                {isWatched ? (
-                  <Clock className="w-4 h-4" />
-                ) : isCurrent ? (
-                  <Play className="w-4 h-4 fill-current" />
-                ) : (
-                  epNum
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium truncate">{isCurrent ? `Episode ${epNum}` : `Episode ${epNum}`}</p>
-                {isCurrent && (
-                  <p className="text-xs text-primary">Now Playing</p>
-                )}
-              </div>
-              {isWatched && (
-                <div className="flex-shrink-0">
-                  <div className="h-1 bg-green-500 rounded-full w-8" style={{ width: "70%" }}></div>
-                </div>
-              )}
-            </Link>
-          );
-        })}
-      </div>
-    </GlassCard>
+    <EpisodeList
+      animeId={anime.id}
+      malId={anime.idMal}
+      totalEpisodes={totalEpisodes}
+      currentEpisode={currentEpisode}
+    />
   );
 }
 

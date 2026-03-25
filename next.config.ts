@@ -1,20 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  turbopack: {
-    // Memory optimization to prevent OOM crashes
-    memoryLimit: 4096, // 4GB memory limit
-  },
-
   // Exclude client-only pages from static generation
   output: 'standalone',
 
   serverExternalPackages: ["webtorrent"],
-
-  // Cache configuration to prevent unbounded growth
-  experimental: {
-    // Optimize webpack/Turbopack cache behavior
-    incrementalCacheHandlerPath: undefined,
-  },
 
   images: {
     remotePatterns: [

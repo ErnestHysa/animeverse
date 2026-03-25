@@ -10,6 +10,7 @@ import { MessageSquare, ThumbsUp, ThumbsDown, Reply, User, Star } from "lucide-r
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
 import { toast } from "react-hot-toast";
+import { useAniListAuth } from "@/store";
 
 interface Comment {
   id: string;
@@ -54,6 +55,7 @@ export function CommentsSection({ animeId, animeTitle }: CommentsSectionProps) {
   const [userRating, setUserRating] = useState(0);
   const [sortBy, setSortBy] = useState<"recent" | "top">("recent");
   const currentTime = useCurrentTime(); // Hook that updates every minute
+  const { anilistUser, isAuthenticated } = useAniListAuth();
 
   // Load comments from localStorage
   useEffect(() => {
@@ -87,7 +89,8 @@ export function CommentsSection({ animeId, animeTitle }: CommentsSectionProps) {
       id: Date.now().toString(),
       animeId,
       user: {
-        name: "Anonymous", // In production, get from auth
+        name: isAuthenticated && anilistUser ? anilistUser.name : "Anonymous",
+        avatar: isAuthenticated && anilistUser ? anilistUser.avatar?.medium : undefined,
       },
       content: newComment,
       rating: userRating || undefined,
