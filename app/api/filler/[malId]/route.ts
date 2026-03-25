@@ -38,9 +38,13 @@ export async function GET(
     clearTimeout(timeoutId);
 
     if (!response.ok) {
+      // Service returned an error — return empty filler data gracefully
       return NextResponse.json(
-        { error: "Filler data not found" },
-        { status: response.status }
+        { episodes: [], fillerCount: 0, available: false },
+        {
+          status: 200,
+          headers: { "Cache-Control": "public, max-age=3600" },
+        }
       );
     }
 
@@ -52,12 +56,18 @@ export async function GET(
       },
     });
   } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      return NextResponse.json({ error: "Request timeout" }, { status: 504 });
-    }
+    // Service unavailable (timeout, network error, etc.) — return empty data gracefully
+    const isTimeout = error instanceof Error && error.name === "AbortError";
+    console.warn(
+      `Filler API unavailable for MAL ID ${malId}:`,
+      isTimeout ? "timeout" : (error instanceof Error ? error.message : error)
+    );
     return NextResponse.json(
-      { error: "Failed to fetch filler data" },
-      { status: 502 }
+      { episodes: [], fillerCount: 0, available: false },
+      {
+        status: 200,
+        headers: { "Cache-Control": "public, max-age=3600" },
+      }
     );
   }
 }

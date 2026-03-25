@@ -118,6 +118,7 @@ async function VideoSection({ anime, episodeNum }: { anime: Media; episodeNum: n
         malId={anime.idMal || null}
         poster={anime.coverImage?.extraLarge || undefined}
         nextEpisodeUrl={hasNext ? `/watch/${anime.id}/${episodeNum + 1}` : undefined}
+        prevEpisodeUrl={hasPrev ? `/watch/${anime.id}/${episodeNum - 1}` : undefined}
       />
 
       {/* Episode Info & Actions */}

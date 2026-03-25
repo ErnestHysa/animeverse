@@ -342,7 +342,6 @@ export default function SettingsPage() {
       }
 
       toast.error(`Authentication failed: ${errorDetails}`, { duration: 8000 });
-      console.error("OAuth Error Details:", { message, debug, errorDetails });
       window.history.replaceState({}, "", "/settings");
     }
   }, [isAuthenticated, anilistUser, anilistToken, setAniListAuth, fetchAniListData]);
@@ -352,12 +351,6 @@ export default function SettingsPage() {
   const handleAniListLogin = () => {
     const redirectUri = `${window.location.origin}/auth/anilist/callback`;
     const authUrl = `https://anilist.co/api/v2/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
-
-    // Debug: show what redirect URI is being used
-    console.log('OAuth Login Initiated');
-    console.log('Client ID:', clientId);
-    console.log('Redirect URI:', redirectUri);
-    console.log('Auth URL:', authUrl);
 
     // Show toast with expected redirect URI for verification
     toast(`Redirecting to AniList...\n\nMake sure your AniList app has this redirect URL:\n${redirectUri}`, {

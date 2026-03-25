@@ -137,12 +137,26 @@ export const AnimeCard = memo(function AnimeCard({
               AIRING
             </div>
           )}
+
+          {/* Format Badge */}
+          {anime.format && (
+            <span className="px-1.5 py-0.5 bg-black/70 text-white text-xs rounded font-medium">
+              {anime.format.replace("_", " ")}
+            </span>
+          )}
         </div>
 
         {/* Episode Badge */}
         <div className="absolute top-2 right-2 px-2 py-1 bg-black/60 backdrop-blur-sm rounded-full text-xs font-medium text-white">
           {episodes}
         </div>
+
+        {/* Episode count overlay badge (bottom right, shown when no rating) */}
+        {!anime.averageScore && anime.episodes && (
+          <span className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/70 text-white text-xs rounded">
+            {anime.episodes} ep
+          </span>
+        )}
 
         {/* Language Badge (bottom left) */}
         {showLanguageBadge && (

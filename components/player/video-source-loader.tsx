@@ -20,6 +20,7 @@ interface VideoSourceLoaderProps {
   malId?: number | null;
   poster?: string;
   nextEpisodeUrl?: string;
+  prevEpisodeUrl?: string;
   onError?: (error: Error) => void;
   onEpisodeEnd?: () => void;
 }
@@ -38,6 +39,7 @@ export function VideoSourceLoader({
   malId,
   poster,
   nextEpisodeUrl,
+  prevEpisodeUrl,
   onError,
   onEpisodeEnd,
 }: VideoSourceLoaderProps) {
@@ -476,6 +478,7 @@ export function VideoSourceLoader({
         episodeNumber={episodeNumber}
         malId={malId}
         nextEpisodeUrl={nextEpisodeUrl}
+        prevEpisodeUrl={prevEpisodeUrl}
         onError={handleVideoError}
         onEpisodeEnd={onEpisodeEnd}
         allServers={allServers}
