@@ -174,8 +174,13 @@ export async function GET(request: NextRequest) {
           // Convert relative URLs to absolute first
           let absoluteUrl = urlMatch;
           if (!urlMatch.startsWith("http://") && !urlMatch.startsWith("https://")) {
-            // Relative URL - make it absolute
-            absoluteUrl = baseUrlString + urlMatch;
+            if (urlMatch.startsWith("/")) {
+              // Root-relative URL (e.g. /segments/001.ts) - prepend origin only
+              absoluteUrl = baseUrl.origin + urlMatch;
+            } else {
+              // Path-relative URL (e.g. segment001.ts) - prepend base path
+              absoluteUrl = baseUrlString + urlMatch;
+            }
           }
 
           // Build proxy URL with referer if available

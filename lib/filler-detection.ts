@@ -32,10 +32,10 @@ export async function getFillerData(malId: number): Promise<FillerData | null> {
     const cached = getCachedFillerData(malId);
     if (cached) return cached;
 
-    // Fetch from API
-    const url = `https://api.animefillerlist.com/v1/anime/${malId}`;
+    // Fetch via server-side proxy to avoid CORS issues
+    const url = `/api/filler/${malId}`;
     const response = await fetch(url, {
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(12000),
     });
 
     if (!response.ok) {
@@ -48,8 +48,8 @@ export async function getFillerData(malId: number): Promise<FillerData | null> {
     cacheFillerData(malId, data);
 
     return data;
-  } catch (error) {
-    console.error("Error fetching filler data:", error);
+  } catch {
+    // Silently fail - filler detection is optional
     return null;
   }
 }
