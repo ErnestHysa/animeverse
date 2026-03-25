@@ -4,7 +4,7 @@
  */
 import { chromium } from '@playwright/test';
 
-async function warmupPage(page: Awaited<ReturnType<typeof import('@playwright/test').chromium.newPage>>, url: string) {
+async function warmupPage(page: import('@playwright/test').Page, url: string) {
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 120000 });
     await page.waitForTimeout(2000);
