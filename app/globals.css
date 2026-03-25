@@ -86,9 +86,9 @@
   --radius-2xl: 1.5rem;
   --radius-full: 9999px;
 
-  /* Custom Fonts */
-  --font-display: "Space Grotesk", system-ui, sans-serif;
-  --font-body: "Plus Jakarta Sans", system-ui, sans-serif;
+  /* Custom Fonts - using system fonts since Google Fonts are unavailable */
+  --font-display: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-body: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 /* Light Theme */

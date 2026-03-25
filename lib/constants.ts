@@ -6,7 +6,7 @@
 // API Configuration
 // ===================================
 
-export const ANILIST_API_URL = "https://graphql.anilist.co";
+export const ANILIST_API_URL = process.env.ANILIST_GRAPHQL_URL || "https://graphql.anilist.co";
 
 export const API_CONFIG = {
   anilist: {
