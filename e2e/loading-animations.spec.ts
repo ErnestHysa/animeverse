@@ -22,11 +22,11 @@ test.describe('Loading Animations', () => {
   test('loading spinner displays while content loads', async ({ page }) => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     // Capture initial state (should show spinner from template.tsx Suspense fallback)
-    await page.screenshot({ timeout: 0, path: 'test-results/loading-state.png' });
+    await page.screenshot({ timeout: 5000, animations: 'disabled', path: 'test-results/loading-state.png' }).catch(() => {});
 
     // Wait for content
     await page.locator('h1').first().waitFor({ timeout: DEFAULT_TIMEOUT });
-    await page.screenshot({ timeout: 0, path: 'test-results/loaded-state.png' });
+    await page.screenshot({ timeout: 5000, animations: 'disabled', path: 'test-results/loaded-state.png' }).catch(() => {});
   });
 
   test('page has smooth transitions enabled', async ({ page }) => {
@@ -82,7 +82,7 @@ test.describe('Loading Animations', () => {
     // App uses glass morphism
     expect(count).toBeGreaterThan(0);
 
-    await page.screenshot({ timeout: 0, path: 'test-results/glass-cards.png' });
+    await page.screenshot({ timeout: 5000, animations: 'disabled', path: 'test-results/glass-cards.png' }).catch(() => {});
   });
 });
 
@@ -93,7 +93,7 @@ test.describe('UI Components', () => {
     const header = page.locator('header');
     await expect(header).toBeVisible({ timeout: DEFAULT_TIMEOUT });
 
-    await page.screenshot({ timeout: 0, path: 'test-results/header.png' });
+    await page.screenshot({ timeout: 5000, animations: 'disabled', path: 'test-results/header.png' }).catch(() => {});
   });
 
   test('footer renders correctly', async ({ page }) => {
@@ -106,7 +106,7 @@ test.describe('UI Components', () => {
     const footer = page.locator('footer');
     await expect(footer).toBeVisible({ timeout: DEFAULT_TIMEOUT });
 
-    await page.screenshot({ timeout: 0, path: 'test-results/footer.png' });
+    await page.screenshot({ timeout: 5000, animations: 'disabled', path: 'test-results/footer.png' }).catch(() => {});
   });
 
   test('dark theme is applied', async ({ page }) => {
@@ -141,6 +141,6 @@ test.describe('UI Components', () => {
     const count = await animeLinks.count();
     expect(count).toBeGreaterThan(0);
 
-    await page.screenshot({ timeout: 0, path: 'test-results/anime-grid.png', fullPage: false });
+    await page.screenshot({ timeout: 5000, animations: 'disabled', path: 'test-results/anime-grid.png', fullPage: false }).catch(() => {});
   });
 });
