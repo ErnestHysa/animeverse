@@ -1330,10 +1330,31 @@ export async function GET(
     ];
 
     // ============================================
+    // Quick Consumet API health check
+    // If Consumet is unavailable, skip all providers and return fallback immediately
+    // This prevents 10s+ timeouts from external API calls (Jikan etc.)
+    // ============================================
+    let consumetAvailable = false;
+    if (title) {
+      try {
+        const healthCtrl = new AbortController();
+        const healthTid = setTimeout(() => healthCtrl.abort(), 2000);
+        const healthResp = await fetch(`${API_BASE_URL}/`, { signal: healthCtrl.signal });
+        clearTimeout(healthTid);
+        consumetAvailable = healthResp.ok;
+      } catch {
+        consumetAvailable = false;
+      }
+      if (!consumetAvailable) {
+        console.log(`[Video Sources] Consumet API unavailable at ${API_BASE_URL}, using fallback immediately`);
+      }
+    }
+
+    // ============================================
     // Try AnimeSaturn first (primary provider)
     // AnimeSaturn's CDN (nezumi.streampeaker.org) works with HLS proxy
     // ============================================
-    if (title && sources.length === 0) {
+    if (consumetAvailable && title && sources.length === 0) {
       console.log(`[Video Sources] Trying AnimeSaturn provider (primary)...`);
 
       const animeSaturnData = await searchAnimeSaturnId(
@@ -1373,7 +1394,7 @@ export async function GET(
     // ============================================
     // Fallback to AnimeKai if AnimeSaturn failed
     // ============================================
-    if (title && sources.length === 0) {
+    if (consumetAvailable && title && sources.length === 0) {
       console.log(`[Video Sources] AnimeSaturn failed, trying AnimeKai fallback...`);
 
       const animeKaiData = await searchAnimeKaiId(
@@ -1413,7 +1434,7 @@ export async function GET(
     // ============================================
     // Fallback to AnimePahe if AnimeKai failed
     // ============================================
-    if (title && sources.length === 0) {
+    if (consumetAvailable && title && sources.length === 0) {
       console.log(`[Video Sources] AnimeKai failed, trying AnimePahe fallback...`);
 
       let animePaheId: string | null = null;

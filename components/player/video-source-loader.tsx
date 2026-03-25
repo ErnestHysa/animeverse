@@ -194,7 +194,7 @@ export function VideoSourceLoader({
         quality: defaultSource.quality,
         provider: data.provider,
         hasReferer: !!data.referer,
-        needsProxy: !!data.referer || !sourceUrl.includes(window.location.hostname),
+        needsProxy: !!data.referer,
       });
       setSources({
         type: "direct",

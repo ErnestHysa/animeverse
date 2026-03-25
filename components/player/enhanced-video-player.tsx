@@ -367,8 +367,10 @@ export function EnhancedVideoPlayer({
         return proxyUrl;
       };
 
-      // Determine if we need to use proxy (has referer or external domain)
-      const needsProxy = source.referer || !source.url.includes(window.location.hostname);
+      // Determine if we need to use proxy
+      // Only proxy when a CDN referer is required (to bypass CDN access controls)
+      // Do NOT proxy just because the URL is external — that breaks public CDN fallback videos
+      const needsProxy = !!source.referer;
 
       if (isHls && typeof Hls !== "undefined" && Hls.isSupported()) {
         // Use HLS.js for browsers that don't support HLS natively
