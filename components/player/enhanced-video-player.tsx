@@ -136,7 +136,9 @@ export function EnhancedVideoPlayer({
   const [isBuffering, setIsBuffering] = useState(false);
   const [bufferProgress, setBufferProgress] = useState(0);
   const [hlsReady, setHlsReady] = useState(false);
-  const [userInitiatedPlay, setUserInitiatedPlay] = useState(false);
+  // Use a ref so the HLS event-handler closures always read the latest value
+  // (avoids the stale-closure bug where clicking play before MANIFEST_PARSED had no effect)
+  const userInitiatedPlayRef = useRef(false);
 
   // Throttled time update to improve performance
   const lastTimeUpdateRef = useRef(0);
@@ -296,7 +298,7 @@ export function EnhancedVideoPlayer({
     setIsLoading(true);
     setIsBuffering(false);
     setHlsReady(false); // Reset HLS ready state
-    setUserInitiatedPlay(false); // Reset user initiated play state
+    userInitiatedPlayRef.current = false; // Reset user initiated play state
 
     // Timeout fallback to prevent infinite loading
     const loadingTimeout = setTimeout(() => {
@@ -457,8 +459,9 @@ export function EnhancedVideoPlayer({
           setHlsReady(true);
 
           // Play if autoplay is enabled OR if user initiated playback
-          if (preferences.autoplay || userInitiatedPlay) {
-            console.log("[HLS] Starting playback (autoplay:", preferences.autoplay, "userInitiated:", userInitiatedPlay, ")");
+          // userInitiatedPlayRef is a ref so we always read the current value (no stale closure)
+          if (preferences.autoplay || userInitiatedPlayRef.current) {
+            console.log("[HLS] Starting playback (autoplay:", preferences.autoplay, "userInitiated:", userInitiatedPlayRef.current, ")");
             play().catch(() => {});
           }
         });
@@ -478,7 +481,7 @@ export function EnhancedVideoPlayer({
         hls.on(Hls.Events.FRAG_LOADED, (event, data) => {
           console.log("[HLS] Fragment loaded:", data);
           // If user initiated play and we have the first fragment, try to play
-          if (userInitiatedPlay && video.paused && video.readyState >= 2) {
+          if (userInitiatedPlayRef.current && video.paused && video.readyState >= 2) {
             console.log("[HLS] Fragment loaded and user wants to play, starting playback...");
             video.play().catch(() => {});
           }
@@ -799,7 +802,14 @@ export function EnhancedVideoPlayer({
 
             // Track references for enabling
             if (index === 0) firstTrack = track;
-            if (sub.lang === "en" || sub.label.toLowerCase().includes("english")) {
+            const langCode = (sub.lang || "").toLowerCase();
+            const labelLower = sub.label.toLowerCase();
+            if (
+              langCode === "en" ||
+              langCode.startsWith("en-") ||
+              langCode === "eng" ||
+              labelLower.includes("english")
+            ) {
               englishTrack = track;
             }
 
@@ -1355,8 +1365,8 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
 
     console.log("[play] Called - video.paused:", video.paused, "hlsReady:", hlsReady, "hls exists:", !!hls, "readyState:", video.readyState);
 
-    // Mark that user initiated playback
-    setUserInitiatedPlay(true);
+    // Mark that user initiated playback (ref so HLS event handlers see the current value immediately)
+    userInitiatedPlayRef.current = true;
 
     // Check if HLS is being used but not ready yet
     if (hls && !hlsReady) {

@@ -159,7 +159,8 @@ export async function GET(request: NextRequest) {
         const proxyBaseUrl = `${requestUrl.protocol}//${requestUrl.host}/api/proxy-hls`;
 
         // Helper function to rewrite a URL to go through the proxy
-        const rewriteUrl = (urlMatch: string): string => {
+        // urlType controls whether the proxy rewrites URLs inside the response ("manifest") or streams it ("segment")
+        const rewriteUrl = (urlMatch: string, urlType: string = "segment"): string => {
           // Skip comments and empty lines
           if (urlMatch.startsWith("#") || !urlMatch.trim()) {
             return urlMatch;
@@ -178,7 +179,8 @@ export async function GET(request: NextRequest) {
           }
 
           // Build proxy URL with referer if available
-          let proxyUrl = `${proxyBaseUrl}?url=${encodeURIComponent(absoluteUrl)}&type=segment`;
+          // NOTE: pass the full URL (including any query params) encoded in the `url` param
+          let proxyUrl = `${proxyBaseUrl}?url=${encodeURIComponent(absoluteUrl)}&type=${urlType}`;
           if (customReferer) {
             proxyUrl += `&referer=${encodeURIComponent(customReferer)}`;
           }
@@ -209,25 +211,20 @@ export async function GET(request: NextRequest) {
               return line;
             }
 
+            // Check for .m3u8 sub-manifests first - proxy as "manifest" so their
+            // internal segment URLs also get rewritten (prevents CORS failures)
+            if (trimmed.endsWith(".m3u8") || trimmed.includes(".m3u8?")) {
+              return rewriteUrl(trimmed, "manifest");
+            }
+
             // Check if this line is a segment URL or key file
             // CRITICAL: Must include .key files for DRM-encrypted streams!
             // CRITICAL: Must include image files (.jpg, .png, .webp) for thumbnail segments!
+            // Pass the full line (including any query-string tokens) so they're
+            // encoded inside the proxy `url` param, not appended after it.
             const segmentPattern = /(\.ts|\.m4s|\.mp4|\.key|\.jpg|\.jpeg|\.png|\.webp)(\?|$)/;
             if (segmentPattern.test(trimmed)) {
-              // Extract the URL part (in case there are params after)
-              const urlMatch = trimmed.split("?")[0];
-              const params = trimmed.includes("?") ? "?" + trimmed.split("?")[1] : "";
-              return rewriteUrl(urlMatch) + params;
-            }
-
-            // Check for .m3u8 (sub-manifests) - also proxy these
-            if (
-              trimmed.endsWith(".m3u8") ||
-              trimmed.includes(".m3u8?")
-            ) {
-              const urlMatch = trimmed.split("?")[0];
-              const params = trimmed.includes("?") ? "?" + trimmed.split("?")[1] : "";
-              return rewriteUrl(urlMatch) + params;
+              return rewriteUrl(trimmed);
             }
 
             return line;
