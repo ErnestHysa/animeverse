@@ -57,7 +57,9 @@ export default defineConfig({
       timeout: 10000,
     },
     {
-      command: 'ANILIST_GRAPHQL_URL=http://localhost:4000 npm run dev:next',
+      command: process.platform === 'win32'
+        ? 'cmd /c "set ANILIST_GRAPHQL_URL=http://localhost:4000&& npm run dev:next"'
+        : 'ANILIST_GRAPHQL_URL=http://localhost:4000 npm run dev:next',
       url: 'http://localhost:3000',
       reuseExistingServer: !process.env.CI,
       timeout: 120000,
