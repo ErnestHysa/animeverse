@@ -20,7 +20,7 @@ test.describe('Loading Animations', () => {
   });
 
   test('loading spinner displays while content loads', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
     // Capture initial state (should show spinner from template.tsx Suspense fallback)
     await page.screenshot({ timeout: 0, path: 'test-results/loading-state.png' });
 
@@ -98,13 +98,13 @@ test.describe('UI Components', () => {
 
   test('footer renders correctly', async ({ page }) => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
-    await page.locator('h1').first().waitFor({ timeout: DEFAULT_TIMEOUT });
+    await page.locator('header').waitFor({ timeout: DEFAULT_TIMEOUT });
 
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
     await page.waitForTimeout(500);
 
     const footer = page.locator('footer');
-    await expect(footer).toBeVisible({ timeout: 15000 });
+    await expect(footer).toBeVisible({ timeout: DEFAULT_TIMEOUT });
 
     await page.screenshot({ timeout: 0, path: 'test-results/footer.png' });
   });

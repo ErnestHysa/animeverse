@@ -71,15 +71,15 @@ test.describe('Home Page', () => {
   test('should display footer', async ({ page }) => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
 
-    // Wait for page to load first
-    await page.locator('h1').first().waitFor({ timeout: DEFAULT_TIMEOUT });
+    // Wait for header to confirm page structure is loaded
+    await page.locator('header').waitFor({ timeout: DEFAULT_TIMEOUT });
 
     // Scroll to footer
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(500);
 
     const footer = page.locator('footer');
-    await expect(footer).toBeVisible({ timeout: 15000 });
+    await expect(footer).toBeVisible({ timeout: DEFAULT_TIMEOUT });
 
     await page.screenshot({ timeout: 0, path: 'test-results/05-footer.png' });
   });
