@@ -166,7 +166,7 @@ export function EnhancedVideoPlayer({
   });
   const [currentLanguage, setCurrentLanguage] = useState(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("preferred-language") || "sub";
+      return localStorage.getItem(`preferred-language-${animeId}`) || localStorage.getItem("preferred-language") || "sub";
     }
     return "sub";
   });
@@ -1731,6 +1731,67 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
   }, [volume]);
 
   // ===================================
+  // Media Session API
+  // ===================================
+
+  // Media Session API — lock screen / notification controls
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: episodeNumber ? `Episode ${episodeNumber}` : (animeTitle || 'Anime'),
+      artist: animeTitle || '',
+      album: 'AnimeVerse',
+      artwork: poster ? [
+        { src: poster, sizes: '512x512', type: 'image/jpeg' }
+      ] : [],
+    });
+
+    navigator.mediaSession.setActionHandler('play', () => {
+      videoRef.current?.play().catch(() => {});
+    });
+    navigator.mediaSession.setActionHandler('pause', () => {
+      videoRef.current?.pause();
+    });
+    navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+      if (videoRef.current) {
+        videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - (details.seekOffset || 10));
+      }
+    });
+    navigator.mediaSession.setActionHandler('seekforward', (details) => {
+      if (videoRef.current) {
+        videoRef.current.currentTime = Math.min(videoRef.current.duration || Infinity, videoRef.current.currentTime + (details.seekOffset || 10));
+      }
+    });
+    navigator.mediaSession.setActionHandler('previoustrack', prevEpisodeUrl ? () => {
+      window.location.href = prevEpisodeUrl;
+    } : null);
+    navigator.mediaSession.setActionHandler('nexttrack', nextEpisodeUrl ? () => {
+      goToNextEpisode();
+    } : null);
+  }, [animeTitle, episodeNumber, poster, nextEpisodeUrl, prevEpisodeUrl]);
+
+  // Update Media Session position state when time changes
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator) || !duration) return;
+    try {
+      navigator.mediaSession.setPositionState({
+        duration,
+        playbackRate: playbackRate,
+        position: currentTime,
+      });
+    } catch {
+      // setPositionState may throw in some browsers
+    }
+  }, [currentTime, duration, playbackRate]);
+
+  // Sync media session playback state
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+    navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+  }, [isPlaying]);
+
+  // ===================================
   // Fullscreen Change Handler
   // ===================================
 
@@ -2056,6 +2117,9 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
                 onLanguageChange={(langId) => {
                   setCurrentLanguage(langId);
                   localStorage.setItem("preferred-language", langId);
+                  if (animeId) {
+                    localStorage.setItem(`preferred-language-${animeId}`, langId);
+                  }
                   onLanguageChange?.(langId);
                 }}
               />
