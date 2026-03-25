@@ -49,9 +49,38 @@ interface PageProps {
   }>;
 }
 
-async function getAnimeData(id: string) {
-  const result = await anilist.getById(parseInt(id));
-  return result.data?.Media;
+async function getAnimeData(id: string): Promise<Media | null> {
+  try {
+    const result = await anilist.getById(parseInt(id));
+    return result.data?.Media ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Minimal placeholder used when AniList is unreachable */
+function makeStubAnime(animeId: string): Media {
+  const id = parseInt(animeId, 10) || 0;
+  return {
+    id,
+    idMal: null,
+    title: { english: null, romaji: `Anime #${id}`, native: null },
+    description: null,
+    coverImage: { large: null, extraLarge: null, color: null },
+    bannerImage: null,
+    episodes: 99,
+    format: "TV",
+    status: "RELEASING",
+    seasonYear: null,
+    season: null,
+    genres: [],
+    averageScore: null,
+    popularity: null,
+    studios: null,
+    nextAiringEpisode: null,
+    relations: null,
+    recommendations: null,
+  } as unknown as Media;
 }
 
 // ===================================
@@ -251,26 +280,9 @@ async function RecommendedSection({ animeId }: { animeId: number }) {
 
 export default async function WatchPage({ params }: PageProps) {
   const { animeId, episode } = await params;
-  const anime = await getAnimeData(animeId);
+  // Fall back to a stub when AniList is unreachable so the player still renders
+  const anime = (await getAnimeData(animeId)) ?? makeStubAnime(animeId);
   const episodeNum = parseInt(episode, 10);
-
-  if (!anime) {
-    return (
-      <>
-        <Header />
-        <main className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <h1 className="text-2xl font-semibold mb-2">Anime Not Found</h1>
-            <p className="text-muted-foreground mb-4">
-              The anime you&apos;re looking for doesn&apos;t exist.
-            </p>
-            <LinkButton href="/">Go Home</LinkButton>
-          </div>
-        </main>
-        <Footer />
-      </>
-    );
-  }
 
   const totalEpisodes = anime.episodes || 12;
 
@@ -337,14 +349,7 @@ export default async function WatchPage({ params }: PageProps) {
 
 export async function generateMetadata({ params }: PageProps) {
   const { animeId, episode } = await params;
-  const anime = await getAnimeData(animeId);
-
-  if (!anime) {
-    return {
-      title: "Not Found",
-    };
-  }
-
+  const anime = (await getAnimeData(animeId)) ?? makeStubAnime(animeId);
   const title = getAnimeTitle(anime);
 
   return {

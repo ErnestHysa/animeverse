@@ -1483,28 +1483,28 @@ export async function GET(
     if (sources.length === 0) {
       console.log(`[Video Search] No sources found, returning fallback demo video`);
 
-      // Fallback demo video (Big Buck Bunny - reliable public domain video)
+      // Fallback demo video (self-hosted, no external dependency)
       const fallbackSources = [
         {
-          url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+          url: "/demo.webm",
           quality: "auto" as const,
           label: "Auto (Demo)",
           provider: "fallback",
-          type: "mp4" as const,
+          type: "webm" as const,
         },
         {
-          url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+          url: "/demo.webm",
           quality: "720p" as const,
           label: "720p (Demo)",
           provider: "fallback",
-          type: "mp4" as const,
+          type: "webm" as const,
         },
         {
-          url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+          url: "/demo.webm",
           quality: "480p" as const,
           label: "480p (Demo)",
           provider: "fallback",
-          type: "mp4" as const,
+          type: "webm" as const,
         },
       ];
 
@@ -1543,11 +1543,11 @@ export async function GET(
     // Return fallback demo video on error (production-ready behavior)
     const fallbackSources = [
       {
-        url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+        url: "/demo.webm",
         quality: "auto" as const,
         label: "Auto (Demo)",
         provider: "fallback",
-        type: "mp4" as const,
+        type: "webm" as const,
       },
     ];
 

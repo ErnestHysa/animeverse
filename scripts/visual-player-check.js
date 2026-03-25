@@ -12,6 +12,29 @@ const fs = require('fs');
 const OUT = path.join(__dirname, '..', 'test-results', 'visual-check');
 fs.mkdirSync(OUT, { recursive: true });
 
+// Ensure demo.webm exists (generated from Playwright test recordings)
+const DEMO_WEBM = path.join(__dirname, '..', 'public', 'demo.webm');
+const PLAYWRIGHT_WEBM = path.join(__dirname, '..', 'test-results',
+  'user-journey-Journey-1-New-a7445-Watch-Now-from-anime-detail-chromium', 'video.webm');
+
+if (!fs.existsSync(DEMO_WEBM)) {
+  if (fs.existsSync(PLAYWRIGHT_WEBM)) {
+    // Extract just the first VP8 frame from the Playwright recording to create a tiny demo video
+    const { execSync } = require('child_process');
+    try {
+      execSync(`python3 ${path.join(__dirname, 'generate-demo-video.py')}`, { stdio: 'inherit' });
+    } catch {
+      // Fallback: just copy the full webm if the generator fails
+      fs.copyFileSync(PLAYWRIGHT_WEBM, DEMO_WEBM);
+      console.log('  ℹ️  Copied Playwright recording as demo.webm');
+    }
+  } else {
+    console.log('  ⚠️  No demo.webm and no Playwright recording found — video may not play locally');
+  }
+} else {
+  console.log(`  ✅ demo.webm exists (${(fs.statSync(DEMO_WEBM).size / 1024).toFixed(1)} KB)`);
+}
+
 async function shot(page, name) {
   const file = path.join(OUT, `${name}.png`);
   try {
