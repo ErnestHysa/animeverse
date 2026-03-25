@@ -58,7 +58,7 @@ export function ReportDialog({
         animeId: animeId || 0,
         episodeNumber: episodeNumber || 0,
         source: "main",
-        issue: selectedIssue,
+        issue: description ? `${selectedIssue}: ${description}` : selectedIssue,
       });
 
       setSubmitted(true);

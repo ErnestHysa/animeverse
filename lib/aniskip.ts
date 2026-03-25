@@ -31,6 +31,7 @@ export type SkipType = "op" | "ed" | "mixed-op" | "mixed-ed" | "recap";
 export interface IntroOutroTimestamps {
   intro?: { start: number; end: number };
   outro?: { start: number; end: number };
+  recap?: { start: number; end: number };
 }
 
 // ===================================
@@ -138,10 +139,8 @@ export function clearCustomTimestamps(animeId: number, episodeNumber: number): v
 // AniSkip API
 // ===================================
 
-const ANISKIP_BASE_URL = "https://api.aniskip.com/v2";
-
 /**
- * Fetch skip times from AniSkip API
+ * Fetch skip times from AniSkip API (via server-side proxy to avoid CORS)
  */
 export async function fetchSkipTimes(
   malId: number,
@@ -151,7 +150,7 @@ export async function fetchSkipTimes(
     episodeLength?: number;
   } = {}
 ): Promise<AniSkipResponse> {
-  const { types = ["op", "ed", "mixed-op", "mixed-ed"], episodeLength = 0 } = options;
+  const { types = ["op", "ed", "mixed-op", "mixed-ed", "recap"], episodeLength = 0 } = options;
 
   // Build query parameters
   const params = new URLSearchParams();
@@ -160,7 +159,10 @@ export async function fetchSkipTimes(
     params.append("episodeLength", episodeLength.toString());
   }
 
-  const url = `${ANISKIP_BASE_URL}/skip-times/${malId}/${episodeNumber}?${params.toString()}`;
+  // Use our server-side proxy to avoid CORS restrictions when called from the browser
+  const isClient = typeof window !== "undefined";
+  const baseUrl = isClient ? "" : (process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000");
+  const url = `${baseUrl}/api/aniskip/${malId}/${episodeNumber}?${params.toString()}`;
 
   try {
     const response = await fetch(url, {
@@ -213,6 +215,13 @@ function parseSkipResults(results: SkipResult[]): IntroOutroTimestamps {
       // For outros, use the last one (closest to end)
       if (!timestamps.outro || endTime > timestamps.outro.end) {
         timestamps.outro = { start: Math.floor(startTime), end: Math.ceil(endTime) };
+      }
+    }
+
+    // Recap types
+    if (skipType === "recap") {
+      if (!timestamps.recap || startTime < timestamps.recap.start) {
+        timestamps.recap = { start: Math.floor(startTime), end: Math.ceil(endTime) };
       }
     }
   }

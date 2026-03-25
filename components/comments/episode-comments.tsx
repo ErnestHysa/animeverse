@@ -164,6 +164,7 @@ export function EpisodeComments({
                   className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 focus:border-primary focus:outline-none resize-none"
                   rows={3}
                   autoFocus
+                  suppressHydrationWarning
                 />
                 <div className="flex gap-2 mt-2">
                   <button
@@ -238,6 +239,7 @@ export function EpisodeComments({
           placeholder="Share your thoughts about this episode..."
           className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 focus:border-primary focus:outline-none resize-none"
           rows={3}
+          suppressHydrationWarning
         />
 
         <div className="flex items-center justify-between mt-3">

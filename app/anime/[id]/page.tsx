@@ -290,21 +290,29 @@ async function InfoSection({ anime }: { anime: Media }) {
           <GlassCard>
             <h2 className="text-xl font-semibold mb-4">Characters</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-              {anime.characters.edges.map((edge) => (
-                <div key={edge.node.id} className="text-center">
-                  <div className="relative aspect-square rounded-lg overflow-hidden bg-muted mb-2">
-                    <ImageWithFallback
-                      src={edge.node.image.large}
-                      alt={edge.node.name.full}
-                      fill
-                      className="object-cover"
-                      sizes="(max-width: 768px) 50vw, 25vw"
-                    />
+              {anime.characters.edges.slice(0, 8).map((edge) => {
+                const va = edge.voiceActors?.[0];
+                return (
+                  <div key={edge.node.id} className="text-center">
+                    <div className="relative aspect-square rounded-lg overflow-hidden bg-muted mb-2">
+                      <ImageWithFallback
+                        src={edge.node.image.medium || edge.node.image.large}
+                        alt={edge.node.name.full}
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 50vw, 25vw"
+                      />
+                    </div>
+                    <p className="text-sm font-medium truncate">{edge.node.name.full}</p>
+                    <p className="text-xs text-muted-foreground truncate">{edge.role}</p>
+                    {va && (
+                      <p className="text-xs text-muted-foreground/70 truncate mt-0.5">
+                        CV: {va.name.full}
+                      </p>
+                    )}
                   </div>
-                  <p className="text-sm font-medium truncate">{edge.node.name.full}</p>
-                  <p className="text-xs text-muted-foreground">{edge.role}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </GlassCard>
         )}
@@ -573,15 +581,31 @@ export async function generateMetadata({ params }: PageProps) {
   }
 
   const title = getAnimeTitle(anime);
-  const description = sanitizeDescription(anime.description?.slice(0, 160)) || `Watch ${title} online.`;
+  const description = anime.description
+    ? sanitizeDescription(anime.description).slice(0, 200)
+    : `Watch ${title} online`;
 
   return {
     title,
     description,
     openGraph: {
-      title,
+      title: `${title} - AnimeVerse`,
       description,
-      images: [getAnimeCover(anime)],
+      images: [
+        {
+          url: anime.coverImage?.extraLarge || anime.coverImage?.large || '',
+          width: 460,
+          height: 650,
+          alt: title,
+        },
+      ],
+      type: 'video.tv_show',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${title} - AnimeVerse`,
+      description,
+      images: [anime.coverImage?.extraLarge || anime.coverImage?.large || ''],
     },
   };
 }

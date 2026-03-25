@@ -7,8 +7,8 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { memo, useState, useEffect } from "react";
-import { Star, Play, Zap } from "lucide-react";
+import { memo, useState, useEffect, useRef } from "react";
+import { Star, Play, Zap, Clock } from "lucide-react";
 import type { Media } from "@/types/anilist";
 import { getAnimeTitle, getAnimeCover, formatEpisodeCount, getStarRating } from "@/lib/anilist";
 import { cn } from "@/lib/utils";
@@ -62,12 +62,27 @@ export const AnimeCard = memo(function AnimeCard({
   const isAiring = anime.status === "RELEASING";
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [showHoverPanel, setShowHoverPanel] = useState(false);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   // Check if simulcast (airs within 24 hours of Japan broadcast)
   const isSimulcast = useSimulcastStatus(anime.nextAiringEpisode?.airingAt);
 
+  const handleMouseEnter = () => {
+    hoverTimeoutRef.current = setTimeout(() => setShowHoverPanel(true), 500);
+  };
+  const handleMouseLeave = () => {
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    setShowHoverPanel(false);
+  };
+
   return (
-    <Link href={`/anime/${anime.id}`} className={cn("group block", className)}>
+    <Link
+      href={`/anime/${anime.id}`}
+      className={cn("group block relative", className)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
       <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-muted">
         {/* Loading skeleton */}
         {!imageLoaded && !imageError && (
@@ -122,12 +137,26 @@ export const AnimeCard = memo(function AnimeCard({
               AIRING
             </div>
           )}
+
+          {/* Format Badge */}
+          {anime.format && (
+            <span className="px-1.5 py-0.5 bg-black/70 text-white text-xs rounded font-medium">
+              {anime.format.replace("_", " ")}
+            </span>
+          )}
         </div>
 
         {/* Episode Badge */}
         <div className="absolute top-2 right-2 px-2 py-1 bg-black/60 backdrop-blur-sm rounded-full text-xs font-medium text-white">
           {episodes}
         </div>
+
+        {/* Episode count overlay badge (bottom right, shown when no rating) */}
+        {!anime.averageScore && anime.episodes && (
+          <span className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/70 text-white text-xs rounded">
+            {anime.episodes} ep
+          </span>
+        )}
 
         {/* Language Badge (bottom left) */}
         {showLanguageBadge && (
@@ -172,6 +201,38 @@ export const AnimeCard = memo(function AnimeCard({
           {anime.seasonYear && <span>• {anime.seasonYear}</span>}
         </div>
       </div>
+
+      {/* Hover Info Panel */}
+      {showHoverPanel && (anime.description || (anime.genres && anime.genres.length > 0)) && (
+        <div className="absolute left-full top-0 ml-2 w-56 bg-popover border border-white/10 rounded-xl shadow-2xl p-3 z-50 pointer-events-none animate-fadeIn hidden lg:block">
+          <p className="font-semibold text-sm mb-2 line-clamp-2">{title}</p>
+          {anime.averageScore && (
+            <div className="flex items-center gap-1 mb-2 text-xs">
+              <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+              <span>{anime.averageScore / 10}/10</span>
+              {anime.episodes && (
+                <>
+                  <span className="text-muted-foreground mx-1">•</span>
+                  <Clock className="w-3 h-3 text-muted-foreground" />
+                  <span className="text-muted-foreground">{anime.episodes} eps</span>
+                </>
+              )}
+            </div>
+          )}
+          {anime.genres && anime.genres.length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-2">
+              {anime.genres.slice(0, 4).map((g) => (
+                <span key={g} className="px-1.5 py-0.5 bg-white/10 rounded text-xs">{g}</span>
+              ))}
+            </div>
+          )}
+          {anime.description && (
+            <p className="text-xs text-muted-foreground line-clamp-3">
+              {anime.description.replace(/<[^>]*>/g, "")}
+            </p>
+          )}
+        </div>
+      )}
     </Link>
   );
 });

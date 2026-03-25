@@ -20,6 +20,7 @@ import {
   Monitor,
   Copy,
   X,
+  Camera,
 } from "lucide-react";
 import { cn, formatTime } from "@/lib/utils";
 import { usePreferences, useStore } from "@/store";
@@ -62,6 +63,7 @@ interface VideoPlayerProps {
   episodeNumber?: number;
   malId?: number | null;
   nextEpisodeUrl?: string;
+  prevEpisodeUrl?: string;
   // New props for server/language selection
   allServers?: Array<{
     id: string;
@@ -107,6 +109,7 @@ export function EnhancedVideoPlayer({
   episodeNumber,
   malId,
   nextEpisodeUrl,
+  prevEpisodeUrl,
   allServers = [],
   allLanguages = [
     { id: "sub", label: "Subtitles", type: "sub" },
@@ -128,8 +131,19 @@ export function EnhancedVideoPlayer({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(1);
-  const [isMuted, setIsMuted] = useState(false);
+  const [volume, setVolume] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('player-volume');
+      return saved ? Math.max(0, Math.min(1, parseFloat(saved))) : 1;
+    }
+    return 1;
+  });
+  const [isMuted, setIsMuted] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('player-muted') === 'true';
+    }
+    return false;
+  });
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
@@ -152,7 +166,7 @@ export function EnhancedVideoPlayer({
   });
   const [currentLanguage, setCurrentLanguage] = useState(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("preferred-language") || "sub";
+      return localStorage.getItem(`preferred-language-${animeId}`) || localStorage.getItem("preferred-language") || "sub";
     }
     return "sub";
   });
@@ -160,7 +174,14 @@ export function EnhancedVideoPlayer({
   // Settings
   const [showSettings, setShowSettings] = useState(false);
   const [showSubtitleSettings, setShowSubtitleSettings] = useState(false);
-  const [playbackRate, setPlaybackRate] = useState(1);
+  const [playbackRate, setPlaybackRate] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('player-speed');
+      const rate = saved ? parseFloat(saved) : 1;
+      return [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].includes(rate) ? rate : 1;
+    }
+    return 1;
+  });
   const [currentQuality, setCurrentQuality] = useState<string>("auto");
 
   // NEW: Subtitle state
@@ -211,11 +232,13 @@ export function EnhancedVideoPlayer({
   const [showAutoplayCountdown, setShowAutoplayCountdown] = useState(false);
   const [autoplayCountdown, setAutoplayCountdown] = useState(10);
 
-  // Skip intro/outro buttons
+  // Skip intro/outro/recap buttons
   const [showSkipIntro, setShowSkipIntro] = useState(false);
   const [showSkipOutro, setShowSkipOutro] = useState(false);
+  const [showSkipRecap, setShowSkipRecap] = useState(false);
   const [introSkipped, setIntroSkipped] = useState(false);
   const [outroSkipped, setOutroSkipped] = useState(false);
+  const [recapSkipped, setRecapSkipped] = useState(false);
 
   // WebTorrent stats
   const [downloadSpeed, setDownloadSpeed] = useState(0);
@@ -244,6 +267,8 @@ export function EnhancedVideoPlayer({
   const introEnd = skipTimestamps.intro?.end ?? 170;
   const outroStart = skipTimestamps.outro?.start ?? 1320;
   const outroEnd = skipTimestamps.outro?.end ?? 1410;
+  const recapStart = skipTimestamps.recap?.start ?? null;
+  const recapEnd = skipTimestamps.recap?.end ?? null;
 
   // ===================================
   // Helper Functions
@@ -362,8 +387,10 @@ export function EnhancedVideoPlayer({
         return proxyUrl;
       };
 
-      // Determine if we need to use proxy (has referer or external domain)
-      const needsProxy = source.referer || !source.url.includes(window.location.hostname);
+      // Determine if we need to use proxy
+      // Only proxy when a CDN referer is required (to bypass CDN access controls)
+      // Do NOT proxy just because the URL is external — that breaks public CDN fallback videos
+      const needsProxy = !!source.referer;
 
       if (isHls && typeof Hls !== "undefined" && Hls.isSupported()) {
         // Use HLS.js for browsers that don't support HLS natively
@@ -748,13 +775,25 @@ export function EnhancedVideoPlayer({
               continue;
             }
 
-            const vttContent = await response.text();
+            const subtitleText = await response.text();
+
+            // Convert SRT to VTT if needed
+            let processedText = subtitleText;
+            if (!subtitleText.trim().startsWith('WEBVTT')) {
+              // SRT format: convert timestamps and add WEBVTT header
+              processedText = 'WEBVTT\n\n' + subtitleText
+                .replace(/\r\n/g, '\n')
+                .replace(/\r/g, '\n')
+                .replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2') // SRT timestamp → VTT
+                .replace(/^\d+\s*\n/gm, '') // Remove cue sequence numbers
+                .trim();
+            }
 
             // Create a new track for this subtitle
             const track = video.addTextTrack("captions", sub.label, sub.lang || `sub${index}`);
 
             // Parse VTT content and add cues
-            const lines = vttContent.split('\n');
+            const lines = processedText.split('\n');
             const cues: Array<{ start: number; end: number; text: string }> = [];
             let currentCue: { start: number; end: number; text: string } | null = null;
 
@@ -1226,11 +1265,21 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
           setOutroSkipped(false);
         }
       }
+
+      // Show skip recap button during recap
+      if (recapStart !== null && recapEnd !== null && time >= recapStart && time <= recapEnd && !recapSkipped) {
+        setShowSkipRecap(true);
+      } else {
+        setShowSkipRecap(false);
+        if (recapEnd !== null && time > recapEnd + 5) {
+          setRecapSkipped(false);
+        }
+      }
     };
 
     video.addEventListener("timeupdate", handleAutoSkip);
     return () => video.removeEventListener("timeupdate", handleAutoSkip);
-  }, [introStart, introEnd, outroStart, outroEnd, preferences.autoSkipIntro, preferences.autoSkipOutro, introSkipped, outroSkipped]);
+  }, [introStart, introEnd, outroStart, outroEnd, recapStart, recapEnd, preferences.autoSkipIntro, preferences.autoSkipOutro, introSkipped, outroSkipped, recapSkipped]);
 
   // Apply subtitle styles
   useEffect(() => {
@@ -1470,7 +1519,13 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
   };
 
   const toggleMute = () => {
-    setIsMuted((m) => !m);
+    setIsMuted((m) => {
+      const newMuted = !m;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('player-muted', String(newMuted));
+      }
+      return newMuted;
+    });
   };
 
   const toggleFullscreen = () => {
@@ -1507,6 +1562,33 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
   const toggleTheaterMode = () => {
     setIsTheaterMode((t) => !t);
   };
+
+  const takeScreenshot = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth || 1280;
+      canvas.height = video.videoHeight || 720;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        const episodePart = episodeNumber ? `-ep${episodeNumber}` : "";
+        const timePart = video.currentTime ? `-${Math.floor(video.currentTime)}s` : "";
+        a.download = `animeverse-${animeTitle?.replace(/[^a-z0-9]/gi, "-").toLowerCase() || "screenshot"}${episodePart}${timePart}.png`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success("Screenshot saved!");
+      }, "image/png");
+    } catch {
+      toast.error("Screenshot failed");
+    }
+  }, [animeTitle, episodeNumber]);
 
   const togglePip = async () => {
     const video = videoRef.current;
@@ -1570,6 +1652,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
 
   const changeSpeed = (speed: number) => {
     setPlaybackRate(speed);
+    localStorage.setItem('player-speed', speed.toString());
     toast(`Playback speed: ${speed}x`, { duration: 2000 });
   };
 
@@ -1640,6 +1723,73 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
       video.muted = isMuted;
     }
   }, [volume, isMuted]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('player-volume', volume.toString());
+    }
+  }, [volume]);
+
+  // ===================================
+  // Media Session API
+  // ===================================
+
+  // Media Session API — lock screen / notification controls
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: episodeNumber ? `Episode ${episodeNumber}` : (animeTitle || 'Anime'),
+      artist: animeTitle || '',
+      album: 'AnimeVerse',
+      artwork: poster ? [
+        { src: poster, sizes: '512x512', type: 'image/jpeg' }
+      ] : [],
+    });
+
+    navigator.mediaSession.setActionHandler('play', () => {
+      videoRef.current?.play().catch(() => {});
+    });
+    navigator.mediaSession.setActionHandler('pause', () => {
+      videoRef.current?.pause();
+    });
+    navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+      if (videoRef.current) {
+        videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - (details.seekOffset || 10));
+      }
+    });
+    navigator.mediaSession.setActionHandler('seekforward', (details) => {
+      if (videoRef.current) {
+        videoRef.current.currentTime = Math.min(videoRef.current.duration || Infinity, videoRef.current.currentTime + (details.seekOffset || 10));
+      }
+    });
+    navigator.mediaSession.setActionHandler('previoustrack', prevEpisodeUrl ? () => {
+      window.location.href = prevEpisodeUrl;
+    } : null);
+    navigator.mediaSession.setActionHandler('nexttrack', nextEpisodeUrl ? () => {
+      goToNextEpisode();
+    } : null);
+  }, [animeTitle, episodeNumber, poster, nextEpisodeUrl, prevEpisodeUrl]);
+
+  // Update Media Session position state when time changes
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator) || !duration) return;
+    try {
+      navigator.mediaSession.setPositionState({
+        duration,
+        playbackRate: playbackRate,
+        position: currentTime,
+      });
+    } catch {
+      // setPositionState may throw in some browsers
+    }
+  }, [currentTime, duration, playbackRate]);
+
+  // Sync media session playback state
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+    navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+  }, [isPlaying]);
 
   // ===================================
   // Fullscreen Change Handler
@@ -1869,6 +2019,24 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
                 <SkipForward className="w-4 h-4" />
               </button>
             )}
+            {showSkipRecap && (
+              <button
+                onClick={() => {
+                  const video = videoRef.current;
+                  if (video && recapEnd !== null) {
+                    video.currentTime = recapEnd;
+                    setRecapSkipped(true);
+                    setShowSkipRecap(false);
+                  }
+                }}
+                className="px-4 py-3 sm:px-3 sm:py-2 bg-orange-500/80 hover:bg-orange-500 text-white rounded-full transition-colors text-sm font-medium flex items-center gap-1 min-h-[44px] sm:min-h-0"
+                aria-label="Skip recap"
+                title="Skip Recap"
+              >
+                <SkipForward className="w-4 h-4" />
+                <span className="hidden sm:inline">Skip Recap</span>
+              </button>
+            )}
 
             {/* Volume - Desktop */}
             <div className="hidden sm:flex items-center gap-1 group/volume">
@@ -1949,6 +2117,9 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
                 onLanguageChange={(langId) => {
                   setCurrentLanguage(langId);
                   localStorage.setItem("preferred-language", langId);
+                  if (animeId) {
+                    localStorage.setItem(`preferred-language-${animeId}`, langId);
+                  }
                   onLanguageChange?.(langId);
                 }}
               />
@@ -2014,6 +2185,32 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
               </div>
             )}
 
+            {/* Previous Episode */}
+            {prevEpisodeUrl && (
+              <button
+                onClick={() => { window.location.href = prevEpisodeUrl!; }}
+                className="flex items-center gap-1 px-2 py-1 text-xs bg-white/10 hover:bg-white/20 rounded transition-colors"
+                title="Previous Episode"
+                aria-label="Previous Episode"
+              >
+                <SkipBack className="w-4 h-4" />
+                <span className="hidden sm:inline">Prev</span>
+              </button>
+            )}
+
+            {/* Next Episode */}
+            {nextEpisodeUrl && (
+              <button
+                onClick={goToNextEpisode}
+                className="flex items-center gap-1 px-2 py-1 text-xs bg-white/10 hover:bg-white/20 rounded transition-colors"
+                title="Next Episode"
+                aria-label="Next Episode"
+              >
+                <SkipForward className="w-4 h-4" />
+                <span className="hidden sm:inline">Next</span>
+              </button>
+            )}
+
             {/* Settings */}
             <div className="relative">
               <button
@@ -2077,6 +2274,31 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
                           {speed}x
                         </button>
                       ))}
+                    </div>
+                  </div>
+
+                  {/* Auto-Skip Settings */}
+                  <div className="p-2 border-b border-white/10">
+                    <div className="border-t border-white/10 pt-2 mt-2">
+                      <p className="text-xs text-white/50 mb-2">Auto-Skip</p>
+                      <label className="flex items-center gap-2 cursor-pointer hover:bg-white/5 px-2 py-1 rounded">
+                        <input
+                          type="checkbox"
+                          checked={preferences.autoSkipIntro}
+                          onChange={(e) => updatePreferences({ autoSkipIntro: e.target.checked })}
+                          className="accent-primary"
+                        />
+                        <span className="text-xs">Skip Intro</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer hover:bg-white/5 px-2 py-1 rounded">
+                        <input
+                          type="checkbox"
+                          checked={preferences.autoSkipOutro}
+                          onChange={(e) => updatePreferences({ autoSkipOutro: e.target.checked })}
+                          className="accent-primary"
+                        />
+                        <span className="text-xs">Skip Outro</span>
+                      </label>
                     </div>
                   </div>
 
@@ -2261,6 +2483,16 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
                 </div>
                 )}
             </div>
+
+            {/* Screenshot */}
+            <button
+              onClick={takeScreenshot}
+              className="p-1 sm:p-1.5 hover:bg-white/10 rounded-full transition-colors min-w-[32px] min-h-[32px] sm:min-w-0 sm:min-h-0 hidden sm:flex items-center justify-center"
+              aria-label="Take screenshot"
+              title="Screenshot (saves to file)"
+            >
+              <Camera className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            </button>
 
             {/* Theater Mode - now visible on all screens */}
             <button

@@ -20,6 +20,7 @@ interface VideoSourceLoaderProps {
   malId?: number | null;
   poster?: string;
   nextEpisodeUrl?: string;
+  prevEpisodeUrl?: string;
   onError?: (error: Error) => void;
   onEpisodeEnd?: () => void;
 }
@@ -31,6 +32,17 @@ interface LanguageOption {
   available: boolean;
 }
 
+// Bandwidth-aware initial quality selection
+function getPreferredQualityForNetwork(): string {
+  if (typeof navigator === 'undefined') return 'auto';
+  const conn = (navigator as Navigator & { connection?: { effectiveType?: string; saveData?: boolean } }).connection;
+  if (!conn) return 'auto';
+  if (conn.saveData) return '360p'; // Data saver mode
+  if (conn.effectiveType === 'slow-2g' || conn.effectiveType === '2g') return '360p';
+  if (conn.effectiveType === '3g') return '480p';
+  return 'auto'; // 4g and above: auto/highest available
+}
+
 export function VideoSourceLoader({
   animeId,
   episodeNumber,
@@ -38,6 +50,7 @@ export function VideoSourceLoader({
   malId,
   poster,
   nextEpisodeUrl,
+  prevEpisodeUrl,
   onError,
   onEpisodeEnd,
 }: VideoSourceLoaderProps) {
@@ -182,7 +195,17 @@ export function VideoSourceLoader({
         }
       });
 
+      // Determine initial quality: saved user preference takes priority,
+      // then fall back to network-aware quality selection.
+      const savedQuality = typeof window !== 'undefined'
+        ? localStorage.getItem('animeverse-preferredQuality')
+        : null;
+      const preferredQuality = savedQuality || getPreferredQualityForNetwork();
+
       const defaultSource =
+        (preferredQuality !== 'auto'
+          ? data.sources.find((s: any) => s.quality === preferredQuality)
+          : null) ||
         data.sources.find((s: any) => s.quality === "1080p") ||
         data.sources.find((s: any) => s.quality === "720p") ||
         data.sources[0];
@@ -194,7 +217,7 @@ export function VideoSourceLoader({
         quality: defaultSource.quality,
         provider: data.provider,
         hasReferer: !!data.referer,
-        needsProxy: !!data.referer || !sourceUrl.includes(window.location.hostname),
+        needsProxy: !!data.referer,
       });
       setSources({
         type: "direct",
@@ -476,6 +499,7 @@ export function VideoSourceLoader({
         episodeNumber={episodeNumber}
         malId={malId}
         nextEpisodeUrl={nextEpisodeUrl}
+        prevEpisodeUrl={prevEpisodeUrl}
         onError={handleVideoError}
         onEpisodeEnd={onEpisodeEnd}
         allServers={allServers}

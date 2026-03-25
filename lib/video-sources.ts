@@ -162,11 +162,14 @@ export async function reportBrokenVideo(data: {
   source: string;
   issue: string;
 }): Promise<void> {
-  // In production, send to backend API or monitoring service
   if (typeof window !== "undefined") {
-    // Store reports locally for demo
-    const reports = JSON.parse(localStorage.getItem("broken-reports") || "[]");
-    reports.push({ ...data, timestamp: Date.now() });
-    localStorage.setItem("broken-reports", JSON.stringify(reports));
+    const reports = JSON.parse(localStorage.getItem("video-reports") || "[]");
+    reports.push({
+      animeId: data.animeId,
+      episodeNumber: data.episodeNumber,
+      reason: data.issue,
+      timestamp: Date.now(),
+    });
+    localStorage.setItem("video-reports", JSON.stringify(reports));
   }
 }

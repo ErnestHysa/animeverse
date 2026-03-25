@@ -43,6 +43,17 @@ const SORT_OPTIONS = [
 
 const YEARS = Array.from({ length: 30 }, (_, i) => new Date().getFullYear() - i);
 
+const MOOD_PRESETS = [
+  { id: 'action', label: '⚡ Hype', genres: ['Action', 'Martial Arts'] },
+  { id: 'relaxing', label: '☁️ Relaxing', genres: ['Slice of Life', 'Comedy'] },
+  { id: 'emotional', label: '💙 Emotional', genres: ['Drama', 'Psychological'] },
+  { id: 'romance', label: '💕 Romance', genres: ['Romance', 'Shoujo'] },
+  { id: 'dark', label: '🌑 Dark', genres: ['Horror', 'Thriller', 'Psychological'] },
+  { id: 'adventure', label: '🗺️ Adventure', genres: ['Adventure', 'Fantasy'] },
+  { id: 'fun', label: '😂 Funny', genres: ['Comedy', 'Parody'] },
+  { id: 'mystery', label: '🔍 Mystery', genres: ['Mystery', 'Suspense'] },
+];
+
 interface AnimeFiltersProps {
   currentFilters: FilterOptions;
   query: string;
@@ -123,6 +134,26 @@ export const AnimeFilters = memo(function AnimeFilters({ currentFilters, query }
 
       {isExpanded && (
         <div className="p-4 pt-0 space-y-4 border-t border-white/10 mt-4">
+          {/* Mood Presets */}
+          <div>
+            <label className="text-sm font-medium mb-2 block">Mood</label>
+            <div className="flex flex-wrap gap-2">
+              {MOOD_PRESETS.map((mood) => (
+                <button
+                  key={mood.id}
+                  onClick={() => updateFilter("genre", mood.genres[0])}
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors border ${
+                    currentFilters.genre === mood.genres[0]
+                      ? "bg-primary/20 border-primary text-primary"
+                      : "bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20"
+                  }`}
+                >
+                  {mood.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Sort */}
           <div>
             <label className="text-sm font-medium mb-2 block">Sort By</label>

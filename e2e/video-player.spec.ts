@@ -23,7 +23,7 @@ test.describe('Watch Page Structure', () => {
     const main = page.locator('main');
     await expect(main).toBeVisible({ timeout: DEFAULT_TIMEOUT });
 
-    await page.screenshot({ timeout: 0, path: 'test-results/watch-page-loaded.png', fullPage: false });
+    await page.screenshot({ timeout: 5000, animations: 'disabled', path: 'test-results/watch-page-loaded.png', fullPage: false }).catch(() => {});
   });
 
   test('should display anime title', async ({ page }) => {
@@ -36,7 +36,7 @@ test.describe('Watch Page Structure', () => {
     const titleText = await title.textContent();
     expect(titleText).toBeTruthy();
 
-    await page.screenshot({ timeout: 0, path: 'test-results/watch-title.png' });
+    await page.screenshot({ timeout: 5000, animations: 'disabled', path: 'test-results/watch-title.png' }).catch(() => {});
   });
 
   test('should display episode navigation', async ({ page }) => {
@@ -62,7 +62,7 @@ test.describe('Watch Page Structure', () => {
     const episodeSection = page.locator('div').filter({ hasText: /episode/i }).first();
     await expect(episodeSection).toBeVisible({ timeout: DEFAULT_TIMEOUT });
 
-    await page.screenshot({ timeout: 0, path: 'test-results/watch-sidebar.png' });
+    await page.screenshot({ timeout: 5000, animations: 'disabled', path: 'test-results/watch-sidebar.png' }).catch(() => {});
   });
 
   test('should display video player container', async ({ page }) => {
@@ -76,7 +76,7 @@ test.describe('Watch Page Structure', () => {
     const mainContent = page.locator('main .grid, main [class*="grid"], main > div').first();
     await expect(mainContent).toBeVisible({ timeout: DEFAULT_TIMEOUT });
 
-    await page.screenshot({ timeout: 0, path: 'test-results/watch-player.png', fullPage: false });
+    await page.screenshot({ timeout: 5000, animations: 'disabled', path: 'test-results/watch-player.png', fullPage: false }).catch(() => {});
   });
 
   test('should display control buttons', async ({ page }) => {
@@ -87,7 +87,7 @@ test.describe('Watch Page Structure', () => {
     const count = await buttons.count();
     expect(count).toBeGreaterThan(2);
 
-    await page.screenshot({ timeout: 0, path: 'test-results/watch-controls.png' });
+    await page.screenshot({ timeout: 5000, animations: 'disabled', path: 'test-results/watch-controls.png' }).catch(() => {});
   });
 
   test('should display anime info section', async ({ page }) => {
@@ -148,7 +148,7 @@ test.describe('Watch Page Navigation', () => {
     const body = page.locator('body');
     await expect(body).toBeAttached({ timeout: DEFAULT_TIMEOUT });
 
-    await page.screenshot({ timeout: 0, path: 'test-results/watch-invalid-episode.png' });
+    await page.screenshot({ timeout: 5000, animations: 'disabled', path: 'test-results/watch-invalid-episode.png' }).catch(() => {});
   });
 
   test('should handle non-existent anime gracefully', async ({ page }) => {
@@ -161,7 +161,7 @@ test.describe('Watch Page Navigation', () => {
     const body = page.locator('body');
     await expect(body).toBeAttached({ timeout: DEFAULT_TIMEOUT });
 
-    await page.screenshot({ timeout: 0, path: 'test-results/watch-not-found.png' });
+    await page.screenshot({ timeout: 5000, animations: 'disabled', path: 'test-results/watch-not-found.png' }).catch(() => {});
   });
 });
 
@@ -174,7 +174,7 @@ test.describe('Video Sources API', () => {
     const main = page.locator('main');
     await expect(main).toBeVisible({ timeout: DEFAULT_TIMEOUT });
 
-    await page.screenshot({ timeout: 0, path: 'test-results/watch-video-area.png', fullPage: false });
+    await page.screenshot({ timeout: 5000, animations: 'disabled', path: 'test-results/watch-video-area.png', fullPage: false }).catch(() => {});
   });
 });
 
@@ -183,13 +183,13 @@ test.describe('Loading States', () => {
     await page.goto('/watch/21459/1');
 
     // Capture initial loading state
-    await page.screenshot({ timeout: 0, path: 'test-results/watch-loading.png' });
+    await page.screenshot({ timeout: 5000, animations: 'disabled', path: 'test-results/watch-loading.png' }).catch(() => {});
 
     // Wait for content
     const h1 = page.locator('h1').first();
     await expect(h1).toBeVisible({ timeout: DEFAULT_TIMEOUT });
 
     // Capture loaded state
-    await page.screenshot({ timeout: 0, path: 'test-results/watch-loaded.png', fullPage: false });
+    await page.screenshot({ timeout: 5000, animations: 'disabled', path: 'test-results/watch-loaded.png', fullPage: false }).catch(() => {});
   });
 });

@@ -1330,10 +1330,31 @@ export async function GET(
     ];
 
     // ============================================
+    // Quick Consumet API health check
+    // If Consumet is unavailable, skip all providers and return fallback immediately
+    // This prevents 10s+ timeouts from external API calls (Jikan etc.)
+    // ============================================
+    let consumetAvailable = false;
+    if (title) {
+      try {
+        const healthCtrl = new AbortController();
+        const healthTid = setTimeout(() => healthCtrl.abort(), 2000);
+        const healthResp = await fetch(`${API_BASE_URL}/`, { signal: healthCtrl.signal });
+        clearTimeout(healthTid);
+        consumetAvailable = healthResp.ok;
+      } catch {
+        consumetAvailable = false;
+      }
+      if (!consumetAvailable) {
+        console.log(`[Video Sources] Consumet API unavailable at ${API_BASE_URL}, using fallback immediately`);
+      }
+    }
+
+    // ============================================
     // Try AnimeSaturn first (primary provider)
     // AnimeSaturn's CDN (nezumi.streampeaker.org) works with HLS proxy
     // ============================================
-    if (title && sources.length === 0) {
+    if (consumetAvailable && title && sources.length === 0) {
       console.log(`[Video Sources] Trying AnimeSaturn provider (primary)...`);
 
       const animeSaturnData = await searchAnimeSaturnId(
@@ -1373,7 +1394,7 @@ export async function GET(
     // ============================================
     // Fallback to AnimeKai if AnimeSaturn failed
     // ============================================
-    if (title && sources.length === 0) {
+    if (consumetAvailable && title && sources.length === 0) {
       console.log(`[Video Sources] AnimeSaturn failed, trying AnimeKai fallback...`);
 
       const animeKaiData = await searchAnimeKaiId(
@@ -1413,7 +1434,7 @@ export async function GET(
     // ============================================
     // Fallback to AnimePahe if AnimeKai failed
     // ============================================
-    if (title && sources.length === 0) {
+    if (consumetAvailable && title && sources.length === 0) {
       console.log(`[Video Sources] AnimeKai failed, trying AnimePahe fallback...`);
 
       let animePaheId: string | null = null;
@@ -1462,28 +1483,28 @@ export async function GET(
     if (sources.length === 0) {
       console.log(`[Video Search] No sources found, returning fallback demo video`);
 
-      // Fallback demo video (Big Buck Bunny - reliable public domain video)
+      // Fallback demo video (self-hosted, no external dependency)
       const fallbackSources = [
         {
-          url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+          url: "/demo.webm",
           quality: "auto" as const,
           label: "Auto (Demo)",
           provider: "fallback",
-          type: "mp4" as const,
+          type: "webm" as const,
         },
         {
-          url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+          url: "/demo.webm",
           quality: "720p" as const,
           label: "720p (Demo)",
           provider: "fallback",
-          type: "mp4" as const,
+          type: "webm" as const,
         },
         {
-          url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+          url: "/demo.webm",
           quality: "480p" as const,
           label: "480p (Demo)",
           provider: "fallback",
-          type: "mp4" as const,
+          type: "webm" as const,
         },
       ];
 
@@ -1522,11 +1543,11 @@ export async function GET(
     // Return fallback demo video on error (production-ready behavior)
     const fallbackSources = [
       {
-        url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+        url: "/demo.webm",
         quality: "auto" as const,
         label: "Auto (Demo)",
         provider: "fallback",
-        type: "mp4" as const,
+        type: "webm" as const,
       },
     ];
 

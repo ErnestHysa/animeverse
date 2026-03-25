@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useCallback, memo, useEffect } from "react";
+import { useState, useCallback, memo, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -74,7 +74,10 @@ export const Header = memo(function Header() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchSuggestions, setSearchSuggestions] = useState<Array<{ id: number; title: string; year?: number | null; format?: string | null }>>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const searchDebounceRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const router = useRouter();
   const { theme, setTheme, resolvedTheme } = useTheme();
   const { anilistUser, isAuthenticated, clearAniListAuth } = useAniListAuth();
@@ -86,10 +89,34 @@ export const Header = memo(function Header() {
         router.push(`/search?q=${encodeURIComponent(searchQuery)}`);
         setSearchOpen(false);
         setSearchQuery("");
+        setShowSuggestions(false);
+        setSearchSuggestions([]);
       }
     },
     [searchQuery, router]
   );
+
+  const handleSearchInput = useCallback((value: string) => {
+    setSearchQuery(value);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    if (value.trim().length < 2) {
+      setSearchSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    searchDebounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/search-suggestions?q=${encodeURIComponent(value)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setSearchSuggestions(data.suggestions || []);
+          setShowSuggestions(true);
+        }
+      } catch {
+        // Silently fail
+      }
+    }, 300);
+  }, []);
 
   const toggleSearch = useCallback(() => {
     setSearchOpen((prev) => !prev);
@@ -332,11 +359,50 @@ export const Header = memo(function Header() {
                   <input
                     type="search"
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) => handleSearchInput(e.target.value)}
+                    onFocus={() => searchQuery.length >= 2 && setShowSuggestions(true)}
                     placeholder="Search anime..."
                     className="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all"
                     autoFocus
+                    autoComplete="off"
                   />
+                  {/* Live Search Suggestions */}
+                  {showSuggestions && searchSuggestions.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-popover border border-white/10 rounded-xl shadow-xl overflow-hidden z-50 max-h-80 overflow-y-auto">
+                      {searchSuggestions.map((suggestion) => (
+                        <button
+                          key={suggestion.id}
+                          onClick={() => {
+                            router.push(`/anime/${suggestion.id}`);
+                            setSearchOpen(false);
+                            setSearchQuery("");
+                            setShowSuggestions(false);
+                          }}
+                          className="w-full px-4 py-3 text-left hover:bg-white/5 transition-colors flex items-center gap-3 border-b border-white/5 last:border-0"
+                        >
+                          <Search className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">{suggestion.title}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {suggestion.format?.replace("_", " ")}{suggestion.year ? ` • ${suggestion.year}` : ""}
+                            </p>
+                          </div>
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => {
+                          router.push(`/search?q=${encodeURIComponent(searchQuery)}`);
+                          setSearchOpen(false);
+                          setSearchQuery("");
+                          setShowSuggestions(false);
+                        }}
+                        className="w-full px-4 py-3 text-left hover:bg-white/5 transition-colors flex items-center gap-2 text-primary text-sm font-medium"
+                      >
+                        <Search className="w-4 h-4" />
+                        See all results for &quot;{searchQuery}&quot;
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <Button type="submit" size="lg" className="shrink-0">
                   Search

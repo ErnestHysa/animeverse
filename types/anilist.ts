@@ -181,7 +181,7 @@ export interface Media {
   bannerImage: string | null;
   trailer: Trailer | null;
   relations: { edges: MediaEdge[] } | null;
-  characters: { edges: { node: Character; role: string }[] } | null;
+  characters: { edges: { node: Character; role: string; voiceActors: { id: number; name: { full: string } }[] }[] } | null;
   staff: { edges: { node: Staff; role: string }[] } | null;
   externalLinks: ExternalLink[] | null;
   streamingEpisodes: StreamingEpisode[] | null;

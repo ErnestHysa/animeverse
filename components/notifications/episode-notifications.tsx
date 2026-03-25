@@ -252,6 +252,84 @@ export function EpisodeNotifications({ airingSchedule = [] }: EpisodeNotificatio
     return () => clearInterval(checkInterval);
   }, [permission, airingSchedule, prefs]);
 
+  // Auto-check for upcoming episodes in user's watchlist
+  useEffect(() => {
+    if (permission !== 'granted') return;
+
+    const checkUpcomingEpisodes = async () => {
+      try {
+        // Get user's watchlist IDs from localStorage/store
+        const storeData = localStorage.getItem('animeverse-storage');
+        if (!storeData) return;
+        const store = JSON.parse(storeData);
+        const watchlistIds = new Set([
+          ...(store?.state?.watchlist?.map((w: {id: number}) => w.id) || []),
+          ...(store?.state?.favorites?.map((f: {id: number}) => f.id) || []),
+        ]);
+        if (watchlistIds.size === 0) return;
+
+        // Fetch current week schedule from AniList
+        const now = Math.floor(Date.now() / 1000);
+        const oneHourFromNow = now + 3600;
+
+        const query = `{
+          Page(page: 1, perPage: 50) {
+            airingSchedules(airingAt_greater: ${now}, airingAt_lesser: ${oneHourFromNow}, sort: TIME) {
+              airingAt
+              episode
+              media {
+                id
+                title { english romaji }
+                coverImage { medium }
+              }
+            }
+          }
+        }`;
+
+        const response = await fetch('https://graphql.anilist.co', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query }),
+          signal: AbortSignal.timeout(8000),
+        });
+
+        if (!response.ok) return;
+        const data = await response.json();
+        const schedules = data?.data?.Page?.airingSchedules || [];
+
+        // Filter to user's watchlist
+        const notifiedKey = 'notified-episodes';
+        const notified: string[] = JSON.parse(localStorage.getItem(notifiedKey) || '[]');
+
+        for (const schedule of schedules) {
+          if (!watchlistIds.has(schedule.media?.id)) continue;
+          const key = `${schedule.media.id}-ep${schedule.episode}`;
+          if (notified.includes(key)) continue;
+
+          const title = schedule.media.title?.english || schedule.media.title?.romaji || 'Unknown';
+          const minutesUntil = Math.round((schedule.airingAt - now) / 60);
+
+          new Notification(`${title} - Episode ${schedule.episode}`, {
+            body: `Airing in ${minutesUntil} minute${minutesUntil !== 1 ? 's' : ''}!`,
+            icon: schedule.media.coverImage?.medium || '/icons/icon.svg',
+            tag: key,
+          });
+
+          notified.push(key);
+        }
+
+        // Keep only last 200 notified keys
+        localStorage.setItem(notifiedKey, JSON.stringify(notified.slice(-200)));
+      } catch {
+        // Silently fail - notifications are non-critical
+      }
+    };
+
+    checkUpcomingEpisodes();
+    const interval = setInterval(checkUpcomingEpisodes, 5 * 60 * 1000); // every 5 min
+    return () => clearInterval(interval);
+  }, [permission]);
+
   // Combine watchlist and favorites for notification settings
   const trackedAnime = [...new Set([...watchlist, ...favorites])];
 

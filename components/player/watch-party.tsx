@@ -6,7 +6,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Users, Copy, Check, Send, X } from "lucide-react";
+import { Users, Copy, Check, Send, X, Info } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
 import { toast } from "react-hot-toast";
@@ -274,6 +274,7 @@ interface WatchPartyControlsProps {
   animeId: number;
   episodeNumber: number;
   onSync?: (currentTime: number, isPlaying: boolean) => void;
+  onSyncState?: (data: { currentTime: number; isPlaying: boolean }) => void;
   currentTime?: number;
   isPlaying?: boolean;
 }
@@ -282,6 +283,7 @@ export function WatchPartyControls({
   animeId,
   episodeNumber,
   onSync,
+  onSyncState,
   currentTime = 0,
   isPlaying = false,
 }: WatchPartyControlsProps) {
@@ -302,13 +304,42 @@ export function WatchPartyControls({
   const [chatInput, setChatInput] = useState("");
   const [showChat, setShowChat] = useState(true);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const channelRef = useRef<BroadcastChannel | null>(null);
 
-  // Sync playback when current time changes
+  // BroadcastChannel for real cross-tab sync
+  useEffect(() => {
+    if (!state.roomId) return;
+
+    if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+      channelRef.current = new BroadcastChannel(`watch-party-${state.roomId}`);
+      channelRef.current.onmessage = (event) => {
+        const { type, data } = event.data;
+        if (type === "SYNC_STATE") {
+          if (onSyncState) onSyncState(data);
+        } else if (type === "CHAT_MESSAGE") {
+          // Messages from other tabs arrive here; the localStorage poll handles dedup
+        }
+      };
+    }
+
+    return () => {
+      channelRef.current?.close();
+      channelRef.current = null;
+    };
+  }, [state.roomId, onSyncState]);
+
+  // Sync playback when current time changes — also broadcast to other tabs
   useEffect(() => {
     if (state.isHost && onSync) {
       onSync(currentTime, isPlaying);
     }
-  }, [currentTime, isPlaying, state.isHost, onSync]);
+    if (state.isHost && state.roomId && channelRef.current) {
+      channelRef.current.postMessage({
+        type: "SYNC_STATE",
+        data: { currentTime, isPlaying },
+      });
+    }
+  }, [currentTime, isPlaying, state.isHost, state.roomId, onSync]);
 
   // Auto-scroll chat
   useEffect(() => {
@@ -445,6 +476,14 @@ export function WatchPartyControls({
                 <X className="w-4 h-4" />
               </button>
             </div>
+          </div>
+
+          {/* Same-device notice */}
+          <div className="px-4 py-3 bg-blue-500/10 border-b border-blue-500/20 flex gap-2">
+            <Info className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-blue-300 leading-snug">
+              Watch Party works between tabs in the same browser. For multi-device sync, connect with friends and manually coordinate playback.
+            </p>
           </div>
 
           {/* Chat Messages */}

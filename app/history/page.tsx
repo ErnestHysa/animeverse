@@ -6,7 +6,7 @@
 "use client";
 
 import { useStore } from "@/store";
-import { Clock, Play, Trash2, Film } from "lucide-react";
+import { Clock, Play, Trash2, Film, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AnimeCard } from "@/components/anime/anime-card";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -39,6 +39,50 @@ export default function HistoryPage() {
     if (confirm("Remove this anime from history?")) {
       clearMediaHistory(mediaId);
     }
+  };
+
+  const handleExportJSON = () => {
+    const exportData = {
+      exportDate: new Date().toISOString(),
+      totalEntries: watchHistory.length,
+      history: watchHistory.map((item) => ({
+        mediaId: item.mediaId,
+        title: mediaCache[item.mediaId]?.title?.userPreferred || mediaCache[item.mediaId]?.title?.romaji || `Anime #${item.mediaId}`,
+        episodeNumber: item.episodeNumber,
+        progress: item.progress,
+        completed: item.completed,
+        watchedAt: new Date(item.timestamp).toISOString(),
+      })),
+    };
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `animeverse-history-${new Date().toISOString().split("T")[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportCSV = () => {
+    const rows = [
+      ["Media ID", "Title", "Episode", "Progress (s)", "Completed", "Watched At"],
+      ...watchHistory.map((item) => [
+        item.mediaId,
+        mediaCache[item.mediaId]?.title?.userPreferred || mediaCache[item.mediaId]?.title?.romaji || `Anime #${item.mediaId}`,
+        item.episodeNumber,
+        item.progress,
+        item.completed ? "Yes" : "No",
+        new Date(item.timestamp).toISOString(),
+      ]),
+    ];
+    const csv = rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `animeverse-history-${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   if (uniqueHistory.length === 0) {
@@ -96,10 +140,32 @@ export default function HistoryPage() {
           </p>
         </div>
         {uniqueHistory.length > 0 && (
-          <Button variant="outline" onClick={handleClearAll}>
-            <Trash2 className="w-4 h-4 mr-2" />
-            Clear All
-          </Button>
+          <div className="flex items-center gap-2">
+            <div className="relative group">
+              <Button variant="outline" size="sm">
+                <Download className="w-4 h-4 mr-2" />
+                Export
+              </Button>
+              <div className="absolute right-0 top-full mt-1 w-36 bg-popover border border-white/10 rounded-lg shadow-xl overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto z-10">
+                <button
+                  onClick={handleExportJSON}
+                  className="w-full px-3 py-2 text-sm text-left hover:bg-white/5 transition-colors"
+                >
+                  Export as JSON
+                </button>
+                <button
+                  onClick={handleExportCSV}
+                  className="w-full px-3 py-2 text-sm text-left hover:bg-white/5 transition-colors"
+                >
+                  Export as CSV
+                </button>
+              </div>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleClearAll}>
+              <Trash2 className="w-4 h-4 mr-2" />
+              Clear All
+            </Button>
+          </div>
         )}
       </div>
 
