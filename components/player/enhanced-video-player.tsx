@@ -20,6 +20,7 @@ import {
   Monitor,
   Copy,
   X,
+  Camera,
 } from "lucide-react";
 import { cn, formatTime } from "@/lib/utils";
 import { usePreferences, useStore } from "@/store";
@@ -211,11 +212,13 @@ export function EnhancedVideoPlayer({
   const [showAutoplayCountdown, setShowAutoplayCountdown] = useState(false);
   const [autoplayCountdown, setAutoplayCountdown] = useState(10);
 
-  // Skip intro/outro buttons
+  // Skip intro/outro/recap buttons
   const [showSkipIntro, setShowSkipIntro] = useState(false);
   const [showSkipOutro, setShowSkipOutro] = useState(false);
+  const [showSkipRecap, setShowSkipRecap] = useState(false);
   const [introSkipped, setIntroSkipped] = useState(false);
   const [outroSkipped, setOutroSkipped] = useState(false);
+  const [recapSkipped, setRecapSkipped] = useState(false);
 
   // WebTorrent stats
   const [downloadSpeed, setDownloadSpeed] = useState(0);
@@ -244,6 +247,8 @@ export function EnhancedVideoPlayer({
   const introEnd = skipTimestamps.intro?.end ?? 170;
   const outroStart = skipTimestamps.outro?.start ?? 1320;
   const outroEnd = skipTimestamps.outro?.end ?? 1410;
+  const recapStart = skipTimestamps.recap?.start ?? null;
+  const recapEnd = skipTimestamps.recap?.end ?? null;
 
   // ===================================
   // Helper Functions
@@ -1226,11 +1231,21 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
           setOutroSkipped(false);
         }
       }
+
+      // Show skip recap button during recap
+      if (recapStart !== null && recapEnd !== null && time >= recapStart && time <= recapEnd && !recapSkipped) {
+        setShowSkipRecap(true);
+      } else {
+        setShowSkipRecap(false);
+        if (recapEnd !== null && time > recapEnd + 5) {
+          setRecapSkipped(false);
+        }
+      }
     };
 
     video.addEventListener("timeupdate", handleAutoSkip);
     return () => video.removeEventListener("timeupdate", handleAutoSkip);
-  }, [introStart, introEnd, outroStart, outroEnd, preferences.autoSkipIntro, preferences.autoSkipOutro, introSkipped, outroSkipped]);
+  }, [introStart, introEnd, outroStart, outroEnd, recapStart, recapEnd, preferences.autoSkipIntro, preferences.autoSkipOutro, introSkipped, outroSkipped, recapSkipped]);
 
   // Apply subtitle styles
   useEffect(() => {
@@ -1507,6 +1522,33 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
   const toggleTheaterMode = () => {
     setIsTheaterMode((t) => !t);
   };
+
+  const takeScreenshot = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth || 1280;
+      canvas.height = video.videoHeight || 720;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        const episodePart = episodeNumber ? `-ep${episodeNumber}` : "";
+        const timePart = video.currentTime ? `-${Math.floor(video.currentTime)}s` : "";
+        a.download = `animeverse-${animeTitle?.replace(/[^a-z0-9]/gi, "-").toLowerCase() || "screenshot"}${episodePart}${timePart}.png`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success("Screenshot saved!");
+      }, "image/png");
+    } catch {
+      toast.error("Screenshot failed");
+    }
+  }, [animeTitle, episodeNumber]);
 
   const togglePip = async () => {
     const video = videoRef.current;
@@ -1867,6 +1909,24 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
               >
                 Skip Outro
                 <SkipForward className="w-4 h-4" />
+              </button>
+            )}
+            {showSkipRecap && (
+              <button
+                onClick={() => {
+                  const video = videoRef.current;
+                  if (video && recapEnd !== null) {
+                    video.currentTime = recapEnd;
+                    setRecapSkipped(true);
+                    setShowSkipRecap(false);
+                  }
+                }}
+                className="px-4 py-3 sm:px-3 sm:py-2 bg-orange-500/80 hover:bg-orange-500 text-white rounded-full transition-colors text-sm font-medium flex items-center gap-1 min-h-[44px] sm:min-h-0"
+                aria-label="Skip recap"
+                title="Skip Recap"
+              >
+                <SkipForward className="w-4 h-4" />
+                <span className="hidden sm:inline">Skip Recap</span>
               </button>
             )}
 
@@ -2261,6 +2321,16 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
                 </div>
                 )}
             </div>
+
+            {/* Screenshot */}
+            <button
+              onClick={takeScreenshot}
+              className="p-1 sm:p-1.5 hover:bg-white/10 rounded-full transition-colors min-w-[32px] min-h-[32px] sm:min-w-0 sm:min-h-0 hidden sm:flex items-center justify-center"
+              aria-label="Take screenshot"
+              title="Screenshot (saves to file)"
+            >
+              <Camera className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            </button>
 
             {/* Theater Mode - now visible on all screens */}
             <button

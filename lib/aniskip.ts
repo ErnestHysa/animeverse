@@ -31,6 +31,7 @@ export type SkipType = "op" | "ed" | "mixed-op" | "mixed-ed" | "recap";
 export interface IntroOutroTimestamps {
   intro?: { start: number; end: number };
   outro?: { start: number; end: number };
+  recap?: { start: number; end: number };
 }
 
 // ===================================
@@ -151,7 +152,7 @@ export async function fetchSkipTimes(
     episodeLength?: number;
   } = {}
 ): Promise<AniSkipResponse> {
-  const { types = ["op", "ed", "mixed-op", "mixed-ed"], episodeLength = 0 } = options;
+  const { types = ["op", "ed", "mixed-op", "mixed-ed", "recap"], episodeLength = 0 } = options;
 
   // Build query parameters
   const params = new URLSearchParams();
@@ -213,6 +214,13 @@ function parseSkipResults(results: SkipResult[]): IntroOutroTimestamps {
       // For outros, use the last one (closest to end)
       if (!timestamps.outro || endTime > timestamps.outro.end) {
         timestamps.outro = { start: Math.floor(startTime), end: Math.ceil(endTime) };
+      }
+    }
+
+    // Recap types
+    if (skipType === "recap") {
+      if (!timestamps.recap || startTime < timestamps.recap.start) {
+        timestamps.recap = { start: Math.floor(startTime), end: Math.ceil(endTime) };
       }
     }
   }

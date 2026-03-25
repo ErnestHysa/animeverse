@@ -461,7 +461,5 @@ export default function ProfilePage() {
   );
 }
 
-export const metadata = {
-  title: "Profile",
-  description: "Your AnimeVerse Stream profile, stats, and watch history.",
-};
+// Note: metadata cannot be exported from client components
+// Title is set via the layout's template pattern
