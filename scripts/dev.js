@@ -142,26 +142,53 @@ ${ANSI.reset}`);
 
   // Start Next.js (delay slightly to let API start first)
   setTimeout(() => {
-    nextProc = spawnProcess(
-      'Next',
-      'npx',
-      ['next', 'dev'],
-      rootDir,
-      /ready|started|localhost/i,
-      (service) => {
-        if (service === 'next' && apiReady) {
-          openBrowser('http://localhost:3000');
+    // Spawn Next.js with custom environment to prevent OOM crashes
+    log.info(`Starting Next...`);
+
+    nextProc = spawn('npx', ['next', 'dev'], {
+      cwd: rootDir,
+      shell: true,
+      env: {
+        ...process.env,
+        FORCE_COLOR: '1',
+        NODE_OPTIONS: '--max-old-space-size=4096',
+        TURBOPACK_CACHE_DIR: path.join(rootDir, '.next', 'cache', 'turbo'),
+      },
+    });
+
+    nextProc.stdout.on('data', (data) => {
+      const output = data.toString();
+      const lines = output.split('\n').filter(l => l.trim());
+
+      for (const line of lines) {
+        log.next(line);
+        nextLines.push(line);
+
+        if (!nextReady && line.match(/ready|started|localhost:3000/i)) {
+          nextReady = true;
+          log.success(`Next.js app is ready on http://localhost:3000`);
+          if (apiReady) {
+            openBrowser('http://localhost:3000');
+          }
         }
       }
-    );
+    });
 
-    // Increase memory limit for Next.js to prevent OOM crashes
-    // Add --max-old-space-size=4096 to allocate 4GB of heap
-    nextProc.env.NODE_OPTIONS = '--max-old-space-size=4096';
+    nextProc.stderr.on('data', (data) => {
+      const output = data.toString();
+      const lines = output.split('\n').filter(l => l.trim());
 
-    // Disable Turbopack cache if it causes issues
-    // Or limit cache size with TURBOPACK_CACHE_DIR env var
-    nextProc.env.TURBOPACK_CACHE_DIR = path.join(rootDir, '.next', 'cache', 'turbo');
+      for (const line of lines) {
+        log.next(line);
+        nextLines.push(line);
+      }
+    });
+
+    nextProc.on('exit', (code) => {
+      if (code !== 0 && code !== null) {
+        log.error(`Next exited with code ${code}`);
+      }
+    });
   }, 2000);
 
   // Handle graceful shutdown
