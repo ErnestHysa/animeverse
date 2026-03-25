@@ -139,10 +139,8 @@ export function clearCustomTimestamps(animeId: number, episodeNumber: number): v
 // AniSkip API
 // ===================================
 
-const ANISKIP_BASE_URL = "https://api.aniskip.com/v2";
-
 /**
- * Fetch skip times from AniSkip API
+ * Fetch skip times from AniSkip API (via server-side proxy to avoid CORS)
  */
 export async function fetchSkipTimes(
   malId: number,
@@ -161,7 +159,10 @@ export async function fetchSkipTimes(
     params.append("episodeLength", episodeLength.toString());
   }
 
-  const url = `${ANISKIP_BASE_URL}/skip-times/${malId}/${episodeNumber}?${params.toString()}`;
+  // Use our server-side proxy to avoid CORS restrictions when called from the browser
+  const isClient = typeof window !== "undefined";
+  const baseUrl = isClient ? "" : (process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000");
+  const url = `${baseUrl}/api/aniskip/${malId}/${episodeNumber}?${params.toString()}`;
 
   try {
     const response = await fetch(url, {

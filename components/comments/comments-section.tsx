@@ -222,6 +222,7 @@ export function CommentsSection({ animeId, animeTitle }: CommentsSectionProps) {
           placeholder="Share your thoughts about this anime..."
           className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 focus:outline-none focus:border-primary/50 resize-none"
           rows={3}
+          suppressHydrationWarning
         />
 
         {/* Reply indicator */}
