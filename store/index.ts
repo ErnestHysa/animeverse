@@ -149,6 +149,20 @@ export interface StoreState {
   checkAndUnlockAchievements: () => void;
 }
 
+type PersistedStoreState = Partial<
+  Pick<
+    StoreState,
+    | "favorites"
+    | "watchlist"
+    | "watchHistory"
+    | "preferences"
+    | "anilistUser"
+    | "anilistToken"
+    | "isAuthenticated"
+    | "anilistMediaList"
+  >
+>;
+
 // ===================================
 // Store Creation
 // ===================================
@@ -746,11 +760,16 @@ export const useStore = create<StoreState>()(
         },
       })),
       // Migration: Ensure subtitleStyle exists for existing users
-      migrate: (persistedState: any, version: number) => {
+      migrate: (persistedState: unknown, version: number) => {
+        const state =
+          persistedState && typeof persistedState === "object"
+            ? (persistedState as PersistedStoreState)
+            : {};
+
         if (version === 0) {
           // Initial migration - ensure preferences has subtitleStyle
-          if (persistedState?.preferences && !persistedState.preferences.subtitleStyle) {
-            persistedState.preferences.subtitleStyle = {
+          if (state.preferences && !state.preferences.subtitleStyle) {
+            state.preferences.subtitleStyle = {
               fontSize: 20,
               fontFamily: "Arial, sans-serif",
               fontColor: "#FFFFFF",
@@ -764,7 +783,7 @@ export const useStore = create<StoreState>()(
             };
           }
         }
-        return persistedState;
+        return state;
       },
       // Only persist certain fields
       partialize: (state) => ({

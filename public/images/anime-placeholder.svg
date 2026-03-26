@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 900" role="img" aria-labelledby="title desc">
+  <title id="title">Anime placeholder poster</title>
+  <desc id="desc">Gradient poster placeholder for anime artwork.</desc>
+  <defs>
+    <linearGradient id="posterBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="50%" stop-color="#1d4ed8" />
+      <stop offset="100%" stop-color="#14b8a6" />
+    </linearGradient>
+    <linearGradient id="posterGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f8fafc" stop-opacity="0.35" />
+      <stop offset="100%" stop-color="#f8fafc" stop-opacity="0" />
+    </linearGradient>
+  </defs>
+  <rect width="600" height="900" rx="36" fill="url(#posterBg)" />
+  <circle cx="470" cy="180" r="130" fill="url(#posterGlow)" />
+  <circle cx="210" cy="270" r="140" fill="#0b1220" opacity="0.55" />
+  <rect x="84" y="118" width="432" height="664" rx="28" fill="#020617" opacity="0.18" />
+  <path d="M166 666c41-146 132-237 223-237 73 0 117 49 117 114 0 104-87 184-213 184H166Z" fill="#e2e8f0" opacity="0.18" />
+  <path d="M203 365c0-67 53-121 119-121s119 54 119 121-53 121-119 121-119-54-119-121Z" fill="#f8fafc" opacity="0.14" />
+  <rect x="156" y="724" width="288" height="20" rx="10" fill="#f8fafc" opacity="0.3" />
+  <rect x="193" y="764" width="214" height="16" rx="8" fill="#f8fafc" opacity="0.18" />
+</svg>

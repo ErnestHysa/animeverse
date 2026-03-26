@@ -248,7 +248,7 @@ export function getAnimeCover(media: Media): string {
     media.coverImage.extraLarge ||
     media.coverImage.large ||
     media.coverImage.medium ||
-    "/placeholder.jpg"
+    "/images/anime-placeholder.svg"
   );
 }
 

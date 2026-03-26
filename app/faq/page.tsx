@@ -23,7 +23,7 @@ const faqs = [
   {
     id: "account-required",
     q: "Do I need to create an account?",
-    a: "No account required! You can start watching immediately. However, creating an account allows you to sync your favorites and watchlist across devices.",
+    a: "No separate AnimeVerse account is required. You can use the app immediately, and optional AniList sign-in adds sync features for your anime data.",
   },
   {
     id: "video-quality",
@@ -38,7 +38,7 @@ const faqs = [
   {
     id: "offline-viewing",
     q: "Can I download episodes for offline viewing?",
-    a: "Currently, we don't support offline downloads. However, you can add anime to your watchlist to easily find them later.",
+    a: "Yes, compatible sources can be downloaded from the watch page. Availability depends on the provider and stream format, so some episodes may still be stream-only.",
   },
   {
     id: "availability",

@@ -68,7 +68,10 @@ async function callScraper(
             native: m.title.native,
           },
           coverImage: {
-            extraLarge: m.coverImage.extraLarge || m.coverImage.large || "/placeholder.jpg",
+            extraLarge:
+              m.coverImage.extraLarge ||
+              m.coverImage.large ||
+              "/images/anime-placeholder.svg",
           },
           description: m.description,
           episodes: m.episodes,

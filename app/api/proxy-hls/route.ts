@@ -8,7 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const MAX_MANIFEST_SIZE = 10 * 1024 * 1024; // 10MB for manifests

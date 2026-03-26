@@ -1,122 +1,122 @@
-# Anime Stream
+# AnimeVerse Stream
 
-A modern anime streaming application built with Next.js 16, featuring AniList integration for anime metadata and video playback.
+AnimeVerse Stream is a Next.js 16 / React 19 anime web app focused on discovery, tracking, and resilient playback. It uses AniList for metadata and search, then layers on watch history, favorites, watchlists, schedule views, AI recommendations, downloads, comments, achievements, AniList sync, and a feature-rich watch page.
 
-## Quick Start
+## Current App State
 
-The project includes a local Consumet API setup for video playback. Simply run:
+- Discovery: home hero, trending, popular, seasonal, studios, genres, schedule, coming soon, random
+- Playback: watch page, server/language switching, HLS proxying, subtitle proxying, download packaging, keyboard shortcuts
+- User tools: continue watching, favorites, watchlist, custom lists, batch actions, history, stats, achievements
+- Connected features: AniList OAuth callback and AniList-backed metadata/search
+- UX extras: PWA support, installable manifest, responsive layouts, AI recommendation surface, comments
+
+## Stack
+
+- Next.js 16 App Router
+- React 19
+- TypeScript
+- Tailwind CSS 4
+- Zustand for local state
+- Playwright for end-to-end coverage
+
+## Getting Started
+
+1. Install dependencies:
+
+```bash
+npm install
+```
+
+2. Copy the example env file if needed:
+
+```bash
+copy .env.local.example .env.local
+```
+
+3. Start the app:
 
 ```bash
 npm run dev
 ```
 
-This will start:
-1. **Consumet API** on `http://localhost:3001` - Provides video sources
-2. **Next.js App** on `http://localhost:3000` - Main application
+The app runs at [http://localhost:3000](http://localhost:3000).
 
-Your browser will automatically open when both servers are ready.
+## Environment Notes
 
-## What's Included
+`npm run dev` starts the Next.js app only. It does not boot a separate video API for you.
 
-- ✅ **Local Consumet API** - Pre-configured and starts automatically
-- ✅ **AnimeKai Provider** - Working video source provider
-- ✅ **AniList Integration** - Anime metadata, search, trending
-- ✅ **Unified Dev Script** - One command to start everything
-- ✅ **Auto Browser Open** - Opens when servers are ready
+`VIDEO_API_BASE_URL` should point at your own provider or deployment if you want live source fetching. When that API is unavailable, the app keeps the discovery surface working and falls back gracefully for local verification instead of crashing.
 
-## Project Structure
-
-```
-~/DEVPROJECTS/
-├── anime-stream/          # Main Next.js application
-│   ├── app/              # Next.js app directory
-│   ├── components/       # React components
-│   ├── scripts/dev.js    # Unified dev server script
-│   └── .env.local        # Config (points to localhost:3001)
-└── consumet/             # Local Consumet API
-    ├── src/              # API source code
-    └── .env              # API config (runs on port 3001)
-```
-
-## Development
-
-### Start Both Servers
-```bash
-npm run dev
-```
-
-### Start Only Next.js (if API is already running)
-```bash
-npm run dev:next
-```
-
-### Build for Production
-```bash
-npm run build
-```
-
-## Configuration
-
-The `.env.local` file is already configured to use the local API:
+Important env vars:
 
 ```env
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 VIDEO_API_BASE_URL=http://localhost:3001
+NEXT_PUBLIC_ANILIST_CLIENT_ID=your-client-id
+ANILIST_CLIENT_SECRET=your-client-secret
 ```
 
-### Using a Different API
+## Quality Checks
 
-If you want to use a different Consumet deployment:
+Run the same checks used during this production-readiness pass:
 
-1. Update `.env.local`:
-   ```env
-   VIDEO_API_BASE_URL=https://your-api-url.com
-   ```
+```bash
+npm run lint
+npm run build
+npm run test:smoke
+```
 
-2. Restart the dev server
+Representative Playwright slices:
+
+```bash
+npx playwright test e2e/home-page.spec.ts --project=chromium
+npx playwright test e2e/video-player.spec.ts --project=chromium
+npx playwright test e2e/real-user-flow.spec.ts --project=chromium
+```
+
+## Production Commands
+
+```bash
+npm run build
+npm start
+```
+
+## Notable Routes
+
+- `/` home, trending, continue watching, AI recommendations
+- `/anime/[id]` anime detail, episodes, related recommendations
+- `/watch/[animeId]/[episode]` playback, downloads, navigation, comments, watch utilities
+- `/search`, `/trending`, `/popular`, `/seasonal`, `/schedule`, `/genres`, `/studios`
+- `/favorites`, `/watchlist`, `/lists`, `/history`, `/stats`, `/achievements`
+- `/about`, `/faq`, `/privacy`, `/terms`, `/dmca`
+
+## API Surface
+
+- `/api/health`
+- `/api/search-suggestions`
+- `/api/video-sources/[animeId]/[episode]`
+- `/api/proxy-hls`
+- `/api/proxy-subtitle`
+- `/api/download-hls`
+- `/api/filler/[malId]`
+- `/api/aniskip/[malId]/[episode]`
+- `/api/scrape`
 
 ## Troubleshooting
 
-**Videos not playing?**
-- Make sure both servers are running (check for API and NEXT logs)
-- Verify `http://localhost:3001` returns "Welcome to consumet api!"
-- Check the browser console for errors
+If playback is unavailable locally:
 
-**Port already in use?**
-- The Consumet API uses port 3001
-- Next.js uses port 3000
-- Kill existing processes: `pkill -f "next dev"` and `pkill -f "nodemon"`
+- verify `VIDEO_API_BASE_URL` points to a reachable service
+- use `/api/health` to confirm the app itself is up
+- run `npm run test:smoke` to check discovery, search, watch routes, and source fallback wiring
 
-## Getting Started (Original)
+If Playwright behaves inconsistently:
 
-First, run the development server:
+- stop any manually running dev servers on ports `3000` or `4000`
+- rerun the targeted spec instead of the full browser matrix first
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## References
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [Next.js docs](https://nextjs.org/docs)
+- [AniList API docs](https://docs.anilist.co)
+- [Playwright docs](https://playwright.dev/docs/intro)

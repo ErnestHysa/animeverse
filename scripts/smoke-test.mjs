@@ -1,6 +1,9 @@
 import http from "node:http";
 import next from "next";
 
+const POSTER_PLACEHOLDER = "http://127.0.0.1:3000/images/anime-placeholder.svg";
+const BANNER_PLACEHOLDER = "http://127.0.0.1:3000/images/anime-banner-placeholder.svg";
+
 function createMockMedia(id = 21459, title = "One Punch Man") {
   return {
     id,
@@ -14,16 +17,12 @@ function createMockMedia(id = 21459, title = "One Punch Man") {
     description:
       "The story of Saitama, a hero who can defeat any enemy with a single punch after training so hard his hair fell out.",
     coverImage: {
-      extraLarge:
-        "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx21459-f6FltM9omHMD.jpg",
-      large:
-        "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx21459-f6FltM9omHMD.jpg",
-      medium:
-        "https://s4.anilist.co/file/anilistcdn/media/anime/cover/small/bx21459-f6FltM9omHMD.jpg",
+      extraLarge: POSTER_PLACEHOLDER,
+      large: POSTER_PLACEHOLDER,
+      medium: POSTER_PLACEHOLDER,
       color: "#f1a150",
     },
-    bannerImage:
-      "https://s4.anilist.co/file/anilistcdn/media/anime/banner/21459-wB5QpMQhfbwH.jpg",
+    bannerImage: BANNER_PLACEHOLDER,
     format: "TV",
     type: "ANIME",
     status: "FINISHED",

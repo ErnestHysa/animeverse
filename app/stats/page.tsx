@@ -299,7 +299,7 @@ export default function StatsPage() {
                     #{index + 1}
                   </span>
                   <img
-                    src={item.anime.coverImage.large || "/placeholder.jpg"}
+                    src={item.anime.coverImage.large || "/images/anime-placeholder.svg"}
                     alt={item.anime.title.userPreferred || ""}
                     className="w-12 h-16 object-cover rounded"
                   />

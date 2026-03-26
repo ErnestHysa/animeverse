@@ -53,7 +53,7 @@ export default defineConfig({
     {
       command: 'node scripts/mock-anilist-server.js',
       url: 'http://localhost:4000/health',
-      reuseExistingServer: true,
+      reuseExistingServer: false,
       timeout: 10000,
     },
     {
@@ -61,7 +61,7 @@ export default defineConfig({
         ? 'cmd /c "set ANILIST_GRAPHQL_URL=http://localhost:4000&& node scripts\\start-next-webpack.mjs"'
         : 'ANILIST_GRAPHQL_URL=http://localhost:4000 node scripts/start-next-webpack.mjs',
       url: 'http://localhost:3000',
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: false,
       timeout: 120000,
       env: {
         ANILIST_GRAPHQL_URL: 'http://localhost:4000',

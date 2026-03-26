@@ -13,7 +13,9 @@ const nextConfig = {
   experimental: {
     // The sandbox blocks child-process workers, so keep webpack builds in-process.
     webpackBuildWorker: false,
-    workerThreads: true,
+    // Worker thread serialization can fail on modern Next builds when route modules
+    // contain non-clonable values, so prefer the more stable single-process path.
+    workerThreads: false,
     cpus: 1,
   },
 

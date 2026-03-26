@@ -11,7 +11,7 @@ import { Star, Users, Zap, Shield } from "lucide-react";
 
 export const metadata = {
   title: "About Us",
-  description: "Learn about AnimeVerse - your ultimate anime streaming destination.",
+  description: "Learn about AnimeVerse and the features that power the current app experience.",
 };
 
 export default function AboutPage() {
@@ -24,7 +24,8 @@ export default function AboutPage() {
           <div className="text-center mb-12">
             <h1 className="text-4xl font-display font-bold mb-4">About AnimeVerse</h1>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Your ultimate destination for watching anime online. Built by anime fans, for anime fans.
+              AniList-powered anime discovery and streaming tools, built to make browsing, tracking,
+              and watching feel fast on desktop and mobile.
             </p>
           </div>
 
@@ -37,9 +38,9 @@ export default function AboutPage() {
               <div>
                 <h2 className="text-2xl font-semibold mb-3">Our Mission</h2>
                 <p className="text-muted-foreground leading-relaxed">
-                  AnimeVerse was created with a simple goal: to provide the best anime streaming experience
-                  possible. We believe everyone should have access to high-quality anime content with a
-                  beautiful, intuitive interface.
+                  AnimeVerse focuses on a polished anime web experience: rich discovery pages, resilient
+                  playback, local watch tracking, AniList sync, and helpful utilities like downloads,
+                  schedule views, comments, and keyboard shortcuts.
                 </p>
               </div>
             </div>
@@ -63,7 +64,8 @@ export default function AboutPage() {
               </div>
               <h3 className="font-semibold mb-2">Community Driven</h3>
               <p className="text-sm text-muted-foreground">
-                Reviews, ratings, and recommendations from a passionate community of anime fans.
+                Episode comments, personalized recommendations, and AniList-connected workflows help
+                the app feel personal without forcing a separate account system.
               </p>
             </GlassCard>
 
@@ -73,7 +75,8 @@ export default function AboutPage() {
               </div>
               <h3 className="font-semibold mb-2">Safe & Secure</h3>
               <p className="text-sm text-muted-foreground">
-                No account required, no ads, and your viewing history stays private on your device.
+                Local watch history, favorites, and preferences stay on-device unless you explicitly
+                connect AniList for sync features.
               </p>
             </GlassCard>
 
@@ -83,7 +86,8 @@ export default function AboutPage() {
               </div>
               <h3 className="font-semibold mb-2">Always Updating</h3>
               <p className="text-sm text-muted-foreground">
-                New episodes and metadata refresh continuously so the catalog stays current throughout each season.
+                Trending, seasonal, studio, genre, and schedule views are powered by live AniList metadata
+                so the catalog stays aligned with the current season.
               </p>
             </GlassCard>
           </div>
@@ -92,7 +96,8 @@ export default function AboutPage() {
           <GlassCard className="p-8">
             <h2 className="text-2xl font-semibold mb-4">Data Source</h2>
             <p className="text-muted-foreground mb-4">
-              AnimeVerse uses the AniList API to provide comprehensive anime information including:
+              AnimeVerse uses the AniList API for discovery metadata and complements it with playback,
+              watch-state, and utility features in-app, including:
             </p>
             <ul className="grid md:grid-cols-2 gap-3 text-muted-foreground">
               <li className="flex items-center gap-2">
@@ -117,7 +122,11 @@ export default function AboutPage() {
               </li>
               <li className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 bg-primary rounded-full" />
-                User recommendations and reviews
+                Recommendation seeds for related anime discovery
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 bg-primary rounded-full" />
+                Watch history, favorites, watchlist, and achievement tracking
               </li>
             </ul>
             <p className="text-sm text-muted-foreground mt-4">
