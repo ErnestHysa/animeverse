@@ -5,7 +5,9 @@
 
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+export const dynamic = "force-dynamic";
+
+import { useMemo, useState } from "react";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -82,6 +84,7 @@ function GenreBar({ genre, count, maxCount, color }: GenreBarProps) {
 
 export default function StatsPage() {
   const { watchHistory, favorites, mediaCache, anilistMediaList } = useStore();
+  const [currentTimestamp] = useState(() => Date.now());
 
   // Calculate comprehensive statistics
   const stats = useMemo(() => {
@@ -105,7 +108,7 @@ export default function StatsPage() {
       : 0;
 
     // Calculate weekly activity
-    const now = Date.now();
+    const now = currentTimestamp;
     const oneWeekAgo = now - 7 * 24 * 60 * 60 * 1000;
     const weeklyEpisodes = watchHistory.filter(
       (item) => item.timestamp >= oneWeekAgo
@@ -181,7 +184,7 @@ export default function StatsPage() {
       favoritesCount: favorites.length,
       maxGenreCount: sortedGenres[0]?.[1] || 1,
     };
-  }, [watchHistory, favorites, mediaCache]);
+  }, [watchHistory, favorites, mediaCache, currentTimestamp]);
 
   const genreColors = [
     "#ef4444", "#f97316", "#f59e0b", "#84cc16", "#22c55e",

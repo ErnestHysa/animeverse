@@ -2,6 +2,8 @@
  * About Page
  */
 
+export const dynamic = "force-dynamic";
+
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -81,7 +83,7 @@ export default function AboutPage() {
               </div>
               <h3 className="font-semibold mb-2">Always Updating</h3>
               <p className="text-sm text-muted-foreground">
-                New episodes added within hours of airing, with simulcast coming soon.
+                New episodes and metadata refresh continuously so the catalog stays current throughout each season.
               </p>
             </GlassCard>
           </div>

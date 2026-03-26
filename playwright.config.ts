@@ -58,8 +58,8 @@ export default defineConfig({
     },
     {
       command: process.platform === 'win32'
-        ? 'cmd /c "set ANILIST_GRAPHQL_URL=http://localhost:4000&& npm run dev:next"'
-        : 'ANILIST_GRAPHQL_URL=http://localhost:4000 npm run dev:next',
+        ? 'cmd /c "set ANILIST_GRAPHQL_URL=http://localhost:4000&& node scripts\\start-next-webpack.mjs"'
+        : 'ANILIST_GRAPHQL_URL=http://localhost:4000 node scripts/start-next-webpack.mjs',
       url: 'http://localhost:3000',
       reuseExistingServer: !process.env.CI,
       timeout: 120000,

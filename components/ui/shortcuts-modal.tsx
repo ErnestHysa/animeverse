@@ -5,8 +5,8 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
-import { keyboardManager, registerDefaultShortcuts, formatKey, DEFAULT_SHORTCUTS } from "@/lib/keyboard-shortcuts";
+import { useEffect, useMemo, useState } from "react";
+import { keyboardManager, registerDefaultShortcuts, formatKey } from "@/lib/keyboard-shortcuts";
 import { X, Keyboard } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 
@@ -23,17 +23,14 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
-  const [shortcuts, setShortcuts] = useState(keyboardManager.getShortcuts());
+  const shortcuts = useMemo(
+    () => (isOpen ? keyboardManager.getShortcuts() : []),
+    [isOpen]
+  );
 
   useEffect(() => {
     registerDefaultShortcuts();
   }, []);
-
-  useEffect(() => {
-    if (isOpen) {
-      setShortcuts(keyboardManager.getShortcuts());
-    }
-  }, [isOpen]);
 
   useEffect(() => {
     const handleToggle = () => onClose();

@@ -7,7 +7,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
@@ -101,8 +101,6 @@ export default function ProfilePage() {
   const mediaCache = useStore((state) => state.mediaCache);
   const achievements = useStore((state) => state.achievements);
 
-  const [topGenres, setTopGenres] = useState<GenreCount[]>([]);
-
   // Compute stats
   const totalEpisodesWatched = watchHistory.length;
   const completedAnime = watchHistory.filter((h) => h.completed).length;
@@ -133,8 +131,7 @@ export default function ProfilePage() {
     (e) => e.status === "DROPPED"
   ).length;
 
-  // Compute top genres from watched anime
-  useEffect(() => {
+  const topGenres = useMemo<GenreCount[]>(() => {
     const genreMap = new Map<string, number>();
     watchHistory.forEach((item) => {
       const media = mediaCache[item.mediaId];
@@ -145,12 +142,10 @@ export default function ProfilePage() {
       }
     });
 
-    const sorted = Array.from(genreMap.entries())
+    return Array.from(genreMap.entries())
       .map(([genre, count]) => ({ genre, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 8);
-
-    setTopGenres(sorted);
   }, [watchHistory, mediaCache]);
 
   return (
@@ -187,7 +182,7 @@ export default function ProfilePage() {
               <p className="text-muted-foreground mt-1">
                 {isAuthenticated
                   ? "AniList account connected"
-                  : "Guest profile — connect AniList to sync your data"}
+                  : "Guest profile - connect AniList to sync your data"}
               </p>
               <div className="flex flex-wrap gap-2 mt-3">
                 {isAuthenticated && anilistUser && (

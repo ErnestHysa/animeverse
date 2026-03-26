@@ -5,6 +5,15 @@
  */
 
 import { WEBTORRENT_CONFIG } from "./constants";
+import type WebTorrent from "webtorrent";
+
+type WebTorrentInstance = WebTorrent.Instance;
+type WebTorrentTorrent = WebTorrent.Torrent;
+type WebTorrentFile = WebTorrent.TorrentFile;
+type WebRtcWindow = Window &
+  typeof globalThis & {
+    RTCPeerConnection?: typeof RTCPeerConnection;
+  };
 
 // ===================================
 // Types
@@ -44,8 +53,8 @@ export interface PlayerEvents {
 // ===================================
 
 class WebTorrentManager {
-  private client: any = null;
-  private currentTorrent: any = null;
+  private client: WebTorrentInstance | null = null;
+  private currentTorrent: WebTorrentTorrent | null = null;
   private videoElement: HTMLVideoElement | null = null;
 
   /**
@@ -106,13 +115,13 @@ class WebTorrentManager {
       this.client!.add(
         torrentId,
         {
-          announce: WEBTORRENT_CONFIG.announce,
+          announce: [...WEBTORRENT_CONFIG.announce],
         },
-        (torrent: any) => {
+        (torrent: WebTorrentTorrent) => {
           this.currentTorrent = torrent;
 
           // Find the largest video file
-          const file = torrent.files.find((f: any) => {
+          const file = torrent.files.find((f: WebTorrentFile) => {
             const ext = f.name.endsWith(".mp4") ||
                         f.name.endsWith(".mkv") ||
                         f.name.endsWith(".webm");
@@ -125,7 +134,7 @@ class WebTorrentManager {
           }
 
           // Stream to video element
-          file.renderTo(videoElement, (err: Error) => {
+          file.renderTo(videoElement, (err?: Error) => {
             if (err) {
               events?.onError?.(err);
               reject(err);
@@ -137,9 +146,10 @@ class WebTorrentManager {
           });
 
           // Handle torrent events
-          torrent.on("error", (err: Error) => {
-            events?.onError?.(err);
-            reject(err);
+          torrent.on("error", (err: Error | string) => {
+            const error = typeof err === "string" ? new Error(err) : err;
+            events?.onError?.(error);
+            reject(error);
           });
 
           torrent.on("done", () => {
@@ -148,9 +158,10 @@ class WebTorrentManager {
         }
       );
 
-      this.client.on("error", (err: Error) => {
-        events?.onError?.(err);
-        reject(err);
+      this.client.on("error", (err: Error | string) => {
+        const error = typeof err === "string" ? new Error(err) : err;
+        events?.onError?.(error);
+        reject(error);
       });
     });
   }
@@ -283,7 +294,7 @@ class WebTorrentManager {
    */
   static isSupported(): boolean {
     return typeof window !== "undefined" &&
-           typeof (window as any).RTCPeerConnection !== "undefined";
+           typeof (window as WebRtcWindow).RTCPeerConnection !== "undefined";
   }
 }
 

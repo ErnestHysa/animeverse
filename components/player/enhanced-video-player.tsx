@@ -34,7 +34,7 @@ import {
   getEstimatedTimestamps,
   type IntroOutroTimestamps,
 } from "@/lib/aniskip";
-import Hls from "hls.js";
+import Hls, { type HlsConfig } from "hls.js";
 
 // Dynamic import for watch party controls to reduce initial bundle
 const WatchPartyControls = dynamic(
@@ -93,6 +93,22 @@ export interface SubtitleTrack {
   lang: string;
   label: string;
 }
+
+type FullscreenDocument = Document & {
+  webkitExitFullscreen?: () => Promise<void> | void;
+  mozCancelFullScreen?: () => Promise<void> | void;
+  msExitFullscreen?: () => Promise<void> | void;
+};
+
+type FullscreenContainer = HTMLDivElement & {
+  webkitRequestFullscreen?: () => Promise<void> | void;
+  mozRequestFullScreen?: () => Promise<void> | void;
+  msRequestFullscreen?: () => Promise<void> | void;
+};
+
+type SeekableVideoElement = HTMLVideoElement & {
+  __lastSeekTime?: number;
+};
 
 // ===================================
 // Main Component
@@ -395,7 +411,7 @@ export function EnhancedVideoPlayer({
       if (isHls && typeof Hls !== "undefined" && Hls.isSupported()) {
         // Use HLS.js for browsers that don't support HLS natively
         // Configure for better compatibility with various CDN formats
-        const hlsConfig: any = {
+        const hlsConfig: Partial<HlsConfig> = {
           // Disable worker - can cause issues with some codec formats
           enableWorker: false,
           // Don't use low latency mode - more lenient parsing
@@ -411,13 +427,6 @@ export function EnhancedVideoPlayer({
           autoStartLoad: true,
           // Cap level to player size to avoid unsupported resolutions
           capLevelToPlayerSize: true,
-          // Add more lenient error recovery
-          recoverMediaErrorDuration: 10000,
-          // Prefer MP4A audio codec (more compatible)
-          preferredCodecs: {
-            video: ['avc1', 'hvc1'],
-            audio: ['mp4a', 'aac'],
-          },
           // Use fetch API for all requests (more reliable than XHR)
           // This allows us to intercept and proxy all requests uniformly
           loader: Hls.DefaultConfig.loader,
@@ -1529,31 +1538,32 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
   };
 
   const toggleFullscreen = () => {
-    const container = containerRef.current;
+    const container = containerRef.current as FullscreenContainer | null;
+    const fullscreenDocument = document as FullscreenDocument;
     if (!container) return;
 
     if (document.fullscreenElement) {
       // Exit fullscreen - try all vendor methods
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
-      } else if ((document as any).webkitExitFullscreen) {
-        (document as any).webkitExitFullscreen();
-      } else if ((document as any).mozCancelFullScreen) {
-        (document as any).mozCancelFullScreen();
-      } else if ((document as any).msExitFullscreen) {
-        (document as any).msExitFullscreen();
+      if (fullscreenDocument.exitFullscreen) {
+        fullscreenDocument.exitFullscreen();
+      } else if (fullscreenDocument.webkitExitFullscreen) {
+        fullscreenDocument.webkitExitFullscreen();
+      } else if (fullscreenDocument.mozCancelFullScreen) {
+        fullscreenDocument.mozCancelFullScreen();
+      } else if (fullscreenDocument.msExitFullscreen) {
+        fullscreenDocument.msExitFullscreen();
       }
       setIsFullscreen(false);
     } else {
       // Enter fullscreen - try all vendor methods
       if (container.requestFullscreen) {
         container.requestFullscreen();
-      } else if ((container as any).webkitRequestFullscreen) {
-        (container as any).webkitRequestFullscreen();
-      } else if ((container as any).mozRequestFullScreen) {
-        (container as any).mozRequestFullScreen();
-      } else if ((container as any).msRequestFullscreen) {
-        (container as any).msRequestFullscreen();
+      } else if (container.webkitRequestFullscreen) {
+        container.webkitRequestFullscreen();
+      } else if (container.mozRequestFullScreen) {
+        container.mozRequestFullScreen();
+      } else if (container.msRequestFullscreen) {
+        container.msRequestFullscreen();
       }
       setIsFullscreen(true);
     }
@@ -1620,7 +1630,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
       video.currentTime = seekTime;
 
       // Store the seek time for recovery if needed
-      (video as any).__lastSeekTime = seekTime;
+      (video as SeekableVideoElement).__lastSeekTime = seekTime;
     }
   };
 

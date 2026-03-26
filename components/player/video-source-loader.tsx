@@ -32,6 +32,34 @@ interface LanguageOption {
   available: boolean;
 }
 
+interface AvailableLanguageResponse {
+  type: "sub" | "dub";
+  available: boolean;
+}
+
+interface ApiVideoSource {
+  url: string;
+  quality: VideoQuality["quality"];
+  label?: string;
+  size?: string;
+  type?: "mp4" | "hls" | "webm";
+}
+
+interface VideoSourcesResponse {
+  error?: string;
+  message?: string;
+  provider?: string;
+  referer?: string;
+  isFallback?: boolean;
+  sources?: ApiVideoSource[];
+  subtitles?: Array<{
+    url: string;
+    lang: string;
+    label: string;
+  }>;
+  availableLanguages?: AvailableLanguageResponse[];
+}
+
 // Bandwidth-aware initial quality selection
 function getPreferredQualityForNetwork(): string {
   if (typeof navigator === 'undefined') return 'auto';
@@ -132,7 +160,9 @@ export function VideoSourceLoader({
       if (!response.ok) {
         if (response.status === 503) {
           // API unavailable error
-          const errorData = await response.json().catch(() => ({}));
+          const errorData = await response.json().catch(
+            (): VideoSourcesResponse => ({})
+          );
           throw new Error(
             errorData.message || "The video source API is currently unavailable. Please try again later."
           );
@@ -140,10 +170,10 @@ export function VideoSourceLoader({
         throw new Error(`Failed to fetch sources: ${response.statusText}`);
       }
 
-      const data = await response.json();
+      const data: VideoSourcesResponse = await response.json();
 
       // Check for API unavailable error
-      if (data.error === "API_UNAVAILABLE" || (!data.sources || data.sources.length === 0)) {
+      if (data.error === "API_UNAVAILABLE" || !data.sources || data.sources.length === 0) {
         const errorMessage = data.message || "No video sources found. The video API may be unavailable.";
         throw new Error(errorMessage);
       }
@@ -154,25 +184,27 @@ export function VideoSourceLoader({
 
       // Update available languages based on API response
       if (data.availableLanguages) {
+        const availableLanguages = data.availableLanguages;
         setAllLanguages((prev) =>
           prev.map((lang) => ({
             ...lang,
-            available: data.availableLanguages.find(
-              (al: any) => al.type === lang.type
+            available: availableLanguages.find(
+              (availableLanguage) => availableLanguage.type === lang.type
             )?.available ?? lang.available,
           }))
         );
       }
 
       // Group sources by quality for quality selector
-      const qualities: VideoQuality[] = data.sources.map((s: any) => ({
-        url: s.url,
-        quality: s.quality,
-        label: s.label || s.quality,
-        size: s.size,
+      const qualities: VideoQuality[] = data.sources.map((source) => ({
+        url: source.url,
+        quality: source.quality,
+        label: source.label || source.quality,
+        size: source.size,
       }));
 
       // Create server options for server selector
+      const apiSources = data.sources;
       const serverOptions: Array<{
         id: string;
         name: string;
@@ -181,9 +213,9 @@ export function VideoSourceLoader({
         type: "mp4" | "hls" | "webm";
       }> = [];
 
-      const uniqueQualities = [...new Set(data.sources.map((s: any) => s.quality))];
+      const uniqueQualities = [...new Set(apiSources.map((source) => source.quality))];
       uniqueQualities.forEach((quality) => {
-        const sourceForQuality = data.sources.find((s: any) => s.quality === quality);
+        const sourceForQuality = apiSources.find((source) => source.quality === quality);
         if (sourceForQuality) {
           serverOptions.push({
             id: `${data.provider}-${quality}`,
@@ -204,11 +236,11 @@ export function VideoSourceLoader({
 
       const defaultSource =
         (preferredQuality !== 'auto'
-          ? data.sources.find((s: any) => s.quality === preferredQuality)
+          ? apiSources.find((source) => source.quality === preferredQuality)
           : null) ||
-        data.sources.find((s: any) => s.quality === "1080p") ||
-        data.sources.find((s: any) => s.quality === "720p") ||
-        data.sources[0];
+        apiSources.find((source) => source.quality === "1080p") ||
+        apiSources.find((source) => source.quality === "720p") ||
+        apiSources[0];
 
       setAllServers(serverOptions);
       const sourceUrl = defaultSource.url;
@@ -472,7 +504,7 @@ export function VideoSourceLoader({
               <h4 className="font-semibold text-yellow-500">Demo Mode</h4>
               <p className="text-sm text-muted-foreground mt-1">
                 The requested anime is not currently available. Showing a demo video instead.
-                This typically happens when the anime isn't in our database yet.
+                This typically happens when the anime isn&apos;t in our database yet.
               </p>
             </div>
             <Button

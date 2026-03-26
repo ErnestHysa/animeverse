@@ -1,0 +1,52 @@
+[GET] http://localhost:3000/watch/172463/1 => [200] OK
+[GET] http://localhost:3000/_next/static/media/0c89a48fa5027cee-s.p.4564287c.woff2 => [200] OK
+[GET] http://localhost:3000/_next/static/media/fba5a26ea33df6a3-s.p.1bbdebe6.woff2 => [200] OK
+[GET] http://localhost:3000/_next/static/chunks/%5Broot-of-the-server%5D__519c4db4._.css => [200] OK
+[GET] http://localhost:3000/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_3961f38e._.js => [200] OK
+[GET] http://localhost:3000/_next/static/chunks/bb6de_next_dist_compiled_react-dom_396ee27e._.js => [200] OK
+[GET] http://localhost:3000/_next/static/chunks/bb6de_next_dist_compiled_react-server-dom-turbopack_cc724c2d._.js => [200] OK
+[GET] http://localhost:3000/_next/static/chunks/bb6de_next_dist_compiled_next-devtools_index_1179cc5e.js => [200] OK
+[GET] http://localhost:3000/_next/static/chunks/bb6de_next_dist_compiled_2568aba4._.js => [200] OK
+[GET] http://localhost:3000/_next/static/chunks/bb6de_next_dist_client_8c49acab._.js => [200] OK
+[GET] http://localhost:3000/_next/static/chunks/bb6de_next_dist_c0ffe618._.js => [200] OK
+[GET] http://localhost:3000/_next/static/chunks/bb6de_%40swc_helpers_cjs_4568f7d0._.js => [200] OK
+[GET] http://localhost:3000/_next/static/chunks/DEVPROJECTS_anime-stream_a0ff3932._.js => [200] OK
+[GET] http://localhost:3000/_next/static/chunks/turbopack-DEVPROJECTS_anime-stream_dc2fa595._.js => [200] OK
+[GET] http://localhost:3000/_next/static/chunks/bb6de_next_dist_5fa8137d._.js => [200] OK
+[GET] http://localhost:3000/_next/static/chunks/DEVPROJECTS_anime-stream_app_favicon_ico_mjs_3211a8ca._.js => [200] OK
+[GET] http://localhost:3000/_next/static/chunks/bb6de_a1619469._.js => [200] OK
+[GET] http://localhost:3000/_next/static/chunks/DEVPROJECTS_anime-stream_b0359fe1._.js => [200] OK
+[GET] http://localhost:3000/_next/static/chunks/DEVPROJECTS_anime-stream_app_layout_tsx_eddba44f._.js => [200] OK
+[GET] http://localhost:3000/_next/static/chunks/DEVPROJECTS_anime-stream_00f4283f._.js => [200] OK
+[GET] http://localhost:3000/_next/static/chunks/DEVPROJECTS_anime-stream_app_error_tsx_a1f80adc._.js => [200] OK
+[GET] http://localhost:3000/_next/static/chunks/DEVPROJECTS_anime-stream_095477a9._.js => [200] OK
+[GET] http://localhost:3000/_next/static/chunks/DEVPROJECTS_anime-stream_app_not-found_tsx_a1f80adc._.js => [200] OK
+[GET] http://localhost:3000/_next/static/chunks/bb6de_next_dist_client_components_builtin_global-error_eddba44f.js => [200] OK
+[GET] http://localhost:3000/_next/static/chunks/DEVPROJECTS_anime-stream_75333f62._.js => [200] OK
+[GET] http://localhost:3000/_next/static/chunks/DEVPROJECTS_anime-stream_199849a0._.js => [200] OK
+[GET] http://localhost:3000/_next/static/chunks/bb6de_next_7fbe96b7._.js => [200] OK
+[GET] http://localhost:3000/_next/static/chunks/bb6de_hls_js_dist_hls_mjs_75fde672._.js => [200] OK
+[GET] http://localhost:3000/_next/static/chunks/bb6de_928529a6._.js => [200] OK
+[GET] http://localhost:3000/_next/static/chunks/DEVPROJECTS_anime-stream_app_watch_%5BanimeId%5D_%5Bepisode%5D_page_tsx_a1f80adc._.js => [200] OK
+[GET] http://localhost:3000/manifest.json => [200] OK
+[GET] http://localhost:3000/_next/image?url=https%3A%2F%2Fs4.anilist.co%2Ffile%2Fanilistcdn%2Fmedia%2Fanime%2Fcover%2Fmedium%2Fbx171627-ZN9D7P46yHnw.png&w=384&q=75 => [200] OK
+[GET] http://localhost:3000/_next/image?url=https%3A%2F%2Fs4.anilist.co%2Ffile%2Fanilistcdn%2Fmedia%2Fanime%2Fcover%2Fmedium%2Fbx269-d2GmRkJbMopq.png&w=384&q=75 => [200] OK
+[GET] http://localhost:3000/_next/image?url=https%3A%2F%2Fs4.anilist.co%2Ffile%2Fanilistcdn%2Fmedia%2Fanime%2Fcover%2Fmedium%2Fbx11061-y5gsT1hoHuHw.png&w=384&q=75 => [200] OK
+[GET] http://localhost:3000/_next/image?url=https%3A%2F%2Fs4.anilist.co%2Ffile%2Fanilistcdn%2Fmedia%2Fanime%2Fcover%2Fmedium%2Fbx116674-p3zK4PUX2Aag.jpg&w=384&q=75 => [200] OK
+[GET] http://localhost:3000/_next/image?url=https%3A%2F%2Fs4.anilist.co%2Ffile%2Fanilistcdn%2Fmedia%2Fanime%2Fcover%2Fmedium%2Fbx392-z90299zIvYmx.png&w=384&q=75 => [200] OK
+[GET] http://localhost:3000/_next/image?url=https%3A%2F%2Fs4.anilist.co%2Ffile%2Fanilistcdn%2Fmedia%2Fanime%2Fcover%2Fmedium%2Fbx136-gj0bbCpDNrKG.jpg&w=384&q=75 => [200] OK
+[GET] http://localhost:3000/_next/image?url=https%3A%2F%2Fs4.anilist.co%2Ffile%2Fanilistcdn%2Fmedia%2Fanime%2Fcover%2Fmedium%2Fbx101922-WBsBl0ClmgYL.jpg&w=384&q=75 => [200] OK
+[GET] http://localhost:3000/_next/image?url=https%3A%2F%2Fs4.anilist.co%2Ffile%2Fanilistcdn%2Fmedia%2Fanime%2Fcover%2Fmedium%2Fbx128893-Gc2t8b8M0mVu.jpg&w=384&q=75 => [200] OK
+[GET] http://localhost:3000/_next/image?url=https%3A%2F%2Fs4.anilist.co%2Ffile%2Fanilistcdn%2Fmedia%2Fanime%2Fcover%2Fmedium%2Fbx172463-LnXqHzt74SJL.jpg&w=96&q=75 => [200] OK
+[GET] http://localhost:3000/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_c8c997ce._.js => [200] OK
+[GET] http://localhost:3000/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_a28c5f8a._.js => [200] OK
+[GET] http://localhost:3000/icons/icon.svg => [200] OK
+[GET] http://localhost:3000/api/video-sources/172463/1?title=JUJUTSU+KAISEN+Season+3%3A+The+Culling+Game+Part+1&malId=57658&language=sub => [200] OK
+[GET] https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx172463-LnXqHzt74SJL.jpg => [200] 
+[GET] http://localhost:3000/_next/static/chunks/DEVPROJECTS_anime-stream_f5374e55._.js => [200] OK
+[GET] http://localhost:3000/_next/static/chunks/DEVPROJECTS_anime-stream_components_player_watch-party_tsx_56691047._.js => [200] OK
+[GET] https://api.aniskip.com/v2/skip-times/57658/1?types=op&types=ed&types=mixed-op&types=mixed-ed => [400] 
+[GET] https://api.aniskip.com/v2/skip-times/57658/1?types=op&types=ed&types=mixed-op&types=mixed-ed => [400] 
+[GET] http://localhost:3000/api/proxy-hls?url=https%3A%2F%2Fsrv29.sushi.streampeaker.org%2FDDL%2FANIME%2FJujutsuKaisen%2FJujutsuKaisen_Ep_01_SUB_ITA.mp4&type=video&referer=https%3A%2F%2Fwww.animesaturn.cx%2Fwatch%3Ffile%3DS_IHR2HWCOF3y => [400] Bad Request
+[GET] http://localhost:3000/__nextjs_font/geist-latin.woff2 => [200] OK
+[POST] http://localhost:3000/__nextjs_original-stack-frames => [200] OK

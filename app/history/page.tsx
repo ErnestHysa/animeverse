@@ -5,6 +5,8 @@
 
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import { useStore } from "@/store";
 import { Clock, Play, Trash2, Film, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
