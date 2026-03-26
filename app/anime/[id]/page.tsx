@@ -20,6 +20,7 @@ import { Suspense } from "react";
 import { AnimeActions } from "@/components/anime/anime-actions";
 import { CommentsSection } from "@/components/comments/comments-section";
 import type { Media } from "@/types/anilist";
+import { CacheAnime } from "@/components/anime/cache-anime";
 
 // ===================================
 // Link Button Wrappers
@@ -532,6 +533,7 @@ export default async function AnimeDetailPage({ params }: PageProps) {
     <>
       <Header />
       <main className="min-h-screen">
+        <CacheAnime media={anime} />
         {/* Hero Section */}
         <Suspense fallback={<AnimeDetailHeroSkeleton />}>
           <HeroSection anime={anime} />

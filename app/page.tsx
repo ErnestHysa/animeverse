@@ -12,6 +12,7 @@ import { ContinueWatching } from "@/components/continue-watching";
 import { AIRecommendationsSection } from "@/components/recommendations/ai-recommendations-section";
 import { GlassCard } from "@/components/ui/glass-card";
 import { ImageWithFallback } from "@/components/ui/image-with-fallback";
+import { CacheAnime } from "@/components/anime/cache-anime";
 import { anilist } from "@/lib/anilist";
 import { Button } from "@/components/ui/button";
 import { Play, TrendingUp, Star, Clock, Eye } from "lucide-react";
@@ -350,6 +351,8 @@ export default async function HomePage() {
       <Header />
       <main className="min-h-screen">
         <div className="container mx-auto px-4 pt-24 pb-12">
+          <CacheAnime media={[...trendingAnime, ...popularAnime, ...seasonalAnime, ...mostViewedAnime]} />
+
           {/* Hero Section */}
           <Suspense fallback={<HeroSkeleton />}>
             <HeroSection anime={trendingAnime} />

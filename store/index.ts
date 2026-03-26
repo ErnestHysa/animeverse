@@ -156,10 +156,13 @@ type PersistedStoreState = Partial<
     | "watchlist"
     | "watchHistory"
     | "preferences"
+    | "mediaCache"
     | "anilistUser"
     | "anilistToken"
     | "isAuthenticated"
     | "anilistMediaList"
+    | "achievements"
+    | "unlockedAchievements"
   >
 >;
 
@@ -729,7 +732,7 @@ export const useStore = create<StoreState>()(
     }),
     {
       name: "animeverse-stream-storage",
-      version: 1,
+      version: 2,
       storage: createJSONStorage(() => ({
         getItem: (name) => {
           try {
@@ -766,7 +769,7 @@ export const useStore = create<StoreState>()(
             ? (persistedState as PersistedStoreState)
             : {};
 
-        if (version === 0) {
+        if (version === 0 || version === 1) {
           // Initial migration - ensure preferences has subtitleStyle
           if (state.preferences && !state.preferences.subtitleStyle) {
             state.preferences.subtitleStyle = {
@@ -786,16 +789,19 @@ export const useStore = create<StoreState>()(
         return state;
       },
       // Only persist certain fields
-      partialize: (state) => ({
-        favorites: state.favorites,
-        watchlist: state.watchlist,
-        watchHistory: state.watchHistory,
-        preferences: state.preferences,
-        anilistUser: state.anilistUser,
-        anilistToken: state.anilistToken,
-        isAuthenticated: state.isAuthenticated,
-        anilistMediaList: state.anilistMediaList,
-      }),
+        partialize: (state) => ({
+          favorites: state.favorites,
+          watchlist: state.watchlist,
+          watchHistory: state.watchHistory,
+          preferences: state.preferences,
+          mediaCache: state.mediaCache,
+          anilistUser: state.anilistUser,
+          anilistToken: state.anilistToken,
+          isAuthenticated: state.isAuthenticated,
+          anilistMediaList: state.anilistMediaList,
+          achievements: state.achievements,
+          unlockedAchievements: state.unlockedAchievements,
+        }),
     }
   )
 );

@@ -5,26 +5,62 @@
 
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Bell, BellOff, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   areNotificationsSupported,
+  getAnimeNotificationPreferences,
   getNotificationPermission,
+  getNotificationTopicSettings,
   requestNotificationPermission,
+  saveNotificationTopicSettings,
+  setAnimeNotificationEnabled,
 } from "@/lib/notifications";
+import { useFavorites, useWatchlist } from "@/store";
 
 export function NotificationSettings() {
   // Use lazy initializers to avoid setState in effect
   const [permission, setPermission] = useState(() => getNotificationPermission());
   const [isSupported] = useState(() => areNotificationsSupported());
   const [requesting, setRequesting] = useState(false);
+  const [topicSettings, setTopicSettings] = useState(() => getNotificationTopicSettings());
+  const { favorites } = useFavorites();
+  const { watchlist } = useWatchlist();
+
+  const trackedAnimeIds = useMemo(
+    () => Array.from(new Set([...watchlist, ...favorites])),
+    [favorites, watchlist]
+  );
+  const enabledAnimeCount = useMemo(() => {
+    const trackedIds = new Set(trackedAnimeIds);
+    return getAnimeNotificationPreferences().filter((item) => trackedIds.has(item.mediaId)).length;
+  }, [trackedAnimeIds]);
 
   const handleRequestPermission = async () => {
     setRequesting(true);
     const result = await requestNotificationPermission();
     setPermission(result);
     setRequesting(false);
+  };
+
+  const handleTopicToggle = (key: keyof typeof topicSettings) => {
+    const next = {
+      ...topicSettings,
+      [key]: !topicSettings[key],
+    };
+    setTopicSettings(next);
+    saveNotificationTopicSettings(next);
+  };
+
+  const handleBulkAnimeToggle = (enabled: boolean) => {
+    trackedAnimeIds.forEach((mediaId) => {
+      setAnimeNotificationEnabled(
+        mediaId,
+        `Anime ${mediaId}`,
+        enabled
+      );
+    });
   };
 
   if (!isSupported) {
@@ -112,6 +148,40 @@ export function NotificationSettings() {
       {/* Notification Types (only shown when granted) */}
       {permission === "granted" && (
         <div className="space-y-3">
+          <div className="p-4 bg-white/5 rounded-lg space-y-3">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="font-medium">Tracked Anime</p>
+                <p className="text-xs text-muted-foreground">
+                  {trackedAnimeIds.length} anime in favorites/watchlist, {enabledAnimeCount} with episode alerts enabled
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="glass"
+                  onClick={() => handleBulkAnimeToggle(true)}
+                  disabled={trackedAnimeIds.length === 0}
+                >
+                  Enable All
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleBulkAnimeToggle(false)}
+                  disabled={enabledAnimeCount === 0}
+                >
+                  Disable All
+                </Button>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Per-anime controls stay available from the header bell, so settings and the in-app notification center now manage the same tracked list.
+            </p>
+          </div>
+
           <p className="text-sm font-medium">Notify me about:</p>
 
           <label className="flex items-center justify-between p-3 bg-white/5 rounded-lg cursor-pointer hover:bg-white/10 transition-colors">
@@ -119,7 +189,12 @@ export function NotificationSettings() {
               <p className="font-medium">New Episodes</p>
               <p className="text-xs text-muted-foreground">When a new episode of anime in your watchlist airs</p>
             </div>
-            <input type="checkbox" className="w-5 h-5 rounded" defaultChecked />
+            <input
+              type="checkbox"
+              className="w-5 h-5 rounded"
+              checked={topicSettings.newEpisodes}
+              onChange={() => handleTopicToggle("newEpisodes")}
+            />
           </label>
 
           <label className="flex items-center justify-between p-3 bg-white/5 rounded-lg cursor-pointer hover:bg-white/10 transition-colors">
@@ -127,7 +202,12 @@ export function NotificationSettings() {
               <p className="font-medium">Airing Reminders</p>
               <p className="text-xs text-muted-foreground">30 minutes before your favorite anime airs</p>
             </div>
-            <input type="checkbox" className="w-5 h-5 rounded" />
+            <input
+              type="checkbox"
+              className="w-5 h-5 rounded"
+              checked={topicSettings.airingReminders}
+              onChange={() => handleTopicToggle("airingReminders")}
+            />
           </label>
 
           <label className="flex items-center justify-between p-3 bg-white/5 rounded-lg cursor-pointer hover:bg-white/10 transition-colors">
@@ -135,7 +215,12 @@ export function NotificationSettings() {
               <p className="font-medium">Recommendations</p>
               <p className="text-xs text-muted-foreground">New anime we think you&apos;ll like based on your history</p>
             </div>
-            <input type="checkbox" className="w-5 h-5 rounded" />
+            <input
+              type="checkbox"
+              className="w-5 h-5 rounded"
+              checked={topicSettings.recommendations}
+              onChange={() => handleTopicToggle("recommendations")}
+            />
           </label>
         </div>
       )}

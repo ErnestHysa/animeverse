@@ -13,7 +13,7 @@ export default function BatchOperationsPage() {
   return (
     <>
       <Header />
-      <main className="min-h-screen container mx-auto px-4 py-8">
+      <main className="min-h-screen container mx-auto px-4 pt-24 pb-12">
         <div className="mb-8">
           <h1 className="text-4xl font-bold mb-2">Batch Operations</h1>
           <p className="text-muted-foreground">

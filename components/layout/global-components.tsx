@@ -8,6 +8,7 @@
 import { KeyboardShortcutsButton } from "@/components/ui/shortcuts-modal";
 import { registerDefaultShortcuts } from "@/lib/keyboard-shortcuts";
 import { useEffect } from "react";
+import { AppSuiteOrchestrator } from "@/components/layout/app-suite-orchestrator";
 
 export function GlobalComponents() {
   useEffect(() => {
@@ -17,6 +18,7 @@ export function GlobalComponents() {
 
   return (
     <>
+      <AppSuiteOrchestrator />
       <KeyboardShortcutsButton />
     </>
   );

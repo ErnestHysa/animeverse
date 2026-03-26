@@ -45,16 +45,51 @@ class RecommendationEngine {
   /**
    * Analyze user's watch history to extract preferences
    */
-  analyzeWatchHistory(watchHistory: WatchHistoryItem[], favorites: number[], ratedAnime: Map<number, number>): UserPreferences {
-    // Extract genres from completed anime (would need to fetch full details)
+  analyzeWatchHistory(
+    watchHistory: WatchHistoryItem[],
+    favorites: number[],
+    candidates: Media[]
+  ): UserPreferences {
+    const animeMap = new Map(candidates.map((anime) => [anime.id, anime]));
     const genreCounts = new Map<string, number>();
     const formatCounts = new Map<string, number>();
     const studioCounts = new Map<string, number>();
-    const totalScore = 0;
-    const scoreCount = 0;
+    let totalScore = 0;
+    let scoreCount = 0;
 
-    // In production, fetch full anime details to extract genres
-    // For now, use default preferences based on watch history size
+    const favoriteSet = new Set(favorites);
+    const watchedIds = new Set(watchHistory.map((entry) => entry.mediaId));
+    const preferenceIds = new Set([...favoriteSet, ...watchedIds]);
+
+    for (const animeId of preferenceIds) {
+      const anime = animeMap.get(animeId);
+      if (!anime) {
+        continue;
+      }
+
+      const historyEntries = watchHistory.filter((entry) => entry.mediaId === animeId);
+      const watchWeight =
+        historyEntries.length +
+        (historyEntries.some((entry) => entry.completed) ? 2 : 0) +
+        (favoriteSet.has(animeId) ? 3 : 0);
+
+      anime.genres?.forEach((genre) => {
+        genreCounts.set(genre, (genreCounts.get(genre) || 0) + watchWeight);
+      });
+
+      if (anime.format) {
+        formatCounts.set(anime.format, (formatCounts.get(anime.format) || 0) + watchWeight);
+      }
+
+      anime.studios?.nodes?.forEach((studio) => {
+        studioCounts.set(studio.name, (studioCounts.get(studio.name) || 0) + watchWeight);
+      });
+
+      if (anime.averageScore) {
+        totalScore += anime.averageScore;
+        scoreCount++;
+      }
+    }
 
     const watchingPattern = this.determineWatchingPattern(watchHistory);
 
@@ -62,10 +97,16 @@ class RecommendationEngine {
       favoriteGenres: Array.from(genreCounts.entries())
         .map(([genre, count]) => ({ genre, score: count, count }))
         .sort((a, b) => b.score - a.score)
-        .slice(0, 5),
-      preferredFormats: Array.from(formatCounts.keys()),
-      preferredStudios: Array.from(studioCounts.keys()),
-      averageScorePreference: totalScore / Math.max(scoreCount, 1),
+      .slice(0, 5),
+      preferredFormats: Array.from(formatCounts.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([format]) => format),
+      preferredStudios: Array.from(studioCounts.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([studio]) => studio),
+      averageScorePreference: scoreCount > 0 ? totalScore / scoreCount : 75,
       watchingPattern,
     };
   }
@@ -97,11 +138,11 @@ class RecommendationEngine {
   scoreAnime(
     anime: Media,
     preferences: UserPreferences,
-    recentlyWatched: Set<number>
+    recentlyWatched: Set<number>,
+    favorites: Set<number>
   ): RecommendationResult {
     let score = 0;
     const reasons: string[] = [];
-    const maxScore = 100;
 
     // 1. Genre matching (up to 40 points)
     if (anime.genres && preferences.favoriteGenres.length > 0) {
@@ -133,6 +174,9 @@ class RecommendationEngine {
       if (anime.averageScore >= 80) {
         reasons.push(`Highly rated (${anime.averageScore}% score)`);
       }
+      if (anime.averageScore >= preferences.averageScorePreference) {
+        score += 6;
+      }
     }
 
     // 4. Popularity/Trending (up to 10 points)
@@ -147,6 +191,22 @@ class RecommendationEngine {
     if (anime.format && preferences.preferredFormats.includes(anime.format)) {
       score += 10;
       reasons.push(`Matches your preferred format`);
+    }
+
+    if (preferences.watchingPattern === "binge" && anime.episodes && anime.episodes >= 24) {
+      score += 5;
+      reasons.push("Great for binge sessions");
+    }
+
+    if (preferences.watchingPattern === "weekly" && anime.status === "RELEASING") {
+      score += 5;
+      reasons.push("Fits your weekly watch pattern");
+    }
+
+    if (favorites.size > 0 && anime.genres?.some((genre) =>
+      preferences.favoriteGenres.some((favGenre) => favGenre.genre === genre)
+    )) {
+      score += 5;
     }
 
     // 6. Currently airing bonus (up to 5 points)
@@ -190,12 +250,13 @@ class RecommendationEngine {
     favorites: number[],
     limit: number = 20
   ): Promise<RecommendationResult[]> {
-    const preferences = this.analyzeWatchHistory(watchHistory, favorites, new Map());
+    const preferences = this.analyzeWatchHistory(watchHistory, favorites, candidates);
     const recentlyWatched = new Set(watchHistory.map((h) => h.mediaId));
+    const favoriteIds = new Set(favorites);
 
     // Score all candidates
     const scored = candidates
-      .map((anime) => this.scoreAnime(anime, preferences, recentlyWatched))
+      .map((anime) => this.scoreAnime(anime, preferences, recentlyWatched, favoriteIds))
       .filter((r) => r.score > 0)
       .sort((a, b) => b.score - a.score)
       .slice(0, limit);
@@ -211,8 +272,6 @@ class RecommendationEngine {
     candidates: Media[],
     limit: number = 10
   ): RecommendationResult[] {
-    const recentlyWatched = new Set([basedOnAnime.id]);
-
     // Score candidates based on similarity to base anime
     const scored = candidates
       .filter((a) => a.id !== basedOnAnime.id)

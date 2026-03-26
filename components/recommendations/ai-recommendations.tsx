@@ -5,13 +5,17 @@
 
 "use client";
 
-import { useEffect, useState, useCallback, memo } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { AnimeCard } from "@/components/anime/anime-card";
 import { GlassCard } from "@/components/ui/glass-card";
 import { SectionErrorFallback } from "@/components/error/error-fallback";
-import { Zap, TrendingUp, Heart, AlertCircle } from "lucide-react";
+import { Zap, TrendingUp, Heart } from "lucide-react";
 import type { Media } from "@/types/anilist";
 import type { WatchHistoryItem } from "@/types/anilist";
+import {
+  getBecauseYouWatched,
+  getPersonalizedRecommendations,
+} from "@/lib/recommendations";
 
 interface RecommendationResult {
   anime: Media;
@@ -46,159 +50,14 @@ export function AIRecommendations({
       setError(null);
       setLoading(true);
 
-      // Simulate AI processing
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      // Simple recommendation logic (client-side)
-      const watchedIds = new Set(watchHistory.map((h) => h.mediaId));
-      const favoriteIds = new Set(favorites);
-
-      let scored: RecommendationResult[] = [];
-
-      if (basedOnAnime) {
-        // "Because you watched X" recommendations
-        scored = allAnime
-          .filter((a) => a.id !== basedOnAnime.id)
-          .map((anime) => {
-            let score = 0;
-            const reasons: string[] = [];
-
-            // Genre matching
-            if (basedOnAnime.genres && anime.genres) {
-              const sharedGenres = basedOnAnime.genres.filter((g) => anime.genres?.includes(g));
-              if (sharedGenres.length > 0) {
-                score += sharedGenres.length * 15;
-                reasons.push(`Similar genres: ${sharedGenres.slice(0, 2).join(", ")}`);
-              }
-            }
-
-            // Same studio
-            if (basedOnAnime.studios?.nodes && anime.studios?.nodes) {
-              const sameStudio = basedOnAnime.studios.nodes.some((s1) =>
-                anime.studios?.nodes?.some((s2) => s1.name === s2.name)
-              );
-              if (sameStudio) {
-                score += 25;
-                reasons.push("Same studio");
-              }
-            }
-
-            // Same format
-            if (basedOnAnime.format === anime.format) {
-              score += 10;
-              reasons.push("Same format");
-            }
-
-            // Quality score
-            if (anime.averageScore && anime.averageScore >= 75) {
-              score += 10;
-              reasons.push("Highly rated");
-            }
-
-            // Currently airing
-            if (anime.status === "RELEASING") {
-              score += 5;
-            }
-
-            return { anime, score, reasons, matchPercentage: Math.min(100, score) };
-          })
-          .filter((r) => r.score > 0)
-          .sort((a, b) => b.score - a.score)
-          .slice(0, limit);
-      } else {
-        // Personalized recommendations
-        // Get favorite genres from watched anime
-        const genreCounts = new Map<string, number>();
-        const studioCounts = new Map<string, number>();
-
-        watchHistory.forEach((h) => {
-          const anime = allAnime.find((a) => a.id === h.mediaId);
-          if (anime) {
-            anime.genres?.forEach((g) => {
-              genreCounts.set(g, (genreCounts.get(g) || 0) + 1);
-            });
-            anime.studios?.nodes.forEach((s) => {
-              studioCounts.set(s.name, (studioCounts.get(s.name) || 0) + 1);
-            });
-          }
-        });
-
-        const topGenres = Array.from(genreCounts.entries())
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 3)
-          .map((e) => e[0]);
-
-        const topStudios = Array.from(studioCounts.entries())
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 2)
-          .map((e) => e[0]);
-
-        scored = allAnime
-          .filter((a) => !watchedIds.has(a.id))
-          .map((anime) => {
-            let score = 0;
-            const reasons: string[] = [];
-
-            // Genre matching
-            if (anime.genres) {
-              const matchedGenres = anime.genres.filter((g) => topGenres.includes(g));
-              if (matchedGenres.length > 0) {
-                score += matchedGenres.length * 15;
-                reasons.push(`Matches your interests`);
-              }
-            }
-
-            // Studio matching
-            if (anime.studios?.nodes) {
-              const matchedStudio = anime.studios.nodes.some((s) => topStudios.includes(s.name));
-              if (matchedStudio) {
-                score += 20;
-                reasons.push(`From a studio you like`);
-              }
-            }
-
-            // Highly rated
-            if (anime.averageScore && anime.averageScore >= 80) {
-              score += 15;
-              reasons.push("Critically acclaimed");
-            }
-
-            // Trending
-            if (anime.trending > 10000) {
-              score += 10;
-              reasons.push("Trending now");
-            }
-
-            // Favorites genre match
-            if (favoriteIds.size > 0) {
-              const favoriteAnime = allAnime.filter((a) => favoriteIds.has(a.id));
-              const favoriteGenres = new Set<string>();
-              favoriteAnime.forEach((a) => a.genres?.forEach((g) => favoriteGenres.add(g)));
-
-              if (anime.genres) {
-                const favMatch = anime.genres.filter((g) => favoriteGenres.has(g));
-                if (favMatch.length > 0) {
-                  score += favMatch.length * 10;
-                }
-              }
-            }
-
-            // Currently airing
-            if (anime.status === "RELEASING") {
-              score += 5;
-            }
-
-            return { anime, score, reasons, matchPercentage: Math.min(100, score) };
-          })
-          .filter((r) => r.score > 0)
-          .sort((a, b) => b.score - a.score)
-          .slice(0, limit);
-      }
+      const scored = basedOnAnime
+        ? await getBecauseYouWatched(basedOnAnime.id, allAnime)
+        : await getPersonalizedRecommendations(allAnime, watchHistory, favorites);
 
       // Deduplicate by anime ID to avoid React key errors
       const uniqueRecommendations = Array.from(
         new Map(scored.map((r) => [r.anime.id, r])).values()
-      );
+      ).slice(0, limit);
 
       setRecommendations(uniqueRecommendations);
     } catch (err) {

@@ -21,7 +21,7 @@ export default function HistoryPage() {
   const { watchHistory, mediaCache, clearWatchHistory, clearMediaHistory, anilistMediaList, isAuthenticated } = useStore();
 
   // Get unique anime from watch history (most recent first)
-  const uniqueHistory = watchHistory
+  const uniqueHistory = [...watchHistory]
     .sort((a, b) => b.timestamp - a.timestamp)
     .filter((item, index, self) =>
       index === self.findIndex((t) => t.mediaId === item.mediaId)

@@ -11,6 +11,10 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
 import { toast } from "react-hot-toast";
 import { useWatchlist, useFavorites } from "@/store";
+import {
+  getAnimeNotificationPreferences,
+  setAnimeNotificationEnabled,
+} from "@/lib/notifications";
 
 // ===================================
 // Types
@@ -33,8 +37,6 @@ interface AiringAnime {
 // ===================================
 // Notification Manager
 // ===================================
-
-const STORAGE_KEY = "animeverse-notifications";
 
 class NotificationManager {
   private permission: NotificationPermission = "default";
@@ -94,31 +96,31 @@ class NotificationManager {
   }
 
   private loadPreferences() {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const prefs: NotificationPreference[] = JSON.parse(stored);
-      this.prefs = new Map(prefs.map((p) => [p.mediaId, p]));
-    }
+    const prefs = getAnimeNotificationPreferences();
+    this.prefs = new Map(prefs.map((p) => [p.mediaId, p]));
   }
 
   private savePreferences() {
     const prefs = Array.from(this.prefs.values());
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
+    for (const pref of prefs) {
+      setAnimeNotificationEnabled(pref.mediaId, pref.title, pref.enabled, pref.episodeOffset);
+    }
   }
 
   enableNotification(mediaId: number, title: string, currentEpisode: number = 0) {
-    this.prefs.set(mediaId, {
+    const preference = {
       mediaId,
       enabled: true,
       title,
       episodeOffset: currentEpisode,
-    });
-    this.savePreferences();
+    };
+    this.prefs.set(mediaId, preference);
+    setAnimeNotificationEnabled(mediaId, title, true, currentEpisode);
   }
 
   disableNotification(mediaId: number) {
     this.prefs.delete(mediaId);
-    this.savePreferences();
+    setAnimeNotificationEnabled(mediaId, "", false);
   }
 
   isEnabled(mediaId: number): boolean {
@@ -258,15 +260,8 @@ export function EpisodeNotifications({ airingSchedule = [] }: EpisodeNotificatio
 
     const checkUpcomingEpisodes = async () => {
       try {
-        // Get user's watchlist IDs from localStorage/store
-        const storeData = localStorage.getItem('animeverse-storage');
-        if (!storeData) return;
-        const store = JSON.parse(storeData);
-        const watchlistIds = new Set([
-          ...(store?.state?.watchlist?.map((w: {id: number}) => w.id) || []),
-          ...(store?.state?.favorites?.map((f: {id: number}) => f.id) || []),
-        ]);
-        if (watchlistIds.size === 0) return;
+        const trackedIds = new Set([...watchlist, ...favorites]);
+        if (trackedIds.size === 0) return;
 
         // Fetch current week schedule from AniList
         const now = Math.floor(Date.now() / 1000);
@@ -302,7 +297,7 @@ export function EpisodeNotifications({ airingSchedule = [] }: EpisodeNotificatio
         const notified: string[] = JSON.parse(localStorage.getItem(notifiedKey) || '[]');
 
         for (const schedule of schedules) {
-          if (!watchlistIds.has(schedule.media?.id)) continue;
+          if (!trackedIds.has(schedule.media?.id)) continue;
           const key = `${schedule.media.id}-ep${schedule.episode}`;
           if (notified.includes(key)) continue;
 
@@ -328,7 +323,7 @@ export function EpisodeNotifications({ airingSchedule = [] }: EpisodeNotificatio
     checkUpcomingEpisodes();
     const interval = setInterval(checkUpcomingEpisodes, 5 * 60 * 1000); // every 5 min
     return () => clearInterval(interval);
-  }, [permission]);
+  }, [favorites, permission, watchlist]);
 
   // Combine watchlist and favorites for notification settings
   const trackedAnime = [...new Set([...watchlist, ...favorites])];

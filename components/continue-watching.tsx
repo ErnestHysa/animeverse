@@ -6,7 +6,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, memo } from "react";
-import { useWatchHistory } from "@/store";
+import { useStore, useWatchHistory } from "@/store";
 import { anilist } from "@/lib/anilist";
 import { Clock } from "lucide-react";
 import Link from "next/link";
@@ -22,6 +22,7 @@ interface AnimeWithProgress {
 
 export function ContinueWatching() {
   const { getContinueWatching } = useWatchHistory();
+  const setMediaCache = useStore((state) => state.setMediaCache);
   const [animeWithProgress, setAnimeWithProgress] = useState<AnimeWithProgress[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -39,6 +40,9 @@ export function ContinueWatching() {
       const animeIds = history.map((h) => h.mediaId);
       const result = await anilist.getByIds(animeIds);
       const mediaList = result.data?.Page.media ?? [];
+      mediaList.forEach((anime: Media) => {
+        setMediaCache(anime);
+      });
 
       // Combine anime data with progress
       const combined = history.map((item) => {
@@ -63,7 +67,7 @@ export function ContinueWatching() {
     } finally {
       setLoading(false);
     }
-  }, [getContinueWatching]);
+  }, [getContinueWatching, setMediaCache]);
 
   useEffect(() => {
     loadContinueWatching();
@@ -110,7 +114,7 @@ export function ContinueWatching() {
           <h2 className="text-2xl font-display font-semibold">Continue Watching</h2>
         </div>
         <Link
-          href="/settings"
+          href="/history"
           className="text-sm text-muted-foreground hover:text-primary transition-colors"
         >
           View All

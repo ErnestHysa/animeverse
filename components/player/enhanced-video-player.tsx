@@ -278,6 +278,26 @@ export function EnhancedVideoPlayer({
   // Dynamic intro/outro timestamps from AniSkip API
   const [skipTimestamps, setSkipTimestamps] = useState<IntroOutroTimestamps>({});
 
+  useEffect(() => {
+    const subtitleStyle = preferences.subtitleStyle;
+    if (!subtitleStyle) {
+      return;
+    }
+
+    const backgroundAlpha = Math.max(0, Math.min(1, subtitleStyle.backgroundOpacity / 100));
+    const normalizedBackground =
+      subtitleStyle.backgroundOpacity === 0
+        ? "transparent"
+        : `${subtitleStyle.backgroundColor}${Math.round(backgroundAlpha * 255)
+            .toString(16)
+            .padStart(2, "0")}`;
+
+    setSubtitleSize((current) => (current === subtitleStyle.fontSize ? current : subtitleStyle.fontSize));
+    setSubtitleColor((current) => (current === subtitleStyle.fontColor ? current : subtitleStyle.fontColor));
+    setSubtitleBackground((current) => (current === normalizedBackground ? current : normalizedBackground));
+    setSubtitlePosition((current) => (current === subtitleStyle.position ? current : subtitleStyle.position));
+  }, [preferences.subtitleStyle]);
+
   // Computed timestamps with fallback to defaults
   const introStart = skipTimestamps.intro?.start ?? 85;
   const introEnd = skipTimestamps.intro?.end ?? 170;
@@ -1657,6 +1677,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
     }, { once: true });
 
     setCurrentQuality(qualityLabel);
+    localStorage.setItem("animeverse-preferredQuality", qualityLabel);
     toast(`Quality changed to ${qualityLabel}`, { duration: 2000 });
   };
 

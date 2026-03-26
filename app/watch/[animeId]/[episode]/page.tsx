@@ -17,12 +17,13 @@ import { ImageWithFallback } from "@/components/ui/image-with-fallback";
 import { EpisodeList } from "@/components/player/episode-list";
 import { anilist, getAnimeTitle } from "@/lib/anilist";
 import { sanitizeDescription } from "@/lib/html-sanitizer";
-import { Play, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import type { Media } from "@/types/anilist";
 import { Suspense } from "react";
 import { VideoPlayerSkeleton, EpisodeListSkeleton, AnimeGridSkeleton } from "@/components/ui/skeleton";
 import { EpisodeCommentsSection } from "@/components/watch/episode-comments-section";
+import { CacheAnime } from "@/components/anime/cache-anime";
 
 // ===================================
 // Link Button Wrappers
@@ -311,6 +312,7 @@ export default async function WatchPage({ params }: PageProps) {
       <Header />
       <main className="min-h-screen">
         <div className="container mx-auto px-4 pt-24 pb-12">
+          <CacheAnime media={anime} />
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Main Content */}
             <div className="lg:col-span-2 space-y-6">

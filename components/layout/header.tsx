@@ -280,6 +280,7 @@ export const Header = memo(function Header() {
                           { href: "/profile", icon: <User className="w-4 h-4" />, label: "Profile" },
                           { href: "/history", icon: <Clock className="w-4 h-4" />, label: "Watch History" },
                           { href: "/watchlist", icon: <BookMarked className="w-4 h-4" />, label: "Watchlist" },
+                          { href: "/batch", icon: <ListIcon className="w-4 h-4" />, label: "Batch Ops" },
                           { href: "/achievements", icon: <Trophy className="w-4 h-4" />, label: "Achievements" },
                           { href: "/stats", icon: <BarChart3 className="w-4 h-4" />, label: "Stats" },
                           { href: "/settings", icon: <Settings2 className="w-4 h-4" />, label: "Settings" },

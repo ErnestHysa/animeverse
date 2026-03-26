@@ -13,6 +13,7 @@ import type { Media } from "@/types/anilist";
 import { getAnimeTitle, getAnimeCover, formatEpisodeCount, getStarRating } from "@/lib/anilist";
 import { cn } from "@/lib/utils";
 import { LanguageBadge } from "@/components/ui/badge";
+import { CacheAnime } from "@/components/anime/cache-anime";
 
 export interface AnimeCardProps {
   anime: Media;
@@ -83,6 +84,7 @@ export const AnimeCard = memo(function AnimeCard({
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
+      <CacheAnime media={anime} />
       <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-muted">
         {/* Loading skeleton */}
         {!imageLoaded && !imageError && (
@@ -255,6 +257,7 @@ export const AnimeCardCompact = memo(function AnimeCardCompact({ anime, showNumb
 
   return (
     <Link href={`/anime/${anime.id}`} className={cn("flex gap-3 group", className)}>
+      <CacheAnime media={anime} />
       {/* Rank Number */}
       {showNumber && number !== undefined && (
         <div className="flex-shrink-0 w-8 flex items-center justify-center text-2xl font-bold text-muted-foreground group-hover:text-primary transition-colors">

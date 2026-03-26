@@ -5,13 +5,12 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useStore } from "@/store";
 import { useCustomLists } from "@/lib/custom-lists";
 import {
   Heart,
   Clock,
-  List as ListIcon,
   Trash2,
   Plus,
   X,
@@ -20,19 +19,33 @@ import {
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
 import { toast } from "react-hot-toast";
+import { anilist } from "@/lib/anilist";
+import type { Media } from "@/types/anilist";
+import { AnimeCard } from "@/components/anime/anime-card";
 
 interface BatchOperationsProps {
   className?: string;
 }
 
 export function BatchOperations({ className = "" }: BatchOperationsProps) {
-  const { favorites, toggleFavorite, clearFavorites, watchlist, toggleWatchlist, clearWatchlist } = useStore();
+  const {
+    favorites,
+    toggleFavorite,
+    watchlist,
+    toggleWatchlist,
+    mediaCache,
+    setMediaCache,
+  } = useStore();
   const { lists, addAnimeToList } = useCustomLists();
   const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
   const [selectionMode, setSelectionMode] = useState<"favorites" | "watchlist" | null>(null);
   const [showAddToList, setShowAddToList] = useState(false);
+  const [fetchedAnime, setFetchedAnime] = useState<Record<number, Media>>({});
 
-  const items = selectionMode === "favorites" ? favorites : selectionMode === "watchlist" ? watchlist : [];
+  const items = useMemo(
+    () => (selectionMode === "favorites" ? favorites : selectionMode === "watchlist" ? watchlist : []),
+    [favorites, selectionMode, watchlist]
+  );
 
   const toggleSelection = (id: number) => {
     const newSelection = new Set(selectedItems);
@@ -51,6 +64,36 @@ export function BatchOperations({ className = "" }: BatchOperationsProps) {
   const clearSelection = () => {
     setSelectedItems(new Set());
   };
+
+  useEffect(() => {
+    async function preloadMissingAnime() {
+      const missingIds = items.filter((id) => !mediaCache[id] && !fetchedAnime[id]);
+      if (missingIds.length === 0) {
+        return;
+      }
+
+      try {
+        const result = await anilist.getByIds(missingIds);
+        const fetched = result.data?.Page.media ?? [];
+        if (fetched.length === 0) {
+          return;
+        }
+
+        setFetchedAnime((state) => {
+          const next = { ...state };
+          fetched.forEach((anime: Media) => {
+            next[anime.id] = anime;
+            setMediaCache(anime);
+          });
+          return next;
+        });
+      } catch {
+        // Non-blocking; items still render with placeholders
+      }
+    }
+
+    void preloadMissingAnime();
+  }, [fetchedAnime, items, mediaCache, setMediaCache]);
 
   const removeSelected = async () => {
     if (selectionMode === "favorites") {
@@ -217,14 +260,13 @@ export function BatchOperations({ className = "" }: BatchOperationsProps) {
                 className="relative group cursor-pointer"
                 onClick={() => toggleSelection(id)}
               >
-                <div
-                  className={`aspect-[3/4] rounded-lg overflow-hidden bg-muted transition-all ${
-                    isSelected ? "ring-2 ring-primary" : ""
-                  }`}
-                >
-                  {/* Placeholder for anime cover - in real implementation, would fetch from mediaCache */}
-                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
-                    <span className="text-2xl font-bold text-primary/50">{id}</span>
+                <div className={isSelected ? "rounded-lg ring-2 ring-primary" : ""}>
+                  <div className="pointer-events-none">
+                    {mediaCache[id] || fetchedAnime[id] ? (
+                      <AnimeCard anime={mediaCache[id] || fetchedAnime[id]} />
+                    ) : (
+                      <div className="aspect-[3/4] rounded-lg overflow-hidden bg-muted animate-pulse" />
+                    )}
                   </div>
                 </div>
 

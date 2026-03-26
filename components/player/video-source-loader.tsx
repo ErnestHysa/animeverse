@@ -12,6 +12,7 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "react-hot-toast";
+import { usePreferences } from "@/store";
 
 interface VideoSourceLoaderProps {
   animeId: number;
@@ -82,6 +83,7 @@ export function VideoSourceLoader({
   onError,
   onEpisodeEnd,
 }: VideoSourceLoaderProps) {
+  const { preferences } = usePreferences();
   const [sources, setSources] = useState<{
     type: "magnet" | "torrent" | "direct";
     url: string;
@@ -101,7 +103,10 @@ export function VideoSourceLoader({
   ]);
   const [currentLanguage, setCurrentLanguage] = useState<"sub" | "dub">(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("animeverse-currentLanguage");
+      const saved =
+        localStorage.getItem(`preferred-language-${animeId}`) ||
+        localStorage.getItem("preferred-language") ||
+        localStorage.getItem("animeverse-currentLanguage");
       return (saved === "dub" ? "dub" : "sub");
     }
     return "sub";
@@ -232,7 +237,10 @@ export function VideoSourceLoader({
       const savedQuality = typeof window !== 'undefined'
         ? localStorage.getItem('animeverse-preferredQuality')
         : null;
-      const preferredQuality = savedQuality || getPreferredQualityForNetwork();
+      const preferredQuality =
+        savedQuality ||
+        (preferences.defaultQuality !== "auto" ? preferences.defaultQuality : null) ||
+        getPreferredQualityForNetwork();
 
       const defaultSource =
         (preferredQuality !== 'auto'
@@ -303,7 +311,7 @@ export function VideoSourceLoader({
       setLoading(false);
       setIsRetrying(false);
     }
-  }, [animeId, episodeNumber, animeTitle, malId, onError]);
+  }, [animeId, episodeNumber, animeTitle, malId, onError, preferences.defaultQuality]);
 
   // Initial fetch and re-fetch when language changes
   useEffect(() => {
@@ -383,6 +391,8 @@ export function VideoSourceLoader({
     }
 
     // Save preference
+    localStorage.setItem("preferred-language", newLanguage);
+    localStorage.setItem(`preferred-language-${animeId}`, newLanguage);
     localStorage.setItem("animeverse-currentLanguage", newLanguage);
     setCurrentLanguage(newLanguage);
 

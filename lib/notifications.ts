@@ -13,6 +13,93 @@ export interface NotificationOptions {
   requireInteraction?: boolean;
 }
 
+export interface AnimeNotificationPreference {
+  mediaId: number;
+  enabled: boolean;
+  title: string;
+  episodeOffset: number;
+}
+
+export interface NotificationTopicSettings {
+  newEpisodes: boolean;
+  airingReminders: boolean;
+  recommendations: boolean;
+}
+
+const ANIME_NOTIFICATION_STORAGE_KEY = "animeverse-notifications";
+const NOTIFICATION_TOPIC_STORAGE_KEY = "animeverse-notification-topics";
+
+const DEFAULT_TOPIC_SETTINGS: NotificationTopicSettings = {
+  newEpisodes: true,
+  airingReminders: false,
+  recommendations: false,
+};
+
+function readJsonStorage<T>(key: string, fallback: T): T {
+  if (typeof window === "undefined") {
+    return fallback;
+  }
+
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeJsonStorage<T>(key: string, value: T) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (error) {
+    console.error(`Failed to save ${key}:`, error);
+  }
+}
+
+export function getAnimeNotificationPreferences(): AnimeNotificationPreference[] {
+  return readJsonStorage<AnimeNotificationPreference[]>(ANIME_NOTIFICATION_STORAGE_KEY, []);
+}
+
+export function saveAnimeNotificationPreferences(preferences: AnimeNotificationPreference[]): void {
+  writeJsonStorage(ANIME_NOTIFICATION_STORAGE_KEY, preferences);
+}
+
+export function setAnimeNotificationEnabled(
+  mediaId: number,
+  title: string,
+  enabled: boolean,
+  episodeOffset = 0
+): AnimeNotificationPreference[] {
+  const next = getAnimeNotificationPreferences().filter((item) => item.mediaId !== mediaId);
+
+  if (enabled) {
+    next.push({
+      mediaId,
+      enabled: true,
+      title,
+      episodeOffset,
+    });
+  }
+
+  saveAnimeNotificationPreferences(next);
+  return next;
+}
+
+export function getNotificationTopicSettings(): NotificationTopicSettings {
+  return {
+    ...DEFAULT_TOPIC_SETTINGS,
+    ...readJsonStorage<Partial<NotificationTopicSettings>>(NOTIFICATION_TOPIC_STORAGE_KEY, {}),
+  };
+}
+
+export function saveNotificationTopicSettings(settings: NotificationTopicSettings): void {
+  writeJsonStorage(NOTIFICATION_TOPIC_STORAGE_KEY, settings);
+}
+
 /**
  * Check if notifications are supported
  */
