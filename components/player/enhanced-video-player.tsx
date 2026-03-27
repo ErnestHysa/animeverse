@@ -398,7 +398,7 @@ export function EnhancedVideoPlayer({
           errorMessage = e.message;
           console.error("Video error:", errorMessage);
         } else {
-          console.error("Video error:", JSON.stringify(e));
+          console.warn("Video error event received");
         }
       }
 
@@ -1880,7 +1880,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
 
       {/* Loading/Buffering Overlay */}
       {(isLoading || isBuffering) && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm animate-fadeIn z-30">
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm animate-fadeIn z-30 pointer-events-none">
           <div className="relative">
             {/* Spinner with glow */}
             <div className="w-16 h-16 border-4 border-primary/30 border-t-primary rounded-full animate-spin mb-4" />
@@ -1921,9 +1921,10 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
           className="absolute inset-0 flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity z-20 pointer-events-none"
         >
           <button
-            className="w-24 h-24 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center pointer-events-auto hover:bg-white/30 transition-colors"
-            onClick={togglePlay}
-            aria-label="Play"
+            className="w-24 h-24 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center pointer-events-none"
+            type="button"
+            tabIndex={-1}
+            aria-hidden="true"
           >
             <Play className="w-12 h-12 text-white ml-1" fill="currentColor" />
           </button>

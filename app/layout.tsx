@@ -10,8 +10,8 @@ export const metadata: Metadata = {
     default: "AnimeVerse Stream - Anime Streaming",
     template: "%s | AnimeVerse Stream",
   },
-  description: "Watch your favorite anime in HD quality. Stream thousands of anime episodes with advanced features like P2P streaming, offline support, and more.",
-  keywords: ["anime", "streaming", "webtorrent", "p2p", "free anime", "watch anime", "anime online", "hd anime"],
+  description: "Watch your favorite anime in HD quality with dependable playback, offline support, tracking, and discovery tools.",
+  keywords: ["anime", "streaming", "free anime", "watch anime", "anime online", "hd anime"],
   authors: [{ name: "AnimeVerse Stream" }],
   openGraph: {
     type: "website",
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     url: "https://animeverse.stream",
     siteName: "AnimeVerse Stream",
     title: "AnimeVerse Stream - Anime Streaming",
-    description: "Watch your favorite anime with free P2P streaming.",
+    description: "Watch your favorite anime with dependable HD streaming and rich discovery features.",
     images: [
       {
         url: "/og-image.png",
@@ -32,7 +32,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "AnimeVerse Stream - Anime Streaming",
-    description: "Watch your favorite anime with free P2P streaming.",
+    description: "Watch your favorite anime with dependable HD streaming and rich discovery features.",
     images: ["/og-image.png"],
   },
   robots: {

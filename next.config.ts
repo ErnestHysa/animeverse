@@ -24,8 +24,6 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
 
-  serverExternalPackages: ["webtorrent"],
-
   images: {
     remotePatterns: [
       {

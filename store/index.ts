@@ -786,6 +786,11 @@ export const useStore = create<StoreState>()(
             };
           }
         }
+
+        if (state.preferences && state.preferences.streamingMethod !== "direct") {
+          state.preferences.streamingMethod = "direct";
+        }
+
         return state;
       },
       // Only persist certain fields

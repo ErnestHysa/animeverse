@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "node scripts/dev.js",
     "dev:next": "node scripts/start-next-webpack.mjs",
-    "build": "next typegen && tsc --noEmit && next build --webpack",
+    "build": "tsc --noEmit -p tsconfig.build.json && next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "test:smoke": "node scripts/smoke-test.mjs",
@@ -24,25 +24,26 @@
     "graphql-request": "^7.4.0",
     "hls.js": "^1.6.15",
     "lucide-react": "^0.577.0",
-    "next": "16.1.7",
-    "react": "19.2.3",
-    "react-dom": "19.2.3",
+    "next": "^16.2.1",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
     "react-hot-toast": "^2.6.0",
     "tailwind-merge": "^3.5.0",
-    "webtorrent": "^2.8.5",
     "zustand": "^5.0.12"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
-    "@tailwindcss/postcss": "^4",
+    "@tailwindcss/postcss": "^4.2.2",
     "@types/archiver": "^7.0.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@types/webtorrent": "^0.110.1",
     "eslint": "^9",
-    "eslint-config-next": "16.1.7",
-    "tailwindcss": "^4",
+    "eslint-config-next": "^16.2.1",
+    "tailwindcss": "^4.2.2",
     "typescript": "^5"
+  },
+  "overrides": {
+    "picomatch": "^4.0.4"
   }
 }

@@ -203,6 +203,22 @@ export const Header = memo(function Header() {
 
             {/* Actions */}
             <div className="flex items-center gap-0.5 flex-shrink-0">
+              <form
+                onSubmit={handleSearch}
+                className="hidden xl:flex items-center relative mr-2"
+              >
+                <Search className="absolute left-3 w-4 h-4 text-muted-foreground pointer-events-none" />
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => handleSearchInput(e.target.value)}
+                  placeholder="Search anime..."
+                  suppressHydrationWarning
+                  className="w-56 pl-9 pr-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all"
+                  autoComplete="off"
+                />
+              </form>
+
               {/* Search Button */}
               <Button
                 variant="ghost"

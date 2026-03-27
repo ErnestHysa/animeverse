@@ -4,7 +4,10 @@
  */
 export const dynamic = "force-dynamic";
 
-
+import { Suspense } from "react";
+import Link from "next/link";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import type { Media } from "@/types/anilist";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { VideoSourceLoader } from "@/components/player/video-source-loader";
@@ -17,31 +20,21 @@ import { ImageWithFallback } from "@/components/ui/image-with-fallback";
 import { EpisodeList } from "@/components/player/episode-list";
 import { anilist, getAnimeTitle } from "@/lib/anilist";
 import { sanitizeDescription } from "@/lib/html-sanitizer";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import Link from "next/link";
-import type { Media } from "@/types/anilist";
-import { Suspense } from "react";
-import { VideoPlayerSkeleton, EpisodeListSkeleton, AnimeGridSkeleton } from "@/components/ui/skeleton";
+import {
+  VideoPlayerSkeleton,
+  EpisodeListSkeleton,
+  AnimeGridSkeleton,
+} from "@/components/ui/skeleton";
 import { EpisodeCommentsSection } from "@/components/watch/episode-comments-section";
 import { CacheAnime } from "@/components/anime/cache-anime";
-
-// ===================================
-// Link Button Wrappers
-// ===================================
 
 function LinkButton({ href, children }: { href: string; children: React.ReactNode }) {
   return (
     <Link href={href} className="no-underline">
-      <Button>
-        {children}
-      </Button>
+      <Button>{children}</Button>
     </Link>
   );
 }
-
-// ===================================
-// Data Fetching
-// ===================================
 
 interface PageProps {
   params: Promise<{
@@ -52,14 +45,13 @@ interface PageProps {
 
 async function getAnimeData(id: string): Promise<Media | null> {
   try {
-    const result = await anilist.getById(parseInt(id));
+    const result = await anilist.getById(parseInt(id, 10));
     return result.data?.Media ?? null;
   } catch {
     return null;
   }
 }
 
-/** Minimal placeholder used when AniList is unreachable */
 function makeStubAnime(animeId: string): Media {
   const id = parseInt(animeId, 10) || 0;
   return {
@@ -84,13 +76,8 @@ function makeStubAnime(animeId: string): Media {
   } as unknown as Media;
 }
 
-// ===================================
-// Components
-// ===================================
-
 async function VideoSection({ anime, episodeNum }: { anime: Media; episodeNum: number }) {
   const title = getAnimeTitle(anime);
-  // Use English title for video API since AnimeKai indexes by English titles
   const englishTitle = anime.title?.english || anime.title?.romaji || title;
   const totalEpisodes = anime.episodes || 12;
   const hasNext = episodeNum < totalEpisodes;
@@ -98,20 +85,21 @@ async function VideoSection({ anime, episodeNum }: { anime: Media; episodeNum: n
 
   return (
     <div className="space-y-4">
-      {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-muted-foreground overflow-x-auto">
         <Link href="/" className="hover:text-foreground transition-colors flex-shrink-0">
           Home
         </Link>
-        <span className="flex-shrink-0">›</span>
-        <Link href={`/anime/${anime.id}`} className="hover:text-foreground transition-colors truncate max-w-[150px] flex-shrink-0">
+        <span className="flex-shrink-0">{">"}</span>
+        <Link
+          href={`/anime/${anime.id}`}
+          className="hover:text-foreground transition-colors truncate max-w-[150px] flex-shrink-0"
+        >
           {title}
         </Link>
-        <span className="flex-shrink-0">›</span>
+        <span className="flex-shrink-0">{">"}</span>
         <span className="text-foreground flex-shrink-0">Episode {episodeNum}</span>
       </div>
 
-      {/* Player */}
       <VideoSourceLoader
         animeId={anime.id}
         episodeNumber={episodeNum}
@@ -122,18 +110,16 @@ async function VideoSection({ anime, episodeNum }: { anime: Media; episodeNum: n
         prevEpisodeUrl={hasPrev ? `/watch/${anime.id}/${episodeNum - 1}` : undefined}
       />
 
-      {/* Episode Info & Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">
             {title} - Episode {episodeNum}
           </h1>
           <p className="text-muted-foreground mt-1">
-            {anime.format && anime.format.replace("_", " ")} • {anime.seasonYear}
+            {anime.format && anime.format.replace("_", " ")} | {anime.seasonYear}
           </p>
         </div>
 
-        {/* Navigation & Actions */}
         <div className="flex items-center gap-2">
           {hasPrev && (
             <Link href={`/watch/${anime.id}/${episodeNum - 1}`}>
@@ -152,16 +138,9 @@ async function VideoSection({ anime, episodeNum }: { anime: Media; episodeNum: n
             </Link>
           )}
 
-          {/* Quick Actions */}
           <div className="hidden sm:flex items-center gap-2">
-            <ReportButton
-              animeId={anime.id}
-              animeTitle={title}
-              episodeNumber={episodeNum}
-            />
-            <ShareButton
-              title={`${title} - Episode ${episodeNum}`}
-            />
+            <ReportButton animeId={anime.id} animeTitle={title} episodeNumber={episodeNum} />
+            <ShareButton title={`${title} - Episode ${episodeNum}`} />
             <KeyboardShortcutsButton />
           </div>
         </div>
@@ -207,10 +186,7 @@ async function AnimeInfo({ anime }: { anime: Media }) {
           </p>
           <div className="flex flex-wrap gap-2 mt-2">
             {anime.genres?.slice(0, 3).map((genre: string) => (
-              <span
-                key={genre}
-                className="px-2 py-1 bg-white/5 rounded text-xs"
-              >
+              <span key={genre} className="px-2 py-1 bg-white/5 rounded text-xs">
                 {genre}
               </span>
             ))}
@@ -223,10 +199,7 @@ async function AnimeInfo({ anime }: { anime: Media }) {
           <p className="text-xs text-muted-foreground mb-2">Genres</p>
           <div className="flex flex-wrap gap-1">
             {anime.genres.slice(0, 6).map((genre: string) => (
-              <span
-                key={genre}
-                className="px-2 py-1 bg-white/5 rounded text-xs"
-              >
+              <span key={genre} className="px-2 py-1 bg-white/5 rounded text-xs">
                 {genre}
               </span>
             ))}
@@ -239,8 +212,10 @@ async function AnimeInfo({ anime }: { anime: Media }) {
 
 async function RecommendedSection({ animeId }: { animeId: number }) {
   const result = await anilist.getRecommendations(animeId);
-  const recommendations = (result.data?.Media as { recommendations?: { nodes?: { mediaRecommendation?: Media }[] } } | null)?.recommendations?.nodes
-    ?.map((n) => n.mediaRecommendation)
+  const recommendations = (
+    result.data?.Media as { recommendations?: { nodes?: { mediaRecommendation?: Media }[] } } | null
+  )?.recommendations?.nodes
+    ?.map((node) => node.mediaRecommendation)
     .filter((media): media is Media => Boolean(media));
 
   if (!recommendations || recommendations.length === 0) {
@@ -252,11 +227,7 @@ async function RecommendedSection({ animeId }: { animeId: number }) {
       <h3 className="font-semibold mb-4">You May Also Like</h3>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
         {recommendations.slice(0, 8).map((rec) => (
-          <Link
-            key={rec.id}
-            href={`/anime/${rec.id}`}
-            className="group"
-          >
+          <Link key={rec.id} href={`/anime/${rec.id}`} className="group">
             <div className="relative aspect-[3/4] rounded-lg overflow-hidden bg-muted mb-2">
               <ImageWithFallback
                 src={rec.coverImage?.large || ""}
@@ -276,20 +247,13 @@ async function RecommendedSection({ animeId }: { animeId: number }) {
   );
 }
 
-// ===================================
-// Page Component
-// ===================================
-
 export default async function WatchPage({ params }: PageProps) {
   const { animeId, episode } = await params;
-  // Fall back to a stub when AniList is unreachable so the player still renders
   const anime = (await getAnimeData(animeId)) ?? makeStubAnime(animeId);
   const episodeNum = parseInt(episode, 10);
-
   const totalEpisodes = anime.episodes || 12;
 
-  // Validate episode number is a valid integer
-  if (isNaN(episodeNum) || episodeNum < 1 || episodeNum > totalEpisodes) {
+  if (Number.isNaN(episodeNum) || episodeNum < 1 || episodeNum > totalEpisodes) {
     return (
       <>
         <Header />
@@ -314,7 +278,6 @@ export default async function WatchPage({ params }: PageProps) {
         <div className="container mx-auto px-4 pt-24 pb-12">
           <CacheAnime media={anime} />
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Main Content */}
             <div className="lg:col-span-2 space-y-6">
               <Suspense fallback={<VideoPlayerSkeleton />}>
                 <VideoSection anime={anime} episodeNum={episodeNum} />
@@ -324,11 +287,9 @@ export default async function WatchPage({ params }: PageProps) {
                 <RecommendedSection animeId={anime.id} />
               </Suspense>
 
-              {/* Episode Comments */}
               <EpisodeCommentsSection animeId={anime.id} episodeNumber={episodeNum} />
             </div>
 
-            {/* Sidebar */}
             <div className="space-y-6">
               <Suspense fallback={<EpisodeListSkeleton />}>
                 <EpisodesList anime={anime} currentEpisode={episodeNum} />
@@ -345,10 +306,6 @@ export default async function WatchPage({ params }: PageProps) {
     </>
   );
 }
-
-// ===================================
-// Metadata
-// ===================================
 
 export async function generateMetadata({ params }: PageProps) {
   const { animeId, episode } = await params;

@@ -620,14 +620,12 @@ export default function SettingsPage() {
                   <div className="mb-3">
                     <p className="font-medium">Streaming Method</p>
                     <p className="text-sm text-muted-foreground">
-                      Choose how you want to stream videos
+                      Direct streaming is the supported playback mode for this release.
                     </p>
                   </div>
                   <div className="flex gap-2">
                     {[
-                      { value: "hybrid", label: "Hybrid (Recommended)" },
-                      { value: "webtorrent", label: "P2P Only" },
-                      { value: "direct", label: "Direct Only" },
+                      { value: "direct", label: "Direct Streaming" },
                     ].map((method) => (
                       <button
                         key={method.value}

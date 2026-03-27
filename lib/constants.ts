@@ -182,7 +182,7 @@ export const DEFAULT_PREFERENCES = {
   defaultQuality: "720p",
   autoplay: true,
   autoNext: true,
-  streamingMethod: "hybrid",
+  streamingMethod: "direct",
   subtitles: true,
   autoSkipIntro: false,
   autoSkipOutro: false,
