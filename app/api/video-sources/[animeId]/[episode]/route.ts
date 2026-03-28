@@ -48,8 +48,8 @@ export async function GET(
       controller.abort();
     }, SERVER_TIMEOUT);
 
-    // Use API-based sources (more reliable than scraping)
-    const { getEpisodeSources } = await import("@/lib/video-sources-api");
+    // Use Playwright-based scraper for actual anime sources
+    const { getEpisodeSources } = await import("@/lib/video-sources-fast");
 
     const result = await getEpisodeSources(animeIdNum, episodeNumber, {
       title,
@@ -84,7 +84,7 @@ export async function GET(
     if (isTimeout) {
       console.warn('[VideoSources] Request timeout - returning demo video');
       // Return demo video on timeout instead of error
-      const { getDemoSources } = await import("@/lib/video-sources-api");
+      const { getDemoSources } = await import("@/lib/video-sources-fast");
       const demoResult = getDemoSources(animeIdNum, episodeNumber);
       return NextResponse.json({
         ...demoResult,

@@ -142,6 +142,8 @@ export function EnhancedVideoPlayer({
   const controlsTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const hlsRef = useRef<Hls | null>(null);
   const bufferingSafetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Debounce timeout for waiting event to prevent false positive buffering overlay
+  const waitingDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
   // State
   const [isPlaying, setIsPlaying] = useState(false);
@@ -459,6 +461,7 @@ export function EnhancedVideoPlayer({
           // Use fetch API for all requests (more reliable than XHR)
           // Custom loader that proxies segments to avoid CORS issues
           loader: needsProxy ? class extends Hls.DefaultConfig.loader {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             constructor(config: any) {
               super(config);
               // Enable fetch-based loading for better CORS handling
@@ -608,16 +611,15 @@ export function EnhancedVideoPlayer({
 
         hls.on(Hls.Events.FRAG_LOADING, (event, data) => {
           console.log("[HLS] Fragment loading:", data);
-          // Set buffering when actively loading fragments (unless initial load)
-          if (!isLoading) {
-            setIsBuffering(true);
-          }
+          // CRITICAL FIX: Don't set buffering on FRAG_LOADING - HLS continuously loads fragments
+          // during normal playback. The video element 'waiting' event is the reliable indicator.
+          // Only set buffering if we're actually in a waiting state (checked by video events)
         });
 
         hls.on(Hls.Events.FRAG_LOADED, (event, data) => {
           console.log("[HLS] Fragment loaded:", data);
-          // Clear buffering when fragment is loaded
-          setIsBuffering(false);
+          // CRITICAL FIX: Don't clear buffering here - let video element events handle it
+          // Clearing here can interfere with the waiting event debounce logic
           // If user initiated play and we have the first fragment, try to play
           if (userInitiatedPlayRef.current && video.paused && video.readyState >= 2) {
             console.log("[HLS] Fragment loaded and user wants to play, starting playback...");
@@ -625,15 +627,8 @@ export function EnhancedVideoPlayer({
           }
         });
 
-        // NEW: Handle fragment load progress for better buffering feedback
-        // Note: FRAG_LOAD_PROGRESS may not be available in all hls.js versions
-        hls.on(Hls.Events.FRAG_LOADED, (event: any, data: any) => {
-          // Clear buffering state when fragment is fully loaded
-          setIsBuffering(false);
-        });
-
         // NEW: Handle buffer appended event for better state management
-        hls.on(Hls.Events.BUFFER_APPENDED, (event, data) => {
+        hls.on(Hls.Events.BUFFER_APPENDED, () => {
           // Buffer has been appended, we should be able to play
           if (video.paused && userInitiatedPlayRef.current) {
             video.play().catch(() => {});
@@ -1284,43 +1279,62 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
       }
     };
     const handleWaiting = () => {
-      console.log("[Video Player] Waiting event - buffering started");
-      setIsBuffering(true);
-      setIsPlaying(false);
+      console.log("[Video Player] Waiting event - debouncing to prevent false positive");
 
-      // Clear any existing buffering timeout
-      if (bufferingSafetyTimeoutRef.current) {
-        clearTimeout(bufferingSafetyTimeoutRef.current);
+      // Clear any existing debounce timeout
+      if (waitingDebounceRef.current) {
+        clearTimeout(waitingDebounceRef.current);
       }
 
-      // ENHANCED: Reduced safety timeout with progressive retry
-      // First check: 5 seconds for quick recovery
-      // Second check: 15 seconds for slower networks
-      // Final: 30 seconds absolute max
-      bufferingSafetyTimeoutRef.current = setTimeout(() => {
-        // Try to recover HLS if it exists
-        const hls = hlsRef.current;
-        if (hls && hls.media) {
-          console.warn("[Buffering Recovery] Attempting HLS recovery after 5s");
-          try {
-            hls.startLoad(video.currentTime);
-          } catch (e) {
-            console.error("[Buffering Recovery] HLS startLoad failed:", e);
-          }
-        }
-      }, 5000); // First recovery attempt at 5s
+      // CRITICAL FIX: Debounce waiting event to prevent false positive buffering
+      // Only show buffering if waiting persists for 500ms (HLS preload triggers quick waiting events)
+      waitingDebounceRef.current = setTimeout(() => {
+        // Double-check we're actually waiting (video hasn't started playing)
+        if (video.paused || video.readyState < 3) {
+          console.log("[Video Player] Confirmed buffering state - video is stalled");
+          setIsBuffering(true);
+          setIsPlaying(false);
 
-      // Set final safety timeout
-      setTimeout(() => {
-        if (bufferingSafetyTimeoutRef.current) {
-          console.warn("Buffering safety timeout - forcing buffering state clear");
-          setIsBuffering(false);
-          bufferingSafetyTimeoutRef.current = null;
+          // Clear any existing buffering timeout
+          if (bufferingSafetyTimeoutRef.current) {
+            clearTimeout(bufferingSafetyTimeoutRef.current);
+          }
+
+          // ENHANCED: Reduced safety timeout with progressive retry
+          // First check: 5 seconds for quick recovery
+          bufferingSafetyTimeoutRef.current = setTimeout(() => {
+            // Try to recover HLS if it exists
+            const hls = hlsRef.current;
+            if (hls && hls.media) {
+              console.warn("[Buffering Recovery] Attempting HLS recovery after 5s");
+              try {
+                hls.startLoad(video.currentTime);
+              } catch (e) {
+                console.error("[Buffering Recovery] HLS startLoad failed:", e);
+              }
+            }
+          }, 5000); // First recovery attempt at 5s
+
+          // Set final safety timeout
+          setTimeout(() => {
+            if (bufferingSafetyTimeoutRef.current) {
+              console.warn("Buffering safety timeout - forcing buffering state clear");
+              setIsBuffering(false);
+              bufferingSafetyTimeoutRef.current = null;
+            }
+          }, 15000); // Reduced from 30s to 15s for better UX
+        } else {
+          console.log("[Video Player] Waiting event cleared - video is playing");
         }
-      }, 15000); // Reduced from 30s to 15s for better UX
+      }, 500); // 500ms debounce to filter out transient waiting events
     };
     const handleCanPlay = () => {
       console.log("[Video Player] CanPlay event - ready to play");
+      // CRITICAL: Clear waiting debounce immediately
+      if (waitingDebounceRef.current) {
+        clearTimeout(waitingDebounceRef.current);
+        waitingDebounceRef.current = null;
+      }
       // Clear the buffering safety timeout since we can play now
       if (bufferingSafetyTimeoutRef.current) {
         clearTimeout(bufferingSafetyTimeoutRef.current);
@@ -1332,6 +1346,11 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
     // NEW: Handle canplaythrough for smoother playback
     const handleCanPlayThrough = () => {
       console.log("[Video Player] CanPlayThrough event - should play without stalling");
+      // CRITICAL: Clear waiting debounce immediately
+      if (waitingDebounceRef.current) {
+        clearTimeout(waitingDebounceRef.current);
+        waitingDebounceRef.current = null;
+      }
       setIsBuffering(false);
       setIsLoading(false);
       if (bufferingSafetyTimeoutRef.current) {
@@ -1369,6 +1388,11 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
     };
     const handleSeeked = () => {
       console.log(`[Video Player] Seeked to ${video.currentTime}s`);
+      // CRITICAL: Clear waiting debounce after seek completes
+      if (waitingDebounceRef.current) {
+        clearTimeout(waitingDebounceRef.current);
+        waitingDebounceRef.current = null;
+      }
       setIsBuffering(false);
     };
     // NEW: Handle stalled event when download stops
@@ -1391,6 +1415,11 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
     // NEW: Handle playing event to ensure buffering state is cleared
     const handlePlaying = () => {
       console.log("[Video Player] Playing event - clearing buffering state");
+      // CRITICAL: Clear waiting debounce immediately when playing starts
+      if (waitingDebounceRef.current) {
+        clearTimeout(waitingDebounceRef.current);
+        waitingDebounceRef.current = null;
+      }
       setIsBuffering(false);
       setIsPlaying(true);
       if (bufferingSafetyTimeoutRef.current) {
@@ -1435,6 +1464,11 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
       if (bufferingSafetyTimeoutRef.current) {
         clearTimeout(bufferingSafetyTimeoutRef.current);
         bufferingSafetyTimeoutRef.current = null;
+      }
+      // Clean up waiting debounce timeout
+      if (waitingDebounceRef.current) {
+        clearTimeout(waitingDebounceRef.current);
+        waitingDebounceRef.current = null;
       }
     };
   }, [playbackRate, animeId, episodeNumber, nextEpisodeUrl, preferences.autoNext, onEpisodeEnd]);
