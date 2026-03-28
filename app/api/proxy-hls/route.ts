@@ -14,7 +14,8 @@ export const dynamic = "force-dynamic";
 const MAX_MANIFEST_SIZE = 10 * 1024 * 1024; // 10MB for manifests
 const MAX_SEGMENT_SIZE = 50 * 1024 * 1024; // 50MB for individual segments
 const MAX_VIDEO_SIZE = 2 * 1024 * 1024 * 1024; // 2GB for full video files
-const TIMEOUT_MS = 30000; // 30 second timeout for video segments
+const TIMEOUT_MS = 60000; // CRITICAL: Increased from 30s to 60s for slow upstream servers (segments take ~10s each)
+const MANIFEST_TIMEOUT_MS = 60000; // CRITICAL: 60s timeout for manifest loading
 
 /**
  * GET /api/proxy-hls?url=<encoded_url>&type=<manifest|segment|video>&referer=<optional_referer>
@@ -91,7 +92,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Set timeout based on content type
-    const timeout = type === "segment" || type === "video" ? TIMEOUT_MS : 15000;
+    const timeout = type === "segment" || type === "video" ? TIMEOUT_MS : MANIFEST_TIMEOUT_MS;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 

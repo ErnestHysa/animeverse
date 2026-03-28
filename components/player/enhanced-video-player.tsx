@@ -450,8 +450,9 @@ export function EnhancedVideoPlayer({
           // Progressive download - more compatible
           progressive: true,
           // ENHANCED: Increase buffer tolerance for better seeking and reduced buffering
-          maxBufferLength: 60, // Increased from 30 for smoother playback
-          maxMaxBufferLength: 120, // Increased from 60 for larger buffer
+          // CRITICAL FIX for slow upstream servers: Allow much larger buffer
+          maxBufferLength: 120, // Increased from 60 to 120s (2 minutes) for pre-buffering on slow connections
+          maxMaxBufferLength: 240, // Increased from 120 to 240s (4 minutes) max buffer capacity
           // Critical for seeking - allow more lenient fragment lookup
           maxFragLookUpTolerance: 1, // Increased from 0.5 for better seek recovery
           // Don't automatically switch levels (can cause parsing issues)
@@ -470,19 +471,30 @@ export function EnhancedVideoPlayer({
           } : Hls.DefaultConfig.loader,
           // Add seek handling settings
           maxBufferHole: 1, // Increased from 0.5 to handle larger gaps
-          // NEW: Enhanced retry configuration for better network resilience
-          fragLoadingMaxRetry: 6, // Increased from default 4
-          fragLoadingRetryDelay: 1000, // Delay between retries
-          fragLoadingMaxRetryTimeout: 24000, // Max time for retries (24s)
-          levelLoadingMaxRetry: 6, // Increased from default 4
-          levelLoadingRetryDelay: 1000,
-          // NEW: Handle seeking better by preloading around seek position
-          // NEW: Progressive back buffer loading to reduce memory
+          // CRITICAL FIX for slow upstream servers (segments taking ~10s each):
+          // Increase fragment loading timeout and retry limits significantly
+          fragLoadingMaxRetry: 10, // Increased from 6 - allow more retries for slow segments
+          fragLoadingRetryDelay: 2000, // Increased from 1000ms - wait longer between retries
+          fragLoadingMaxRetryTimeout: 90000, // CRITICAL: Increased from 24s to 90s to handle 10s segments + retries
+          levelLoadingMaxRetry: 10, // Increased from 6 - more retries for level/playlist loading
+          levelLoadingRetryDelay: 2000, // Increased from 1000ms
+          levelLoadingMaxRetryTimeout: 60000, // NEW: 60s max for level loading
+          // Handle seeking better by preloading around seek position
+          // Progressive back buffer loading to reduce memory
           backBufferLength: 30,
-          // NEW: Better handling of manifest parsing errors
-          manifestLoadingMaxRetry: 6,
-          manifestLoadingRetryDelay: 1000,
-          manifestLoadingMaxRetryTimeout: 20000, // 20s max for manifest loading - CRITICAL FIX
+          // Better handling of manifest parsing errors for slow servers
+          manifestLoadingMaxRetry: 10, // Increased from 6
+          manifestLoadingRetryDelay: 2000, // Increased from 1000ms
+          manifestLoadingMaxRetryTimeout: 60000, // CRITICAL: Increased from 20s to 60s for slow manifest loading
+          // NEW: Additional timeout settings for fetch-based loader
+          fetchSetup: (context, initParams) => {
+            // Extend timeout for fetch requests to handle slow servers
+            return {
+              ...initParams,
+              // Note: AbortSignal.timeout can be used but we handle via AbortController in the proxy
+              // The fetch API itself doesn't have a built-in timeout option
+            };
+          },
         };
 
         // Determine the actual URL to load
