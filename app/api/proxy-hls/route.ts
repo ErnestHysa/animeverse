@@ -155,8 +155,10 @@ export async function GET(request: NextRequest) {
         const baseUrlString = baseUrl.origin + baseUrl.pathname.replace(/[^/]+$/, "");
 
         // Get the proxy base URL (relative to work on both localhost and production)
+        // Use the Host header to get the correct host from the browser's perspective
         const requestUrl = new URL(request.url);
-        const proxyBaseUrl = `${requestUrl.protocol}//${requestUrl.host}/api/proxy-hls`;
+        const hostHeader = request.headers.get("host") || requestUrl.host;
+        const proxyBaseUrl = `${requestUrl.protocol}//${hostHeader}/api/proxy-hls`;
 
         // Helper function to rewrite a URL to go through the proxy
         // urlType controls whether the proxy rewrites URLs inside the response ("manifest") or streams it ("segment")
@@ -267,12 +269,18 @@ export async function GET(request: NextRequest) {
       headers["Content-Length"] = contentLengthHeader;
     }
 
+    // Log segment requests for debugging
+    if (type === "segment") {
+      console.log(`[HLS Proxy] Segment: ${targetUrl.substring(0, 70)}... Size: ${contentLengthHeader || 'unknown'}`);
+    }
+
     // Handle Range requests for seeking (supports both segments and videos)
     const rangeHeader = request.headers.get("range");
     if (rangeHeader && (type === "segment" || type === "video")) {
       const range = response.headers.get("content-range");
       if (range) {
         headers["Content-Range"] = range;
+        console.log(`[HLS Proxy] Range request: ${rangeHeader} -> ${range}`);
         return new NextResponse(response.body, {
           status: 206, // Partial Content
           headers,
