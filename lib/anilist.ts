@@ -229,6 +229,56 @@ class AniListClient {
     const query = `query TopRated($page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME, sort: SCORE_DESC, status: FINISHED) { ${MEDIA_FULL_FRAGMENT} } } }`;
     return this.query<TrendingResponse>(query, { page, perPage });
   }
+
+  /**
+   * Get hidden gems: high-scoring anime that aren't extremely popular
+   * These are great shows that flew under the radar
+   */
+  async getHiddenGems(page: number = 1, perPage: number = 24): Promise<APIResult<TrendingResponse>> {
+    const query = `query HiddenGems($page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME, sort: SCORE_DESC, averageScore_greater: 79, popularity_lesser: 80000, status: FINISHED, episodes_greater: 1) { ${MEDIA_FULL_FRAGMENT} } } }`;
+    return this.query<TrendingResponse>(query, { page, perPage });
+  }
+
+  /**
+   * Save a media list entry to AniList (requires user auth token)
+   * Used for reverse-sync: marking episodes watched in AnimeVerse → AniList
+   */
+  async saveMediaListEntry(
+    token: string,
+    mediaId: number,
+    progress: number,
+    status: "CURRENT" | "COMPLETED" | "PLANNING" | "PAUSED" | "DROPPED" | "REPEATING"
+  ): Promise<APIResult<{ SaveMediaListEntry: { id: number; status: string; progress: number } }>> {
+    const mutation = `mutation SaveProgress($mediaId: Int, $progress: Int, $status: MediaListStatus) {
+      SaveMediaListEntry(mediaId: $mediaId, progress: $progress, status: $status) {
+        id status progress score
+      }
+    }`;
+    try {
+      const response = await fetch(this.url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ query: mutation, variables: { mediaId, progress, status } }),
+      });
+      const data = await response.json();
+      if (!response.ok || data.errors) {
+        return {
+          data: null,
+          error: { message: data.errors?.[0]?.message || `HTTP ${response.status}` },
+        };
+      }
+      return { data: data.data, error: null };
+    } catch (error) {
+      return {
+        data: null,
+        error: { message: error instanceof Error ? error.message : "Network error" },
+      };
+    }
+  }
 }
 
 export const anilist = new AniListClient();

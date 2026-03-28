@@ -31,6 +31,7 @@ import {
   BarChart3,
   BookMarked,
   Settings2,
+  Gem,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -185,6 +186,9 @@ export const Header = memo(function Header() {
               </NavLink>
               <NavLink href="/random" icon={<Shuffle className="w-4 h-4" />}>
                 Random
+              </NavLink>
+              <NavLink href="/hidden-gems" icon={<Gem className="w-4 h-4" />} className="hidden lg:flex">
+                Hidden Gems
               </NavLink>
               <NavLink href="/seasonal" icon={<Tv className="w-4 h-4" />} className="hidden lg:flex">
                 Seasonal
@@ -488,6 +492,9 @@ export const Header = memo(function Header() {
               </MobileNavLink>
               <MobileNavLink href="/random" icon={<Shuffle className="w-5 h-5" />}>
                 Random
+              </MobileNavLink>
+              <MobileNavLink href="/hidden-gems" icon={<Gem className="w-5 h-5" />}>
+                Hidden Gems
               </MobileNavLink>
               <MobileNavLink href="/seasonal" icon={<Tv className="w-5 h-5" />}>
                 Seasonal
