@@ -32,6 +32,7 @@ import {
   BookMarked,
   Settings2,
   Gem,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -54,7 +55,7 @@ const NavLink = memo(function NavLink({ href, icon, children, className = "" }: 
       className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors whitespace-nowrap ${className}`}
     >
       {icon}
-      <span className="hidden xl:inline">{children}</span>
+      <span className="hidden md:inline">{children}</span>
     </Link>
   );
 });
@@ -78,7 +79,11 @@ export const Header = memo(function Header() {
   const [searchSuggestions, setSearchSuggestions] = useState<Array<{ id: number; title: string; year?: number | null; format?: string | null }>>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [discoverOpen, setDiscoverOpen] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
   const searchDebounceRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const discoverRef = useRef<HTMLDivElement>(null);
+  const libraryRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const { theme, setTheme, resolvedTheme } = useTheme();
   const { anilistUser, isAuthenticated, clearAniListAuth } = useAniListAuth();
@@ -131,20 +136,24 @@ export const Header = memo(function Header() {
     setMobileMenuOpen(false);
   }, []);
 
-  // Close user menu when clicking outside
+  // Close user menu + dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement;
-      if (userMenuOpen && !target.closest(".user-menu-container")) {
+      const target = event.target as Node;
+      if (userMenuOpen && !document.querySelector(".user-menu-container")?.contains(target)) {
         setUserMenuOpen(false);
+      }
+      if (discoverOpen && !discoverRef.current?.contains(target)) {
+        setDiscoverOpen(false);
+      }
+      if (libraryOpen && !libraryRef.current?.contains(target)) {
+        setLibraryOpen(false);
       }
     };
 
-    if (userMenuOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
-    }
-  }, [userMenuOpen]);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [userMenuOpen, discoverOpen, libraryOpen]);
 
   return (
     <>
@@ -174,64 +183,92 @@ export const Header = memo(function Header() {
             </Link>
 
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-0.5 min-w-0 flex-1 overflow-x-auto" aria-label="Main navigation">
+            <nav className="hidden md:flex items-center gap-0.5 flex-1" aria-label="Main navigation">
+              {/* Primary links */}
               <NavLink href="/" icon={<TrendingUp className="w-4 h-4" />}>
                 Trending
               </NavLink>
               <NavLink href="/schedule" icon={<Calendar className="w-4 h-4" />}>
                 Schedule
               </NavLink>
-              <NavLink href="/coming-soon" icon={<Clock className="w-4 h-4" />}>
-                Coming Soon
-              </NavLink>
-              <NavLink href="/random" icon={<Shuffle className="w-4 h-4" />}>
-                Random
-              </NavLink>
-              <NavLink href="/hidden-gems" icon={<Gem className="w-4 h-4" />} className="hidden lg:flex">
-                Hidden Gems
-              </NavLink>
-              <NavLink href="/seasonal" icon={<Tv className="w-4 h-4" />} className="hidden lg:flex">
-                Seasonal
-              </NavLink>
-              <NavLink href="/genres" icon={<Tags className="w-4 h-4" />} className="hidden lg:flex">
-                Genres
-              </NavLink>
-              <NavLink href="/favorites" icon={<Heart className="w-4 h-4" />} className="hidden xl:flex">
-                Favorites
-              </NavLink>
-              <NavLink href="/watchlist" icon={<Clock className="w-4 h-4" />} className="hidden 2xl:flex">
-                Watchlist
-              </NavLink>
-              <NavLink href="/lists" icon={<ListIcon className="w-4 h-4" />} className="hidden 2xl:flex">
-                Lists
-              </NavLink>
-              <NavLink href="/achievements" icon={<Trophy className="w-4 h-4" />} className="hidden 2xl:flex">
-                Achievements
-              </NavLink>
-              <NavLink href="/stats" icon={<BarChart3 className="w-4 h-4" />} className="hidden 2xl:flex">
-                Stats
-              </NavLink>
+
+              {/* Discover dropdown */}
+              <div className="relative" ref={discoverRef}>
+                <button
+                  onClick={() => { setDiscoverOpen((p) => !p); setLibraryOpen(false); }}
+                  className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
+                  aria-expanded={discoverOpen}
+                  aria-haspopup="menu"
+                >
+                  <Tv className="w-4 h-4 flex-shrink-0" />
+                  <span>Discover</span>
+                  <ChevronDown className={`w-3 h-3 flex-shrink-0 transition-transform duration-200 ${discoverOpen ? "rotate-180" : ""}`} />
+                </button>
+                {discoverOpen && (
+                  <div className="absolute left-0 top-full mt-1 w-52 bg-popover border border-white/10 rounded-xl shadow-xl overflow-hidden z-50 animate-fadeIn" role="menu">
+                    {[
+                      { href: "/seasonal", icon: <Tv className="w-4 h-4" />, label: "Seasonal" },
+                      { href: "/hidden-gems", icon: <Gem className="w-4 h-4" />, label: "Hidden Gems" },
+                      { href: "/popular", icon: <TrendingUp className="w-4 h-4" />, label: "All-Time Popular" },
+                      { href: "/genres", icon: <Tags className="w-4 h-4" />, label: "Genres" },
+                      { href: "/random", icon: <Shuffle className="w-4 h-4" />, label: "Random Pick" },
+                      { href: "/coming-soon", icon: <Clock className="w-4 h-4" />, label: "Coming Soon" },
+                    ].map((item) => (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setDiscoverOpen(false)}
+                        className="flex items-center gap-3 px-3 py-2.5 text-sm hover:bg-white/5 transition-colors text-muted-foreground hover:text-foreground"
+                        role="menuitem"
+                      >
+                        <span className="flex-shrink-0">{item.icon}</span>
+                        {item.label}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* My Library dropdown */}
+              <div className="relative" ref={libraryRef}>
+                <button
+                  onClick={() => { setLibraryOpen((p) => !p); setDiscoverOpen(false); }}
+                  className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
+                  aria-expanded={libraryOpen}
+                  aria-haspopup="menu"
+                >
+                  <ListIcon className="w-4 h-4 flex-shrink-0" />
+                  <span>My Library</span>
+                  <ChevronDown className={`w-3 h-3 flex-shrink-0 transition-transform duration-200 ${libraryOpen ? "rotate-180" : ""}`} />
+                </button>
+                {libraryOpen && (
+                  <div className="absolute left-0 top-full mt-1 w-52 bg-popover border border-white/10 rounded-xl shadow-xl overflow-hidden z-50 animate-fadeIn" role="menu">
+                    {[
+                      { href: "/favorites", icon: <Heart className="w-4 h-4" />, label: "Favorites" },
+                      { href: "/watchlist", icon: <BookMarked className="w-4 h-4" />, label: "Watchlist" },
+                      { href: "/lists", icon: <ListIcon className="w-4 h-4" />, label: "Custom Lists" },
+                      { href: "/history", icon: <Clock className="w-4 h-4" />, label: "Watch History" },
+                      { href: "/stats", icon: <BarChart3 className="w-4 h-4" />, label: "Stats" },
+                      { href: "/achievements", icon: <Trophy className="w-4 h-4" />, label: "Achievements" },
+                    ].map((item) => (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setLibraryOpen(false)}
+                        className="flex items-center gap-3 px-3 py-2.5 text-sm hover:bg-white/5 transition-colors text-muted-foreground hover:text-foreground"
+                        role="menuitem"
+                      >
+                        <span className="flex-shrink-0">{item.icon}</span>
+                        {item.label}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
             </nav>
 
             {/* Actions */}
             <div className="flex items-center gap-0.5 flex-shrink-0">
-              <form
-                onSubmit={handleSearch}
-                className="hidden xl:flex items-center relative mr-2"
-              >
-                <Search className="absolute left-3 w-4 h-4 text-muted-foreground pointer-events-none" />
-                <input
-                  type="search"
-                  value={searchQuery}
-                  onChange={(e) => handleSearchInput(e.target.value)}
-                  placeholder="Search anime..."
-                  aria-label="Search anime"
-                  suppressHydrationWarning
-                  className="w-56 pl-9 pr-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all"
-                  autoComplete="off"
-                />
-              </form>
-
               {/* Search Button */}
               <Button
                 variant="ghost"
@@ -258,16 +295,16 @@ export const Header = memo(function Header() {
                 )}
               </Button>
 
-              {/* Discord Community - hidden on smaller screens */}
+              {/* Discord Community */}
               <a
                 href="https://discord.gg/animeverse"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hidden 2xl:inline-flex items-center justify-center rounded-lg text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 h-8 px-2 gap-1 transition-colors text-xs font-medium"
+                className="hidden lg:inline-flex items-center justify-center rounded-lg text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 h-8 px-2 gap-1 transition-colors text-xs font-medium"
                 aria-label="Join Discord"
               >
                 <MessageSquare className="w-3.5 h-3.5" />
-                <span>Discord</span>
+                <span className="hidden xl:inline">Discord</span>
               </a>
 
               {/* Episode Notifications */}
