@@ -75,13 +75,13 @@ export function ContinueWatching() {
 
   if (loading) {
     return (
-      <section className="mb-16">
+      <section className="mb-16" aria-labelledby="continue-watching-heading">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <Clock className="w-6 h-6 text-primary" />
-            <h2 className="text-2xl font-display font-semibold">Continue Watching</h2>
+            <Clock className="w-6 h-6 text-primary" aria-hidden="true" />
+            <h2 id="continue-watching-heading" className="text-2xl font-display font-semibold">Continue Watching</h2>
           </div>
-          <div className="h-6 w-20 bg-muted/30 rounded animate-pulse" />
+          <div className="h-6 w-20 bg-muted/30 rounded animate-pulse" aria-hidden="true" />
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
           {Array.from({ length: 5 }).map((_, i) => (
@@ -107,11 +107,11 @@ export function ContinueWatching() {
   }
 
   return (
-    <section className="mb-16">
+    <section className="mb-16" aria-labelledby="continue-watching-heading">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <Clock className="w-6 h-6 text-primary" />
-          <h2 className="text-2xl font-display font-semibold">Continue Watching</h2>
+          <Clock className="w-6 h-6 text-primary" aria-hidden="true" />
+          <h2 id="continue-watching-heading" className="text-2xl font-display font-semibold">Continue Watching</h2>
         </div>
         <Link
           href="/history"
@@ -152,6 +152,7 @@ const ContinueWatchingCard = memo(function ContinueWatchingCard({
     <Link
       href={`/watch/${anime.id}/${episodeNumber}`}
       className="group block"
+      aria-label={`Continue watching ${title}, episode ${episodeNumber}, ${Math.round(progress)}% complete`}
     >
       <div className="relative aspect-video rounded-xl overflow-hidden bg-muted">
         {/* Loading skeleton */}

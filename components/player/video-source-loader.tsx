@@ -13,6 +13,7 @@ import { AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "react-hot-toast";
 import { usePreferences } from "@/store";
+import logger from "@/lib/logger";
 
 interface VideoSourceLoaderProps {
   animeId: number;
@@ -252,13 +253,6 @@ export function VideoSourceLoader({
 
       setAllServers(serverOptions);
       const sourceUrl = defaultSource.url;
-      console.log("[VideoSourceLoader] Setting video source:", {
-        url: sourceUrl,
-        quality: defaultSource.quality,
-        provider: data.provider,
-        hasReferer: !!data.referer,
-        needsProxy: !!data.referer,
-      });
       setSources({
         type: "direct",
         url: sourceUrl,
@@ -354,7 +348,7 @@ export function VideoSourceLoader({
     if (isMediaError && currentServerIndex < allServers.length - 1) {
       // Try the next server in the list
       const nextServer = allServers[currentServerIndex + 1];
-      console.log(`[VideoSourceLoader] Media error detected, trying next server: ${nextServer.name}`);
+      logger.info(`Media error detected, trying next server: ${nextServer.name}`);
       toast.loading(`Trying next server...`, { id: "server-fallback" });
 
       setCurrentServerIndex(currentServerIndex + 1);

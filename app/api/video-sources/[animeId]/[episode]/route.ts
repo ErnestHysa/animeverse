@@ -1,9 +1,10 @@
 /**
  * Video Sources API Route
- * Uses stealth scraper with anti-bot bypass
+ * Uses robust multi-strategy video source fetching
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { getEpisodeSources, getDemoSources } from "@/lib/video-sources-robust";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,6 +25,7 @@ export async function GET(
   const episodeNumber = parseInt(episode, 10);
   const animeIdNum = parseInt(animeId, 10);
 
+  // Validate inputs
   if (isNaN(animeIdNum) || isNaN(episodeNumber) || episodeNumber < 1) {
     return NextResponse.json(
       { error: "Invalid animeId or episode number" },
@@ -36,31 +38,27 @@ export async function GET(
   const malId = searchParams.get("malId")
     ? parseInt(searchParams.get("malId")!, 10)
     : animeIdNum;
-
-  console.log(`[VideoSources] START: ${title} (ID: ${animeIdNum}) - Episode ${episodeNumber}`);
+  const language = searchParams.get("language") === "dub" ? "dub" : "sub";
 
   try {
-    // Add server-side timeout to prevent hanging requests
+    // Set overall timeout for the request
     const controller = new AbortController();
-    const SERVER_TIMEOUT = 32000; // 32 seconds server timeout
+    const SERVER_TIMEOUT = 40000; // 40 seconds server timeout
     const timeoutId = setTimeout(() => {
-      console.warn(`[VideoSources] TIMEOUT after ${SERVER_TIMEOUT}ms`);
       controller.abort();
     }, SERVER_TIMEOUT);
 
-    // Use Playwright-based scraper for actual anime sources
-    const { getEpisodeSources } = await import("@/lib/video-sources-fast");
-
-    const result = await getEpisodeSources(animeIdNum, episodeNumber, {
-      title,
-      malId,
-      language: "sub",
-    });
+    // Fetch video sources using robust implementation
+    const result = await Promise.race([
+      getEpisodeSources(animeIdNum, episodeNumber, { title, malId, language }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Server timeout')), SERVER_TIMEOUT)
+      ),
+    ]);
 
     clearTimeout(timeoutId);
 
     const elapsed = Date.now() - startTime;
-    console.log(`[VideoSources] DONE in ${elapsed}ms: Provider=${result.provider}, IsFallback=${result.isFallback ? 'yes' : 'no'}`);
 
     return NextResponse.json({
       ...result,
@@ -69,12 +67,12 @@ export async function GET(
         { type: "dub", available: false },
       ],
       hasSubtitles: (result.subtitles?.length || 0) > 0,
+      responseTime: elapsed,
     });
   } catch (error) {
     const elapsed = Date.now() - startTime;
-    console.error(`[VideoSources] ERROR after ${elapsed}ms:`, error);
 
-    // Check if error is due to timeout
+    // Check if timeout
     const isTimeout = error instanceof Error && (
       error.name === 'AbortError' ||
       error.message.includes('timeout') ||
@@ -82,10 +80,8 @@ export async function GET(
     );
 
     if (isTimeout) {
-      console.warn('[VideoSources] Request timeout - returning demo video');
-      // Return demo video on timeout instead of error
-      const { getDemoSources } = await import("@/lib/video-sources-fast");
-      const demoResult = getDemoSources(animeIdNum, episodeNumber);
+      // Return demo video on timeout
+      const demoResult = getDemoSources(animeIdNum, episodeNumber, title);
       return NextResponse.json({
         ...demoResult,
         availableLanguages: [
@@ -93,6 +89,8 @@ export async function GET(
           { type: "dub", available: false },
         ],
         hasSubtitles: false,
+        isTimeout: true,
+        responseTime: elapsed,
       });
     }
 
@@ -113,6 +111,7 @@ export async function OPTIONS() {
     headers: {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
     },
   });
 }

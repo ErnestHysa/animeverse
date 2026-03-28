@@ -196,3 +196,105 @@ export function formatTime(seconds: number): string {
   }
   return `${minutes}:${secs.toString().padStart(2, "0")}`;
 }
+
+/**
+ * Accessibility utility: Generate unique IDs for ARIA attributes
+ */
+let idCounter = 0;
+export function generateId(prefix: string = "id"): string {
+  return `${prefix}-${++idCounter}`;
+}
+
+/**
+ * Accessibility utility: Announce message to screen readers
+ * Uses a live region for dynamic content announcements
+ */
+export function announceToScreenReader(message: string, priority: "polite" | "assertive" = "polite"): void {
+  if (typeof window === "undefined") return;
+
+  // Get or create live region
+  let liveRegion = document.getElementById(`sr-live-${priority}`);
+  if (!liveRegion) {
+    liveRegion = document.createElement("div");
+    liveRegion.id = `sr-live-${priority}`;
+    liveRegion.setAttribute("aria-live", priority);
+    liveRegion.setAttribute("aria-atomic", "true");
+    liveRegion.className = "sr-only";
+    document.body.appendChild(liveRegion);
+  }
+
+  // Clear and set new message
+  liveRegion.textContent = "";
+  setTimeout(() => {
+    liveRegion!.textContent = message;
+  }, 100);
+}
+
+/**
+ * Accessibility utility: Trap focus within a container
+ * Useful for modals and dropdowns
+ */
+export function trapFocus(container: HTMLElement): () => void {
+  const focusableElements = container.querySelectorAll(
+    'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  );
+  const firstElement = focusableElements[0] as HTMLElement;
+  const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
+
+  const handleTabKey = (e: KeyboardEvent) => {
+    if (e.key !== "Tab") return;
+
+    if (e.shiftKey) {
+      if (document.activeElement === firstElement) {
+        e.preventDefault();
+        lastElement.focus();
+      }
+    } else {
+      if (document.activeElement === lastElement) {
+        e.preventDefault();
+        firstElement.focus();
+      }
+    }
+  };
+
+  container.addEventListener("keydown", handleTabKey);
+  firstElement?.focus();
+
+  // Return cleanup function
+  return () => {
+    container.removeEventListener("keydown", handleTabKey);
+  };
+}
+
+/**
+ * Accessibility utility: Check if user prefers reduced motion
+ */
+export function prefersReducedMotion(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+/**
+ * Accessibility utility: Get safe focus selector
+ * Returns elements that can receive focus
+ */
+export function getFocusableElements(container: HTMLElement): HTMLElement[] {
+  const focusableSelectors = [
+    'a[href]',
+    'button:not([disabled])',
+    'textarea:not([disabled])',
+    'input:not([disabled])',
+    'select:not([disabled])',
+    '[tabindex]:not([tabindex="-1"])',
+  ].join(", ");
+
+  return Array.from(container.querySelectorAll<HTMLElement>(focusableSelectors));
+}
+
+/**
+ * Accessibility utility: Create screen reader only text
+ * Returns HTML that is visually hidden but accessible to screen readers
+ */
+export function srOnly(text: string): string {
+  return `<span class="sr-only">${text}</span>`;
+}

@@ -1,90 +1,188 @@
-# AnimeVerse User Guide
+# AnimeVerse Stream - User Guide
 
-## Start the App
+## Getting Started
+
+### Launching the App
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`.
+Open your browser and navigate to `http://localhost:3000`.
 
-Development mode gives you:
+### What You Can Do
 
-- hot reload
-- detailed error output
-- source maps
-- graceful fallback behavior if `VIDEO_API_BASE_URL` is unavailable
+AnimeVerse Stream provides a complete anime watching experience:
+
+- **Browse** trending, popular, and seasonal anime
+- **Search** for specific titles with filters
+- **Watch** episodes with high-quality streaming
+- **Track** your viewing history and progress
+- **Organize** with favorites, watchlists, and custom lists
+- **Earn** achievements as you watch more
 
 ## Main Areas
 
-- Home: featured anime, trending, popular, continue watching, AI recommendations
-- Anime detail: synopsis, metadata, episodes, related recommendations
-- Watch page: playback, episode navigation, downloads, comments, share/report actions
-- Library pages: trending, popular, seasonal, genres, studios, schedule, coming soon
-- Personal pages: favorites, watchlist, custom lists, history, stats, achievements
+### Home Page
 
-## Watching Anime
+The home page features:
+- **Hero Section**: Featured anime with quick access
+- **Continue Watching**: Resume from where you left off
+- **Latest Episodes**: Recently aired episodes
+- **AI Recommendations**: Personalized picks based on your history
+- **Trending**: What's popular right now
+- **Popular**: All-time favorites
+- **Seasonal**: Current season anime
 
-From any anime detail page, open an episode from the episode list or use `Watch Now`.
+### Anime Detail Page
 
-The watch page includes:
+Click any anime card to see:
+- Full synopsis and description
+- Episode list with numbers and titles
+- Related anime recommendations
+- Studio and genre information
+- Ratings and popularity stats
+- Add to favorites/watchlist buttons
 
-- play/pause and seeking controls
-- next/previous episode navigation
-- subtitle and language controls when available
-- download support for compatible sources
-- keyboard shortcuts
+### Watch Page
 
-Common shortcuts:
+The video player includes:
+- Large video player with controls
+- Episode navigation (previous/next)
+- Episode list sidebar
+- Server/quality selection when available
+- Keyboard shortcuts for control
+- Progress tracking (auto-saves)
 
-- `Space`: play/pause
-- `Left` / `Right`: seek
-- `Up` / `Down`: volume
-- `M`: mute
-- `F`: fullscreen
-- `N`: next episode
+## Keyboard Shortcuts
 
-## Downloads
+While watching, use these shortcuts:
 
-To download:
+| Key | Action |
+|-----|--------|
+| `Space` | Play/Pause |
+| `Left` | Seek backward 10 seconds |
+| `Right` | Seek forward 10 seconds |
+| `Up` | Volume up |
+| `Down` | Volume down |
+| `M` | Mute/Unmute |
+| `F` | Toggle fullscreen |
+| `N` | Next episode |
 
-1. Open a watch page.
-2. Click the download button in the player controls.
-3. Wait for packaging to complete.
+## Managing Your Library
 
-Notes:
+### Favorites
 
-- download availability depends on the current provider/source
-- some streams are view-only and will not offer download packaging
+Click the heart icon on any anime to add it to favorites:
+- Quickly access your favorite shows
+- Appears in the Favorites page
+- Synced across sessions
 
-## AniList Sync
+### Watchlist
 
-AnimeVerse does not require its own account system.
+Add anime to your watchlist to plan what to watch:
+- Click the bookmark icon
+- Organize by priority
+- Track your plan-to-watch queue
 
-If you connect AniList, you can use:
+### Custom Lists
 
-- AniList-backed authentication
-- synced anime data
-- richer profile and stats workflows
+Create personalized collections:
+1. Go to the Lists page
+2. Click "Create New List"
+3. Name your list and add anime
+4. Organize by genre, mood, or any criteria
 
-Without AniList, your favorites, watchlist, history, and preferences remain local to your device.
+### Watch History
+
+Your viewing history is automatically tracked:
+- See all watched episodes
+- Resume from where you left off
+- Filter by date or anime
+
+## Statistics & Achievements
+
+### Viewing Stats
+
+Track your anime journey:
+- Total episodes watched
+- Total time spent watching
+- Favorite genres
+- Anime completion rate
+- Viewing streaks
+
+### Achievements
+
+Unlock achievements as you watch:
+- **First Anime**: Watch your first episode
+- **Episode Milestones**: 10, 50, 100, 500 episodes
+- **Anime Milestones**: 10, 50 different anime
+- **Completion**: Complete 5, 25 series
+- **Collector**: Add 10, 50 favorites
+
+## Search & Discovery
+
+### Search Bar
+
+Use the search bar to:
+- Find anime by title
+- Get instant suggestions as you type
+- Filter by genre, year, status
+- Sort by relevance, popularity, or rating
+
+### Browse Pages
+
+Explore curated collections:
+- **Trending**: What's popular now
+- **Popular**: All-time best rated
+- **Seasonal**: Current season releases
+- **Schedule**: Weekly airing schedule
+- **Genres**: Browse by category
+- **Studios**: Browse by animation studio
+
+## Settings & Preferences
+
+Access settings to customize:
+- **Video Quality**: Default quality preference
+- **Autoplay**: Auto-play next episode
+- **Subtitles**: Show/hide subtitles
+- **Filler Episodes**: Show/hide filler detection
+- **Adult Content**: Filter NSFW content
+
+## Tips & Tricks
+
+1. **Continue Watching**: The home page shows your most recent incomplete anime
+2. **Quick Actions**: Hover over anime cards for quick access buttons
+3. **Episode Thumbs**: Use the episode list to jump to any episode
+4. **Random Discovery**: Try the random anime feature for new discoveries
+5. **Keyboard Control**: Use shortcuts for faster navigation
 
 ## Troubleshooting
 
-If the app starts but playback is unavailable:
+### Video Won't Play
 
-- confirm `VIDEO_API_BASE_URL` points to a working source API
-- try another episode or server
-- run `npm run test:smoke` to verify core routing and fallback behavior
+- Try refreshing the page
+- Check your internet connection
+- Try a different episode
+- Some anime may have unavailable sources
 
-If production validation is needed:
+### Progress Not Saving
 
-```bash
-npm run lint
-npm run build
-npm run test:smoke
-npx playwright test e2e/home-page.spec.ts --project=chromium
-npx playwright test e2e/video-player.spec.ts --project=chromium
-npx playwright test e2e/real-user-flow.spec.ts --project=chromium
-```
+- Make sure cookies/localStorage are enabled
+- Check if you're in private/incognito mode
+- Try refreshing the page
+
+### Search Not Working
+
+- Check your internet connection
+- Try partial matches of the title
+- Use the English or Romanized title
+
+## Need More Help?
+
+- Check the [README.md](./README.md) for technical documentation
+- See [SETUP.md](./SETUP.md) for installation help
+- Report issues via the project's issue tracker
+
+Happy watching!

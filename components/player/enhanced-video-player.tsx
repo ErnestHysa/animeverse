@@ -25,6 +25,7 @@ import {
 import { cn, formatTime } from "@/lib/utils";
 import { usePreferences, useStore } from "@/store";
 import { toast } from "react-hot-toast";
+import logger from "@/lib/logger";
 import { ServerSelector, LanguageSelector } from "@/components/player/server-selector";
 import dynamic from "next/dynamic";
 import { SimpleThumbnailPreview } from "@/components/player/episode-thumbnails";
@@ -346,7 +347,7 @@ export function EnhancedVideoPlayer({
     const video = videoRef.current;
     if (!video) return;
 
-    console.log("[VideoPlayer] Loading video source:", {
+    logger.log("[VideoPlayer] Loading video source:", {
       type: source.type,
       url: source.url,
       hasReferer: !!source.referer,
@@ -365,14 +366,14 @@ export function EnhancedVideoPlayer({
 
     // Timeout fallback to prevent infinite loading
     const loadingTimeout = setTimeout(() => {
-      console.warn("Video loading timeout - clearing loading state");
+      logger.warn("Video loading timeout - clearing loading state");
       setIsLoading(false);
       setIsBuffering(false);
     }, 15000); // 15 seconds max (reduced from 30 for faster UX)
 
     // Fallback safety timeout - ensures loading state is always cleared
     const safetyTimeout = setTimeout(() => {
-      console.warn("Video safety timeout - forcing loading state clear");
+      logger.warn("Video safety timeout - forcing loading state clear");
       setIsLoading(false);
       setIsBuffering(false);
     }, 30000); // 30 seconds absolute max
@@ -395,12 +396,12 @@ export function EnhancedVideoPlayer({
       if (e) {
         if (e instanceof ErrorEvent) {
           errorMessage = e.message || "Unknown error";
-          console.error("Video error:", errorMessage);
+          logger.error("Video error:", errorMessage);
         } else if (e instanceof Error) {
           errorMessage = e.message;
-          console.error("Video error:", errorMessage);
+          logger.error("Video error:", errorMessage);
         } else {
-          console.warn("Video error event received");
+          logger.warn("Video error event received");
         }
       }
 
@@ -430,7 +431,7 @@ export function EnhancedVideoPlayer({
       // This fixes empty ArrayBuffer payloads on segments
       const isExternalHls = isHls && !source.url.includes(window.location.hostname);
       const needsProxy = !!source.referer || isExternalHls;
-      console.log("[HLS] Proxy decision:", {
+      logger.log("[HLS] Proxy decision:", {
         isHls,
         sourceUrl: source.url.substring(0, 50),
         hostname: window.location.hostname,
@@ -502,7 +503,7 @@ export function EnhancedVideoPlayer({
         // The manifest itself will contain rewritten URLs to the proxy
         const manifestUrl = needsProxy ? createProxyUrl(source.url, "manifest") : source.url;
 
-        console.log("[HLS] Loading manifest:", needsProxy ? "(via proxy)" : "(direct)", {
+        logger.log("[HLS] Loading manifest:", needsProxy ? "(via proxy)" : "(direct)", {
           original: source.url,
           proxied: manifestUrl !== source.url ? manifestUrl : "(same)",
         });
@@ -528,7 +529,7 @@ export function EnhancedVideoPlayer({
         // This is shorter than the main timeout to provide better UX
         const manifestFallbackTimeout = setTimeout(() => {
           if (!manifestTimeoutCleared) {
-            console.warn("[HLS] Manifest loading timeout - clearing loading state after 12s");
+            logger.warn("[HLS] Manifest loading timeout - clearing loading state after 12s");
             clearLoadingState();
             // Trigger error to notify parent component
             onError?.(new Error("Manifest loading timeout. Video source may be unavailable."));
@@ -544,7 +545,7 @@ export function EnhancedVideoPlayer({
         const onMediaAttached = () => {
           if (!mediaAttached) {
             mediaAttached = true;
-            console.log("[HLS] Media attached, loading source:", manifestUrl);
+            logger.log("[HLS] Media attached, loading source:", manifestUrl);
             hls.loadSource(manifestUrl);
             hls.off(Hls.Events.MEDIA_ATTACHED, onMediaAttached);
           }
@@ -554,7 +555,7 @@ export function EnhancedVideoPlayer({
         // If media attach fails, try loading anyway after a short delay
         setTimeout(() => {
           if (hlsRef.current && !hlsRef.current.media && !mediaAttached) {
-            console.warn("[HLS] Media attach timeout, forcing source load");
+            logger.warn("[HLS] Media attach timeout, forcing source load");
             mediaAttached = true;
             hls.loadSource(manifestUrl);
           }
@@ -562,19 +563,19 @@ export function EnhancedVideoPlayer({
 
         // Comprehensive HLS event logging for debugging
         hls.on(Hls.Events.MEDIA_ATTACHED, (event, data) => {
-          console.log("[HLS] Media attached event fired:", data);
+          logger.log("[HLS] Media attached event fired:", data);
         });
 
         hls.on(Hls.Events.MANIFEST_LOADING, (event, data) => {
-          console.log("[HLS] Manifest loading:", data);
+          logger.log("[HLS] Manifest loading:", data);
         });
 
         hls.on(Hls.Events.MANIFEST_LOADED, (event, data) => {
-          console.log("[HLS] Manifest loaded:", data);
-          console.log("[HLS] Levels available:", data.levels.length);
+          logger.log("[HLS] Manifest loaded:", data);
+          logger.log("[HLS] Levels available:", data.levels.length);
           // CRITICAL FIX: Check if there are any playable levels
           if (data.levels.length === 0) {
-            console.error("[HLS] No playable levels in manifest");
+            logger.error("[HLS] No playable levels in manifest");
             clearTimeout(manifestFallbackTimeout);
             clearLoadingState();
             // Trigger error to notify parent component
@@ -588,13 +589,13 @@ export function EnhancedVideoPlayer({
         });
 
         hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
-          console.log("[HLS] Manifest parsed successfully:", data);
+          logger.log("[HLS] Manifest parsed successfully:", data);
           // Clear any remaining timeouts since manifest is now fully parsed
           clearTimeout(manifestFallbackTimeout);
           // Play if autoplay is enabled OR if user initiated playback
           // userInitiatedPlayRef is a ref so we always read the current value (no stale closure)
           if (preferences.autoplay || userInitiatedPlayRef.current) {
-            console.log("[HLS] Starting playback (autoplay:", preferences.autoplay, "userInitiated:", userInitiatedPlayRef.current, ")");
+            logger.log("[HLS] Starting playback (autoplay:", preferences.autoplay, "userInitiated:", userInitiatedPlayRef.current, ")");
             play().catch(() => {});
           }
         });
@@ -605,7 +606,7 @@ export function EnhancedVideoPlayer({
         hls.once(Hls.Events.MANIFEST_LOADED, () => {
           parseCheckTimeout = setTimeout(() => {
             if (video.readyState >= 1 && hlsRef.current) {
-              console.log("[HLS] Manifest parsed event not fired, but video has data - attempting playback");
+              logger.log("[HLS] Manifest parsed event not fired, but video has data - attempting playback");
               if (preferences.autoplay || userInitiatedPlayRef.current) {
                 play().catch(() => {});
               }
@@ -614,27 +615,27 @@ export function EnhancedVideoPlayer({
         });
 
         hls.on(Hls.Events.LEVEL_LOADING, (event, data) => {
-          console.log("[HLS] Level loading:", data);
+          logger.log("[HLS] Level loading:", data);
         });
 
         hls.on(Hls.Events.LEVEL_LOADED, (event, data) => {
-          console.log("[HLS] Level loaded:", data);
+          logger.log("[HLS] Level loaded:", data);
         });
 
         hls.on(Hls.Events.FRAG_LOADING, (event, data) => {
-          console.log("[HLS] Fragment loading:", data);
+          logger.log("[HLS] Fragment loading:", data);
           // CRITICAL FIX: Don't set buffering on FRAG_LOADING - HLS continuously loads fragments
           // during normal playback. The video element 'waiting' event is the reliable indicator.
           // Only set buffering if we're actually in a waiting state (checked by video events)
         });
 
         hls.on(Hls.Events.FRAG_LOADED, (event, data) => {
-          console.log("[HLS] Fragment loaded:", data);
+          logger.log("[HLS] Fragment loaded:", data);
           // CRITICAL FIX: Don't clear buffering here - let video element events handle it
           // Clearing here can interfere with the waiting event debounce logic
           // If user initiated play and we have the first fragment, try to play
           if (userInitiatedPlayRef.current && video.paused && video.readyState >= 2) {
-            console.log("[HLS] Fragment loaded and user wants to play, starting playback...");
+            logger.log("[HLS] Fragment loaded and user wants to play, starting playback...");
             video.play().catch(() => {});
           }
         });
@@ -660,13 +661,13 @@ export function EnhancedVideoPlayer({
 
           // Use warn for non-fatal errors to reduce console noise
           if (data.fatal) {
-            console.error("HLS fatal error:", {
+            logger.error("HLS fatal error:", {
               type: data.type,
               details: data.details,
               reason: data.reason,
             });
           } else {
-            console.warn("HLS non-fatal error:", {
+            logger.warn("HLS non-fatal error:", {
               type: data.type,
               details: data.details,
             });
@@ -682,19 +683,19 @@ export function EnhancedVideoPlayer({
             mediaErrorCount++;
             lastErrorTime = now;
 
-            console.warn(`Media error count: ${mediaErrorCount}/${MAX_MEDIA_ERRORS}`);
+            logger.warn(`Media error count: ${mediaErrorCount}/${MAX_MEDIA_ERRORS}`);
 
             // Try recovery before giving up on the server
             if (mediaErrorCount < MAX_MEDIA_ERRORS && recoveryAttempts < MAX_RECOVERY_ATTEMPTS) {
               recoveryAttempts++;
-              console.warn(`Attempting media error recovery (attempt ${recoveryAttempts}/${MAX_RECOVERY_ATTEMPTS})`);
+              logger.warn(`Attempting media error recovery (attempt ${recoveryAttempts}/${MAX_RECOVERY_ATTEMPTS})`);
               hls.recoverMediaError();
               return;
             }
 
             // If we hit the threshold, trigger fallback to next server
             if (mediaErrorCount >= MAX_MEDIA_ERRORS) {
-              console.warn("Too many media errors, triggering server fallback");
+              logger.warn("Too many media errors, triggering server fallback");
               onError?.(new Error(`Media parsing failed after ${MAX_MEDIA_ERRORS} attempts. Trying next server...`));
               // Don't try to recover - let the parent component switch servers
               return;
@@ -704,7 +705,7 @@ export function EnhancedVideoPlayer({
           if (data.fatal) {
             switch (data.type) {
               case Hls.ErrorTypes.NETWORK_ERROR:
-                console.log("Attempting to recover from network error...");
+                logger.log("Attempting to recover from network error...");
                 // ENHANCED: Try to recover from current position for better seek handling
                 const currentPos = video.currentTime || 0;
                 hls.startLoad(currentPos);
@@ -712,13 +713,13 @@ export function EnhancedVideoPlayer({
                 setIsBuffering(false);
                 break;
               case Hls.ErrorTypes.MEDIA_ERROR:
-                console.log("Attempting to recover from media error...");
+                logger.log("Attempting to recover from media error...");
                 hls.recoverMediaError();
                 // Clear buffering state on recovery attempt
                 setIsBuffering(false);
                 break;
               default:
-                console.error("Fatal HLS error, cannot recover");
+                logger.error("Fatal HLS error, cannot recover");
                 handleError();
                 break;
             }
@@ -1288,12 +1289,12 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
       // This handles the case where browser's native play() is called (not via our play() function)
       const hls = hlsRef.current;
       if (hls && hlsReady) {
-        console.log("[handlePlay] Video started playing, ensuring HLS is loading");
+        logger.log("[handlePlay] Video started playing, ensuring HLS is loading");
         try {
           hls.startLoad(video.currentTime);
         } catch (e) {
           // HLS might already be loading or in a state where startLoad isn't needed
-          console.debug("[handlePlay] HLS startLoad skipped:", e);
+          logger.debug("[handlePlay] HLS startLoad skipped:", e);
         }
       }
     };
@@ -1305,7 +1306,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
       }
     };
     const handleWaiting = () => {
-      console.log("[Video Player] Waiting event - debouncing to prevent false positive");
+      logger.log("[Video Player] Waiting event - debouncing to prevent false positive");
 
       // Clear any existing debounce timeout
       if (waitingDebounceRef.current) {
@@ -1317,7 +1318,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
       waitingDebounceRef.current = setTimeout(() => {
         // Double-check we're actually waiting (video hasn't started playing)
         if (video.paused || video.readyState < 3) {
-          console.log("[Video Player] Confirmed buffering state - video is stalled");
+          logger.log("[Video Player] Confirmed buffering state - video is stalled");
           setIsBuffering(true);
           setIsPlaying(false);
 
@@ -1332,11 +1333,11 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
             // Try to recover HLS if it exists
             const hls = hlsRef.current;
             if (hls && hls.media) {
-              console.warn("[Buffering Recovery] Attempting HLS recovery after 5s");
+              logger.warn("[Buffering Recovery] Attempting HLS recovery after 5s");
               try {
                 hls.startLoad(video.currentTime);
               } catch (e) {
-                console.error("[Buffering Recovery] HLS startLoad failed:", e);
+                logger.error("[Buffering Recovery] HLS startLoad failed:", e);
               }
             }
           }, 5000); // First recovery attempt at 5s
@@ -1344,18 +1345,18 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
           // Set final safety timeout
           setTimeout(() => {
             if (bufferingSafetyTimeoutRef.current) {
-              console.warn("Buffering safety timeout - forcing buffering state clear");
+              logger.warn("Buffering safety timeout - forcing buffering state clear");
               setIsBuffering(false);
               bufferingSafetyTimeoutRef.current = null;
             }
           }, 15000); // Reduced from 30s to 15s for better UX
         } else {
-          console.log("[Video Player] Waiting event cleared - video is playing");
+          logger.log("[Video Player] Waiting event cleared - video is playing");
         }
       }, 500); // 500ms debounce to filter out transient waiting events
     };
     const handleCanPlay = () => {
-      console.log("[Video Player] CanPlay event - ready to play");
+      logger.log("[Video Player] CanPlay event - ready to play");
       // CRITICAL: Clear waiting debounce immediately
       if (waitingDebounceRef.current) {
         clearTimeout(waitingDebounceRef.current);
@@ -1371,7 +1372,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
     };
     // NEW: Handle canplaythrough for smoother playback
     const handleCanPlayThrough = () => {
-      console.log("[Video Player] CanPlayThrough event - should play without stalling");
+      logger.log("[Video Player] CanPlayThrough event - should play without stalling");
       // CRITICAL: Clear waiting debounce immediately
       if (waitingDebounceRef.current) {
         clearTimeout(waitingDebounceRef.current);
@@ -1391,7 +1392,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
     };
     // ENHANCED: Better seek handling with explicit HLS recovery
     const handleSeeking = () => {
-      console.log(`[Video Player] Seeking to ${video.currentTime}s`);
+      logger.log(`[Video Player] Seeking to ${video.currentTime}s`);
       setIsBuffering(true);
 
       // For HLS, explicitly start loading from the new position
@@ -1408,12 +1409,12 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
             }
           }, 50);
         } catch (e) {
-          console.warn("[HLS] Seek recovery failed:", e);
+          logger.warn("[HLS] Seek recovery failed:", e);
         }
       }
     };
     const handleSeeked = () => {
-      console.log(`[Video Player] Seeked to ${video.currentTime}s`);
+      logger.log(`[Video Player] Seeked to ${video.currentTime}s`);
       // CRITICAL: Clear waiting debounce after seek completes
       if (waitingDebounceRef.current) {
         clearTimeout(waitingDebounceRef.current);
@@ -1423,7 +1424,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
     };
     // NEW: Handle stalled event when download stops
     const handleStalled = () => {
-      console.log("[Video Player] Download stalled, checking if recovery needed");
+      logger.log("[Video Player] Download stalled, checking if recovery needed");
       // Only set buffering if we're actually playing (not paused)
       if (!video.paused && video.readyState < 3) {
         setIsBuffering(true);
@@ -1433,14 +1434,14 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
           try {
             hls.startLoad(video.currentTime);
           } catch (e) {
-            console.error("[Stalled Recovery] HLS restart failed:", e);
+            logger.error("[Stalled Recovery] HLS restart failed:", e);
           }
         }
       }
     };
     // NEW: Handle playing event to ensure buffering state is cleared
     const handlePlaying = () => {
-      console.log("[Video Player] Playing event - clearing buffering state");
+      logger.log("[Video Player] Playing event - clearing buffering state");
       // CRITICAL: Clear waiting debounce immediately when playing starts
       if (waitingDebounceRef.current) {
         clearTimeout(waitingDebounceRef.current);
@@ -1702,20 +1703,20 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
     const hls = hlsRef.current;
 
     if (!video) {
-      console.warn("[play] No video element available");
+      logger.warn("[play] No video element available");
       return;
     }
 
-    console.log("[play] Called - video.paused:", video.paused, "hlsReady:", hlsReady, "hls exists:", !!hls, "readyState:", video.readyState);
+    logger.log("[play] Called - video.paused:", video.paused, "hlsReady:", hlsReady, "hls exists:", !!hls, "readyState:", video.readyState);
 
     // CRITICAL FIX: When resuming from pause, HLS.js needs startLoad() to restart buffering
     // HLS.js automatically calls stopLoad() when paused, but doesn't auto-restart
     if (hls && video.paused && hlsReady) {
-      console.log("[play] Resuming from pause - calling hls.startLoad() at position:", video.currentTime);
+      logger.log("[play] Resuming from pause - calling hls.startLoad() at position:", video.currentTime);
       try {
         hls.startLoad(video.currentTime);
       } catch (e) {
-        console.error("[play] HLS startLoad failed:", e);
+        logger.error("[play] HLS startLoad failed:", e);
       }
     }
 
@@ -1724,15 +1725,15 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
 
     // Check if HLS is being used but not ready yet
     if (hls && !hlsReady) {
-      console.log("[play] HLS exists but not ready, waiting for MANIFEST_PARSED...");
+      logger.log("[play] HLS exists but not ready, waiting for MANIFEST_PARSED...");
       setIsLoading(true);
       toast("Loading stream...", { icon: "⏳", duration: 2000 });
 
       // Set up a one-time listener to play when ready
       const onManifestParsed = () => {
-        console.log("[play] Manifest parsed, starting playback...");
+        logger.log("[play] Manifest parsed, starting playback...");
         video.play().catch((err) => {
-          console.error("[play] Play failed after manifest parsed:", err);
+          logger.error("[play] Play failed after manifest parsed:", err);
         });
       };
 
@@ -1742,7 +1743,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
       // Also try to play after a short delay as fallback
       setTimeout(() => {
         if (video.paused && video.readyState >= 2) {
-          console.log("[play] Fallback: Video has data, attempting play...");
+          logger.log("[play] Fallback: Video has data, attempting play...");
           video.play().catch(() => {});
         }
       }, 2000);
@@ -1752,17 +1753,17 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
 
     // Check video readyState before attempting to play
     if (video.readyState < 2) { // HAVE_CURRENT_DATA
-      console.log(`[play] Video not ready (readyState: ${video.readyState}), waiting...`);
+      logger.log(`[play] Video not ready (readyState: ${video.readyState}), waiting...`);
       setIsLoading(true);
 
       // Wait for video to be ready
       let retries = 0;
       const checkReady = () => {
         if (video.readyState >= 2) {
-          console.log("[play] Video is now ready, playing...");
+          logger.log("[play] Video is now ready, playing...");
           setIsLoading(false);
           video.play().catch((err) => {
-            console.warn("[play] Play failed:", err);
+            logger.warn("[play] Play failed:", err);
             toast("Click to play video", { icon: "🎬", duration: 2000 });
           });
         } else {
@@ -1771,7 +1772,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
             retries++;
             setTimeout(checkReady, 100);
           } else {
-            console.warn("[play] Gave up waiting for video to be ready");
+            logger.warn("[play] Gave up waiting for video to be ready");
             setIsLoading(false);
             toast("Video failed to load. Try refreshing.", { icon: "⚠️", duration: 3000 });
           }
@@ -1783,11 +1784,11 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
     }
 
     try {
-      console.log("[play] Playing video (readyState:", video.readyState, "paused:", video.paused, ")");
+      logger.log("[play] Playing video (readyState:", video.readyState, "paused:", video.paused, ")");
       await video.play();
       setIsLoading(false);
     } catch (e) {
-      console.error("[play] Failed to play:", e);
+      logger.error("[play] Failed to play:", e);
       // Auto-play was blocked or other error
       toast("Click to play video", { icon: "🎬", duration: 2000 });
     }
@@ -1903,7 +1904,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
       // Use video.duration directly instead of state to avoid stale values
       const videoDuration = video.duration || duration;
       const seekTime = Math.max(0, Math.min(videoDuration, time));
-      console.log(`[Video Player] Seeking to ${seekTime}s (current: ${video.currentTime}s, duration: ${videoDuration}s)`);
+      logger.log(`[Video Player] Seeking to ${seekTime}s (current: ${video.currentTime}s, duration: ${videoDuration}s)`);
 
       // For HLS, we need to ensure we don't trigger a reload
       // HLS.js should handle seeking natively
@@ -2102,7 +2103,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
   const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const video = videoRef.current;
     if (!video || !video.duration) {
-      console.warn("[handleProgressClick] No video or duration available");
+      logger.warn("[handleProgressClick] No video or duration available");
       return;
     }
     const rect = e.currentTarget.getBoundingClientRect();

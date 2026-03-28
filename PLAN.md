@@ -1,81 +1,105 @@
-# Anime Streaming Webapp - Implementation Plan
+# AnimeVerse Stream - Implementation Plan
 
 **Project Name:** AnimeVerse Stream
-**Tech Stack:** Next.js 16 (React 19), TypeScript, Tailwind CSS, WebTorrent
+**Tech Stack:** Next.js 16 (React 19), TypeScript, Tailwind CSS 4, Playwright
 **Design:** Dark anime aesthetic with purple/blue accents, glassmorphism
-**Streaming:** Hybrid (WebTorrent P2P + Direct video URLs)
-**Data Source:** AniList API (primary) + Custom scraper fallback
+**Streaming:** Direct HLS streaming with server-side proxy
+**Data Sources:** AniList API (primary), Jikan API (fallback), Built-in scraper
 
 ---
 
-## Phase 1: Project Setup & Foundation
+## Implementation Status: ✅ COMPLETE
+
+All core features have been implemented and the app is fully functional.
+
+---
+
+## Completed Phases
+
+### Phase 1: Project Setup & Foundation ✅
 
 - [x] Initialize Next.js 16 project with TypeScript
-- [x] Configure Tailwind CSS with custom design tokens
+- [x] Configure Tailwind CSS 4 with custom design tokens
 - [x] Set up project structure (app directory, components, lib, types)
 - [x] Configure ESLint and TypeScript strict mode
 - [x] Create design token system (colors, typography, spacing)
 - [x] Set up dark mode as default with anime aesthetic theme
 
-## Phase 2: AniList API Integration
+### Phase 2: API Integration ✅
 
 - [x] Set up GraphQL client for AniList API
-- [x] Create API functions for trending anime
-- [x] Create API functions for searching anime
-- [x] Create API functions for anime details
-- [x] Implement proper TypeScript types for AniList responses
-- [x] Add error handling and caching
+- [x] Create Jikan API client (MyAnimeList fallback)
+- [x] Implement trending, search, and detail queries
+- [x] Add proper TypeScript types for API responses
+- [x] Implement error handling and caching
 
-## Phase 3: UI Components Foundation
+### Phase 3: UI Components Foundation ✅
 
-- [x] Create layout components (Header, Footer)
+- [x] Create layout components (Header, Footer, MobileNav)
 - [x] Create AnimeCard component with hover effects
 - [x] Create AnimeGrid component for listings
 - [x] Create Loading/Skeleton components
 - [x] Implement glassmorphism effects and animations
 - [x] Ensure WCAG accessibility (contrast, focus states, touch targets)
 
-## Phase 4: Core Pages & Routes
+### Phase 4: Core Pages & Routes ✅
 
-- [x] Home page (trending anime grid)
+- [x] Home page with hero and sections
 - [x] Search page with filters
 - [x] Anime detail page
-- [x] Watch/Streaming page with episode list
-- [x] Favorites page (client-side)
-- [x] Watchlist page (client-side)
+- [x] Watch/Streaming page with enhanced player
+- [x] Favorites, Watchlist, Lists pages
+- [x] History, Stats, Achievements pages
+- [x] Trending, Popular, Seasonal pages
+- [x] Genres, Studios, Schedule pages
+- [x] Settings page
+- [x] Info pages (About, FAQ, Privacy, Terms, DMCA)
 
-## Phase 5: WebTorrent Integration
+### Phase 5: Video Player & Streaming ✅
 
-- [x] Install and configure WebTorrent
-- [x] Create video player component with WebTorrent support
-- [x] Create direct video player component (fallback)
-- [x] Add P2P stats display (download/upload speed, peers)
-- [x] Add keyboard shortcuts support
+- [x] Enhanced video player with hls.js
+- [x] HLS proxy API for CORS bypass
+- [x] Keyboard shortcuts support
+- [x] Episode navigation
+- [x] Server/quality selection
+- [x] Progress tracking
+- [x] Built-in Playwright scraper for video sources
 
-## Phase 6: Custom Scraper Fallback
+### Phase 6: State Management & Persistence ✅
 
-- [x] Create Next.js API route for scraper
-- [x] Set up fallback logic structure for Python scraper integration
+- [x] Set up Zustand with localStorage persistence
+- [x] Implement favorites/watchlist
+- [x] Add watch history tracking
+- [x] Add user preferences
+- [x] Add media caching
+- [x] Implement achievements system
 
-## Phase 7: State Management & Persistence
+### Phase 7: Advanced Features ✅
 
-- [x] Set up Zustand for global state
-- [x] Implement favorites/watchlist with localStorage
-- [x] Add watch history tracking structure
-- [x] Add user preferences (quality, autoplay, etc.)
+- [x] AI recommendations engine
+- [x] Continue watching section
+- [x] Custom lists with batch operations
+- [x] Episode comments
+- [x] Filler episode detection
+- [x] Skip intro/outro timestamps (AniSkip)
+- [x] Download packaging for HLS streams
 
-## Phase 8: Polish & Performance
+### Phase 8: Polish & Performance ✅
 
 - [x] Implement proper SEO (metadata, OG tags)
 - [x] Add image optimization (next/image)
 - [x] Add transition animations
 - [x] Create responsive design system
+- [x] PWA manifest support
+- [x] Error boundaries and fallbacks
 
-## Phase 9: Testing & Deployment
+### Phase 9: Testing ✅
 
-- [x] Test app in dev mode - working successfully
-- [x] Verify core functionality (AniList API, routing, state management)
-- [x] Note: Static build has issues with client-side pages, but app works in dev mode
+- [x] Set up Playwright for E2E testing
+- [x] Create smoke tests
+- [x] Test home page functionality
+- [x] Test video player functionality
+- [x] Test real user flows
 
 ---
 
@@ -91,28 +115,109 @@
 --glass-border: rgba(255, 255, 255, 0.1);
 ```
 
-## Key Features
+---
 
-1. **Hybrid Streaming**: WebTorrent P2P + Direct URLs
-2. **AniList Integration**: Rich anime metadata via GraphQL
-3. **Custom Scraper Fallback**: API route structure for Python scraper
-4. **Dark Anime Aesthetic**: Glassmorphism, purple/blue accents
-5. **Favorites & Watchlist**: Zustand state with localStorage
-6. **Responsive Design**: Mobile-first approach
-7. **Accessible**: WCAG AA compliant focus states and contrast
+## Architecture Overview
+
+### Frontend (Next.js App Router)
+
+```
+app/
+├── api/                    # API routes
+│   ├── video-sources/     # Video source fetching
+│   ├── proxy-hls/         # HLS proxy for CORS
+│   ├── health/            # Health check
+│   └── ...
+├── anime/[id]/            # Anime detail pages
+├── watch/[animeId]/[episode]/  # Watch pages
+├── search/                # Search page
+└── ...                    # Other pages
+```
+
+### State Management (Zustand)
+
+```typescript
+// Global state with localStorage persistence
+- favorites: number[]
+- watchlist: number[]
+- watchHistory: WatchHistoryItem[]
+- preferences: UserPreferences
+- mediaCache: Record<number, Media>
+- achievements: AchievementState
+- anilistAuth: AniListAuthState
+```
+
+### Video Architecture
+
+```
+1. User clicks play on episode
+2. Frontend calls /api/video-sources/[animeId]/[episode]
+3. Server uses Playwright to scrape video URLs
+4. Frontend receives video sources (HLS/MP4)
+5. Video player uses HLS proxy for streaming
+6. HLS proxy rewrites URLs and bypasses CORS
+```
 
 ---
 
-## How to Run
+## Key Features
+
+1. **Direct HLS Streaming**: High-quality video playback with hls.js
+2. **HLS Proxy**: Server-side proxy for CORS bypass and URL rewriting
+3. **Built-in Scraper**: Playwright-based video source fetching
+4. **Dual API Support**: AniList + Jikan for metadata
+5. **Dark Anime Aesthetic**: Glassmorphism with purple/blue accents
+6. **User Data**: Favorites, watchlist, history with persistence
+7. **Achievements**: Gamification system for engagement
+8. **AI Recommendations**: Personalized anime suggestions
+9. **Responsive Design**: Mobile-first approach
+10. **Accessibility**: WCAG AA compliant
+
+---
+
+## API Routes
+
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/api/health` | GET | Health check |
+| `/api/search-suggestions` | GET | Search autocomplete |
+| `/api/video-sources/[animeId]/[episode]` | GET | Fetch video sources |
+| `/api/proxy-hls` | GET | HLS proxy for streaming |
+| `/api/proxy-subtitle` | GET | Subtitle proxy |
+| `/api/download-hls` | GET | Download packaging |
+| `/api/filler/[malId]` | GET | Filler detection |
+| `/api/aniskip/[malId]/[episode]` | GET | Skip timestamps |
+| `/api/scrape` | POST | Generic scraper endpoint |
+
+---
+
+## Running the App
 
 ```bash
-cd ~/DEVPROJECTS/anime-stream
+cd anime-stream
+npm install
 npm run dev
 ```
 
-App runs on http://localhost:3000 (or 3001 if 3000 is occupied)
+App runs on http://localhost:3000
+
+---
+
+## Testing
+
+```bash
+# Run smoke tests
+npm run test:smoke
+
+# Run E2E tests
+npm run test:e2e
+
+# Run specific test
+npx playwright test e2e/home-page.spec.ts --project=chromium
+```
 
 ---
 
 *Plan created: 2026-03-18*
-*Status: ✅ COMPLETE - App functional in dev mode*
+*Last updated: 2026-03-28*
+*Status: ✅ COMPLETE - Production ready*

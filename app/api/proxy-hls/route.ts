@@ -7,6 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -119,7 +120,7 @@ export async function GET(request: NextRequest) {
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      console.error(`HLS proxy error: ${response.status} ${response.statusText} for ${targetUrl}`);
+      logger.error(`HLS proxy error: ${response.status} ${response.statusText} for ${targetUrl}`);
       return NextResponse.json(
         { error: `Failed to fetch: ${response.statusText}` },
         { status: response.status }
@@ -203,7 +204,7 @@ export async function GET(request: NextRequest) {
           (match, quote, uriWithSingleQuote, uriWithDoubleQuote) => {
             const uri = uriWithSingleQuote || uriWithDoubleQuote;
             const rewritten = rewriteUrl(uri);
-            console.log(`[HLS Proxy] Rewrote key URI: ${uri} -> ${rewritten}`);
+            logger.log(`[HLS Proxy] Rewrote key URI: ${uri} -> ${rewritten}`);
             return `#EXT-X-KEY${match.split(/URI=/)[0]}URI="${rewritten}"`;
           }
         );
@@ -240,7 +241,7 @@ export async function GET(request: NextRequest) {
           .join("\n");
       } catch (e) {
         // If URL rewriting fails, return original manifest
-        console.error("Failed to rewrite manifest URLs:", e);
+        logger.error("Failed to rewrite manifest URLs:", e);
       }
 
       return new NextResponse(rewrittenManifest, {
@@ -272,7 +273,7 @@ export async function GET(request: NextRequest) {
 
     // Log segment requests for debugging
     if (type === "segment") {
-      console.log(`[HLS Proxy] Segment: ${targetUrl.substring(0, 70)}... Size: ${contentLengthHeader || 'unknown'}`);
+      logger.log(`[HLS Proxy] Segment: ${targetUrl.substring(0, 70)}... Size: ${contentLengthHeader || 'unknown'}`);
     }
 
     // Handle Range requests for seeking (supports both segments and videos)
@@ -281,7 +282,7 @@ export async function GET(request: NextRequest) {
       const range = response.headers.get("content-range");
       if (range) {
         headers["Content-Range"] = range;
-        console.log(`[HLS Proxy] Range request: ${rangeHeader} -> ${range}`);
+        logger.log(`[HLS Proxy] Range request: ${rangeHeader} -> ${range}`);
         return new NextResponse(response.body, {
           status: 206, // Partial Content
           headers,
@@ -301,7 +302,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.error("HLS proxy error:", error);
+    logger.error("HLS proxy error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

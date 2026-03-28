@@ -147,12 +147,20 @@ export const Header = memo(function Header() {
 
   return (
     <>
+      {/* Skip to main content link for keyboard users */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-lg focus:font-medium"
+      >
+        Skip to main content
+      </a>
+
       {/* Main Header */}
       <header className="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-background/80 backdrop-blur-xl">
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-14 min-w-0">
             {/* Logo */}
-            <Link href="/" className="flex items-center gap-2 group">
+            <Link href="/" className="flex items-center gap-2 group" aria-label="AnimeVerse Stream Home">
               <div className="relative w-8 h-8">
                 <div className="absolute inset-0 bg-gradient-to-br from-primary to-secondary rounded-lg group-hover:scale-110 transition-transform" />
                 <div className="absolute inset-0 flex items-center justify-center">
@@ -165,7 +173,7 @@ export const Header = memo(function Header() {
             </Link>
 
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-0.5 min-w-0 flex-1 overflow-x-auto">
+            <nav className="hidden md:flex items-center gap-0.5 min-w-0 flex-1 overflow-x-auto" aria-label="Main navigation">
               <NavLink href="/" icon={<TrendingUp className="w-4 h-4" />}>
                 Trending
               </NavLink>
@@ -213,6 +221,7 @@ export const Header = memo(function Header() {
                   value={searchQuery}
                   onChange={(e) => handleSearchInput(e.target.value)}
                   placeholder="Search anime..."
+                  aria-label="Search anime"
                   suppressHydrationWarning
                   className="w-56 pl-9 pr-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all"
                   autoComplete="off"
@@ -266,6 +275,9 @@ export const Header = memo(function Header() {
                   <button
                     onClick={() => setUserMenuOpen((prev) => !prev)}
                     className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                    aria-label="User menu"
+                    aria-expanded={userMenuOpen}
+                    aria-haspopup="menu"
                   >
                     {anilistUser.avatar ? (
                       <img
@@ -283,7 +295,7 @@ export const Header = memo(function Header() {
 
                   {userMenuOpen && (
                     <div className="user-menu-container absolute right-0 top-full mt-2 w-52 bg-popover border border-white/10 rounded-lg shadow-xl overflow-hidden animate-fadeIn z-50">
-                      <div className="p-2 border-b border-white/10">
+                      <div className="p-2 border-b border-white/10" role="presentation">
                         <p className="text-xs text-muted-foreground px-2 py-1">
                           Signed in as
                         </p>
@@ -291,7 +303,7 @@ export const Header = memo(function Header() {
                           {anilistUser.name}
                         </p>
                       </div>
-                      <div className="py-1">
+                      <div className="py-1" role="menu" aria-label="User menu options">
                         {[
                           { href: "/profile", icon: <User className="w-4 h-4" />, label: "Profile" },
                           { href: "/history", icon: <Clock className="w-4 h-4" />, label: "Watch History" },
@@ -305,19 +317,23 @@ export const Header = memo(function Header() {
                             key={item.href}
                             onClick={() => { router.push(item.href); setUserMenuOpen(false); }}
                             className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-white/5 transition-colors text-left"
+                            role="menuitem"
+                            tabIndex={0}
                           >
                             <span className="text-muted-foreground">{item.icon}</span>
                             {item.label}
                           </button>
                         ))}
                       </div>
-                      <div className="border-t border-white/10">
+                      <div className="border-t border-white/10" role="presentation">
                         <button
                           onClick={() => {
                             clearAniListAuth();
                             setUserMenuOpen(false);
                           }}
                           className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-white/5 transition-colors text-left text-red-400"
+                          role="menuitem"
+                          tabIndex={0}
                         >
                           <LogOut className="w-4 h-4" />
                           Logout
@@ -379,14 +395,24 @@ export const Header = memo(function Header() {
                     onChange={(e) => handleSearchInput(e.target.value)}
                     onFocus={() => searchQuery.length >= 2 && setShowSuggestions(true)}
                     placeholder="Search anime..."
+                    aria-label="Search anime"
+                    aria-expanded={showSuggestions}
+                    aria-controls="search-suggestions-list"
+                    aria-autocomplete="list"
+                    role="combobox"
                     className="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all"
                     autoFocus
                     autoComplete="off"
                   />
                   {/* Live Search Suggestions */}
                   {showSuggestions && searchSuggestions.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-popover border border-white/10 rounded-xl shadow-xl overflow-hidden z-50 max-h-80 overflow-y-auto">
-                      {searchSuggestions.map((suggestion) => (
+                    <div
+                      id="search-suggestions-list"
+                      className="absolute top-full left-0 right-0 mt-1 bg-popover border border-white/10 rounded-xl shadow-xl overflow-hidden z-50 max-h-80 overflow-y-auto"
+                      role="listbox"
+                      aria-label="Search suggestions"
+                    >
+                      {searchSuggestions.map((suggestion, index) => (
                         <button
                           key={suggestion.id}
                           onClick={() => {
@@ -396,6 +422,9 @@ export const Header = memo(function Header() {
                             setShowSuggestions(false);
                           }}
                           className="w-full px-4 py-3 text-left hover:bg-white/5 transition-colors flex items-center gap-3 border-b border-white/5 last:border-0"
+                          role="option"
+                          tabIndex={-1}
+                          aria-selected={index === 0}
                         >
                           <Search className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                           <div className="min-w-0">
@@ -440,13 +469,14 @@ export const Header = memo(function Header() {
 
       {/* Mobile Menu */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-40 md:hidden animate-fadeIn">
+        <div className="fixed inset-0 z-40 md:hidden animate-fadeIn" role="dialog" aria-modal="true" aria-label="Mobile navigation menu">
           <div
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={closeMobileMenu}
+            aria-hidden="true"
           />
-          <GlassCard className="absolute top-14 right-4 left-4 p-4 animate-slideDown">
-            <nav className="flex flex-col gap-2">
+          <GlassCard className="absolute top-14 right-4 left-4 p-4 animate-slideDown" role="presentation">
+            <nav className="flex flex-col gap-2" aria-label="Mobile navigation">
               <MobileNavLink href="/" icon={<TrendingUp className="w-5 h-5" />}>
                 Trending
               </MobileNavLink>

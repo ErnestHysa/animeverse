@@ -105,13 +105,13 @@ async function HeroSection({ anime }: { anime: Media[] }) {
   const description = featured.description?.slice(0, 200) + "...";
 
   return (
-    <section className="relative h-[60vh] min-h-[400px] md:h-[70vh] rounded-2xl overflow-hidden mb-12 group">
+    <section className="relative h-[60vh] min-h-[400px] md:h-[70vh] rounded-2xl overflow-hidden mb-12 group" aria-labelledby="hero-title">
       {/* Background Image */}
       {cover && (
-        <div className="absolute inset-0">
+        <div className="absolute inset-0" aria-hidden="true">
           <ImageWithFallback
             src={cover}
-            alt={title}
+            alt=""
             fill
             priority
             className="object-cover transition-transform duration-700 group-hover:scale-105"
@@ -127,7 +127,7 @@ async function HeroSection({ anime }: { anime: Media[] }) {
         <div className="container mx-auto">
           <div className="max-w-2xl space-y-4 animate-slideUp">
             {/* Tags */}
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2" aria-label="Anime genres">
               <span className="px-3 py-1 bg-primary/20 text-primary rounded-full text-sm font-medium">
                 Featured
               </span>
@@ -142,9 +142,9 @@ async function HeroSection({ anime }: { anime: Media[] }) {
             </div>
 
             {/* Title */}
-            <h1 className="text-3xl md:text-5xl font-display font-bold text-gradient">
+            <h2 id="hero-title" className="text-3xl md:text-5xl font-display font-bold text-gradient">
               {title}
-            </h1>
+            </h2>
 
             {/* Description */}
             <p className="text-muted-foreground text-sm md:text-base line-clamp-3">
@@ -190,11 +190,11 @@ async function HeroSection({ anime }: { anime: Media[] }) {
 
 async function TrendingSection({ anime }: { anime: Media[] }) {
   return (
-    <section className="mb-16">
+    <section className="mb-16" aria-labelledby="trending-heading">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <TrendingUp className="w-6 h-6 text-primary" />
-          <h2 className="text-2xl font-display font-semibold">Trending Now</h2>
+          <TrendingUp className="w-6 h-6 text-primary" aria-hidden="true" />
+          <h2 id="trending-heading" className="text-2xl font-display font-semibold">Trending Now</h2>
         </div>
         <Link href="/trending" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
           View All
@@ -207,9 +207,9 @@ async function TrendingSection({ anime }: { anime: Media[] }) {
 
 async function PopularSection({ anime }: { anime: Media[] }) {
   return (
-    <section className="mb-16">
+    <section className="mb-16" aria-labelledby="popular-heading">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-display font-semibold">All Time Popular</h2>
+        <h2 id="popular-heading" className="text-2xl font-display font-semibold">All Time Popular</h2>
         <Link href="/popular" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
           View All
         </Link>
@@ -223,13 +223,13 @@ async function MostViewedSection({ anime }: { anime: Media[] }) {
   if (anime.length === 0) return null;
 
   return (
-    <section className="mb-16">
+    <section className="mb-16" aria-labelledby="most-viewed-heading">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center" aria-hidden="true">
             <Eye className="w-5 h-5 text-purple-500" />
           </div>
-          <h2 className="text-2xl font-display font-semibold">Most Viewed</h2>
+          <h2 id="most-viewed-heading" className="text-2xl font-display font-semibold">Most Viewed</h2>
         </div>
       </div>
       <AnimeGrid anime={anime} />
@@ -241,9 +241,9 @@ async function SeasonalSection({ anime }: { anime: Media[] }) {
   if (anime.length === 0) return null;
 
   return (
-    <section className="mb-16">
+    <section className="mb-16" aria-labelledby="seasonal-heading">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-display font-semibold">This Season</h2>
+        <h2 id="seasonal-heading" className="text-2xl font-display font-semibold">This Season</h2>
         <Link href="/seasonal" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
           View All
         </Link>
@@ -260,13 +260,13 @@ async function LatestEpisodesSection({ airingSchedules }: { airingSchedules: Air
   const latestEpisodes = airingSchedules.slice(0, 12);
 
   return (
-    <section className="mb-16">
+    <section className="mb-16" aria-labelledby="latest-episodes-heading">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center" aria-hidden="true">
             <Clock className="w-5 h-5 text-secondary" />
           </div>
-          <h2 className="text-2xl font-display font-semibold">Latest Episodes</h2>
+          <h2 id="latest-episodes-heading" className="text-2xl font-display font-semibold">Latest Episodes</h2>
         </div>
         <Link href="/schedule" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
           View Schedule
@@ -349,7 +349,9 @@ export default async function HomePage() {
   return (
     <>
       <Header />
-      <main className="min-h-screen">
+      <main id="main-content" className="min-h-screen" tabIndex={-1}>
+        {/* Visually hidden h1 for accessibility and SEO */}
+        <h1 className="sr-only">AnimeVerse - Watch Anime Online Free</h1>
         <div className="container mx-auto px-4 pt-24 pb-12">
           <CacheAnime media={[...trendingAnime, ...popularAnime, ...seasonalAnime, ...mostViewedAnime]} />
 
