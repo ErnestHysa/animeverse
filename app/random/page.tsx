@@ -241,7 +241,7 @@ export default function RandomPage() {
                     {randomAnime.genres.slice(0, 6).map((genre) => (
                       <Link
                         key={genre}
-                        href={`/search?q=&genre=${genre}`}
+                        href={`/search?genre=${genre}`}
                         className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded-full text-sm transition-colors"
                       >
                         {genre}
