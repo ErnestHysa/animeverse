@@ -35,27 +35,28 @@ export interface SubtitleSource {
 /**
  * These are public test streams that always work
  * Used as fallback when anime sources fail
+ * Updated with more reliable streams (avoiding 403 errors)
  */
 const TEST_STREAMS: VideoSource[] = [
   {
     url: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
     quality: 'auto',
-    label: 'Test Stream 1 (Mux)',
-    provider: 'Test',
+    label: 'Demo Stream (Big Buck Bunny)',
+    provider: 'Demo',
     type: 'hls',
   },
   {
-    url: 'https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8',
+    url: 'https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_ts/master.m3u8',
     quality: 'auto',
-    label: 'Test Stream 2 (Sintel)',
-    provider: 'Test',
+    label: 'Demo Stream (Apple Test)',
+    provider: 'Demo',
     type: 'hls',
   },
   {
-    url: 'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8',
+    url: 'https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8',
     quality: 'auto',
-    label: 'Test Stream 3 (Akamai)',
-    provider: 'Test',
+    label: 'Demo Stream (Tears of Steel)',
+    provider: 'Demo',
     type: 'hls',
   },
 ];

@@ -92,56 +92,132 @@ async function tryDomain(
 }
 
 // Extract m3u8 URL from iframe page
-async function extractFromIframe(iframeUrl: string, timeoutMs: number = 10000): Promise<string | null> {
+async function extractFromIframe(
+  iframeUrl: string,
+  timeoutMs: number = 20000 // Increased from 10000 for better iframe loading
+): Promise<string | null> {
+  console.log(`[extractFromIframe] Starting extraction from: ${iframeUrl.substring(0, 60)}...`);
+  console.log(`[extractFromIframe] Timeout set to ${timeoutMs}ms`);
+
   const browser = await chromium.launch({ headless: true });
 
   try {
     const context = await browser.newContext({
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     });
 
     const page = await context.newPage();
     page.setDefaultTimeout(timeoutMs);
 
     const m3u8Urls: string[] = [];
+    const allRequests: string[] = [];
 
-    // Capture network requests
-    page.on('response', (resp) => {
+    // Capture network requests for debugging
+    page.on('request', (req) => {
+      const url = req.url();
+      allRequests.push(url);
+    });
+
+    // Capture network responses
+    page.on('response', async (resp) => {
       const url = resp.url();
+      const status = resp.status();
+
+      // Log m3u8 responses with status
       if (url.includes('.m3u8') && !url.includes('ping.gif') && !url.includes('/segment')) {
+        console.log(`[extractFromIframe] Found m3u8: ${url.substring(0, 80)}... (status: ${status})`);
+        m3u8Urls.push(url);
+      }
+
+      // Also check for mp4 videos as fallback
+      if (url.includes('.mp4') && status === 200) {
+        console.log(`[extractFromIframe] Found mp4: ${url.substring(0, 80)}... (status: ${status})`);
         m3u8Urls.push(url);
       }
     });
 
+    console.log(`[extractFromIframe] Navigating to iframe URL...`);
     await page.goto(iframeUrl, {
       waitUntil: 'domcontentloaded',
       timeout: timeoutMs,
     });
 
-    // Wait for video player to initialize
-    await page.waitForTimeout(3000); // Reduced from 5000
+    console.log(`[extractFromIframe] Page loaded, waiting for video player...`);
+
+    // Wait for video player to initialize - progressive wait with checks
+    const maxWaitTime = 8000;
+    const checkInterval = 1000;
+    let waitedTime = 0;
+
+    while (waitedTime < maxWaitTime) {
+      await page.waitForTimeout(checkInterval);
+      waitedTime += checkInterval;
+
+      if (m3u8Urls.length > 0) {
+        console.log(`[extractFromIframe] Found ${m3u8Urls.length} video source(s) after ${waitedTime}ms`);
+        break;
+      }
+    }
+
+    // If still no sources, try to extract from page scripts
+    if (m3u8Urls.length === 0) {
+      console.log(`[extractFromIframe] No sources found via network, trying script extraction...`);
+
+      try {
+        // Look for video URLs in scripts
+        const scriptContent = await page.content();
+        const m3u8Regex = /https?:\/\/[^\s"'<>]+\.m3u8[^\s"'<>]*/g;
+        const matches = scriptContent.match(m3u8Regex);
+
+        if (matches && matches.length > 0) {
+          console.log(`[extractFromIframe] Found ${matches.length} m3u8 URL(s) in page content`);
+          // Filter out segments and pings
+          const validMatches = matches.filter(url =>
+            !url.includes('segment') &&
+            !url.includes('ping.gif') &&
+            !url.includes('ts.')
+          );
+          m3u8Urls.push(...validMatches);
+        }
+      } catch (e) {
+        console.log(`[extractFromIframe] Script extraction failed: ${(e as Error).message}`);
+      }
+    }
 
     await browser.close();
 
+    console.log(`[extractFromIframe] Total sources found: ${m3u8Urls.length}`);
+
+    if (m3u8Urls.length === 0) {
+      console.log(`[extractFromIframe] No valid sources found`);
+      return null;
+    }
+
     // Return master.m3u8 if available, otherwise first m3u8
     const master = m3u8Urls.find(u => u.includes('master.m3u8'));
-    return master || m3u8Urls[0] || null;
-  } catch {
+    const selected = master || m3u8Urls[0];
+    console.log(`[extractFromIframe] Selected source: ${selected.substring(0, 80)}...`);
+
+    return selected;
+  } catch (error) {
+    console.log(`[extractFromIframe] Error: ${(error as Error).message}`);
     await browser.close();
     return null;
   }
 }
 
 // Generate multiple slug variations for better matching
+// Increased limit from 50 to 100 characters for better URL matching
 function generateSlugVariations(title: string): string[] {
   const slugs: string[] = [];
+  const MAX_SLUG_LENGTH = 100; // Increased from 50
 
   // Basic slug (english words with hyphens)
   const basicSlug = title
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, '')
     .replace(/\s+/g, '-')
-    .substring(0, 50);
+    .substring(0, MAX_SLUG_LENGTH);
   if (basicSlug) slugs.push(basicSlug);
 
   // Remove special characters more aggressively
@@ -149,7 +225,7 @@ function generateSlugVariations(title: string): string[] {
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, '')
     .replace(/\s+/g, '-')
-    .substring(0, 50);
+    .substring(0, MAX_SLUG_LENGTH);
   if (cleanSlug && cleanSlug !== basicSlug) slugs.push(cleanSlug);
 
   // Remove "the" prefix
@@ -159,8 +235,8 @@ function generateSlugVariations(title: string): string[] {
       .toLowerCase()
       .replace(/[^a-z0-9\s-]/g, '')
       .replace(/\s+/g, '-')
-      .substring(0, 50);
-    if (noTheSlug) slugs.push(noTheSlug);
+      .substring(0, MAX_SLUG_LENGTH);
+    if (noTheSlug && noTheSlug !== basicSlug) slugs.push(noTheSlug);
   }
 
   // Remove season/episode suffixes
@@ -174,8 +250,17 @@ function generateSlugVariations(title: string): string[] {
       .toLowerCase()
       .replace(/[^a-z0-9\s-]/g, '')
       .replace(/\s+/g, '-')
-      .substring(0, 50);
-    if (seasonSlug) slugs.push(seasonSlug);
+      .substring(0, MAX_SLUG_LENGTH);
+    if (seasonSlug && seasonSlug !== basicSlug) slugs.push(seasonSlug);
+  }
+
+  // Shorter version (first 3-4 words) - some sites use shorter slugs
+  const words = title.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 0);
+  if (words.length > 3) {
+    const shortSlug = words.slice(0, 4).join('-');
+    if (shortSlug && shortSlug !== basicSlug) {
+      slugs.push(shortSlug.substring(0, MAX_SLUG_LENGTH));
+    }
   }
 
   // Dedupe while preserving order
@@ -200,7 +285,7 @@ async function scrapeFast(
       console.log(`[FastScraper] Trying ${domain} with slug: ${slug}`);
 
       try {
-        const iframeSrc = await tryDomain(domain, slug, episodeNumber, 8000);
+        const iframeSrc = await tryDomain(domain, slug, episodeNumber, 10000); // Increased from 8000
 
         if (iframeSrc) {
           console.log(`[FastScraper] ✓ Found iframe on ${domain}`);
@@ -211,7 +296,7 @@ async function scrapeFast(
 
           console.log(`[FastScraper] Extracting video from iframe...`);
 
-          const m3u8Url = await extractFromIframe(fullIframeUrl, 8000);
+          const m3u8Url = await extractFromIframe(fullIframeUrl, 20000); // Increased from 8000 to 20000
 
           if (m3u8Url) {
             console.log(`[FastScraper] ✓✓ Success! Found video source: ${m3u8Url.substring(0, 50)}...`);
@@ -342,10 +427,23 @@ async function scrapeWithSearch(
 
               await iframePage.goto(fullIframeUrl, {
                 waitUntil: 'domcontentloaded',
-                timeout: 12000,
+                timeout: 20000, // Increased from 12000
               });
 
-              await iframePage.waitForTimeout(4000);
+              // Progressive wait with checks for better timeout handling
+              const searchMaxWait = 8000;
+              const searchCheckInterval = 1000;
+              let searchWaitedTime = 0;
+
+              while (searchWaitedTime < searchMaxWait) {
+                await iframePage.waitForTimeout(searchCheckInterval);
+                searchWaitedTime += searchCheckInterval;
+
+                if (m3u8Urls.length > 0) {
+                  console.log(`[SearchScraper] Found ${m3u8Urls.length} video source(s) after ${searchWaitedTime}ms`);
+                  break;
+                }
+              }
 
               await browser.close();
 
@@ -444,14 +542,32 @@ function getDemoSources(animeId: number, episodeNumber: number): EpisodeSources 
   return {
     animeId,
     episodeNumber,
-    sources: [{
-      // Use a reliable HLS test stream from Bitmovin (known to work without CORS issues)
-      url: 'https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8',
-      quality: 'auto',
-      label: 'Demo (Sintel Test)',
-      provider: 'Demo',
-      type: 'hls',
-    }],
+    sources: [
+      {
+        // Use a reliable HLS test stream from Mux (known to work without CORS issues)
+        url: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+        quality: 'auto',
+        label: 'Demo (Big Buck Bunny)',
+        provider: 'Demo',
+        type: 'hls',
+      },
+      {
+        // Alternative: Big Buck Bunny backup
+        url: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+        quality: 'auto',
+        label: 'Demo Backup',
+        provider: 'Demo',
+        type: 'hls',
+      },
+      {
+        // Alternative: Apple test stream
+        url: 'https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_ts/master.m3u8',
+        quality: 'auto',
+        label: 'Demo (Apple Test)',
+        provider: 'Demo',
+        type: 'hls',
+      },
+    ],
     subtitles: [],
     provider: 'Demo',
     isFallback: true,
