@@ -1282,7 +1282,21 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
         startAutoplayCountdown();
       }
     };
-    const handlePlay = () => setIsPlaying(true);
+    const handlePlay = () => {
+      setIsPlaying(true);
+      // CRITICAL FIX: Ensure HLS is loading when video starts playing
+      // This handles the case where browser's native play() is called (not via our play() function)
+      const hls = hlsRef.current;
+      if (hls && hlsReady) {
+        console.log("[handlePlay] Video started playing, ensuring HLS is loading");
+        try {
+          hls.startLoad(video.currentTime);
+        } catch (e) {
+          // HLS might already be loading or in a state where startLoad isn't needed
+          console.debug("[handlePlay] HLS startLoad skipped:", e);
+        }
+      }
+    };
     const handlePause = () => setIsPlaying(false);
     const handleProgress = () => {
       if (video.buffered.length > 0) {
@@ -1693,6 +1707,17 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
     }
 
     console.log("[play] Called - video.paused:", video.paused, "hlsReady:", hlsReady, "hls exists:", !!hls, "readyState:", video.readyState);
+
+    // CRITICAL FIX: When resuming from pause, HLS.js needs startLoad() to restart buffering
+    // HLS.js automatically calls stopLoad() when paused, but doesn't auto-restart
+    if (hls && video.paused && hlsReady) {
+      console.log("[play] Resuming from pause - calling hls.startLoad() at position:", video.currentTime);
+      try {
+        hls.startLoad(video.currentTime);
+      } catch (e) {
+        console.error("[play] HLS startLoad failed:", e);
+      }
+    }
 
     // Mark that user initiated playback (ref so HLS event handlers see the current value immediately)
     userInitiatedPlayRef.current = true;

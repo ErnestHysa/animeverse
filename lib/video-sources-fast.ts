@@ -30,6 +30,16 @@ export interface SubtitleSource {
   isDefault?: boolean;
 }
 
+// Helper to check if a URL is for a dub version
+// This helps ensure we get SUB (Japanese audio) versions instead of DUB
+function isDubVersion(url: string): boolean {
+  const lowerUrl = url.toLowerCase();
+  // Common patterns for dub versions
+  return lowerUrl.includes('-dub') ||
+         lowerUrl.includes('/dub') ||
+         lowerUrl.includes('dub-');
+}
+
 // Known working anime episode URL patterns
 // Note: These domains change frequently. Try multiple mirrors.
 const GOGOANIME_DOMAINS = [
@@ -50,6 +60,12 @@ async function tryDomain(
   episodeNumber: number,
   timeoutMs: number = 10000 // Reduced from 15000 for faster fallback
 ): Promise<string | null> {
+  // CRITICAL FIX: Skip dub versions at the URL construction level
+  if (isDubVersion(animeSlug)) {
+    console.log(`[tryDomain] Skipping dub slug: ${animeSlug}`);
+    return null;
+  }
+
   const browser = await chromium.launch({ headless: true });
 
   try {
@@ -359,14 +375,38 @@ async function scrapeWithSearch(
       await page.waitForTimeout(1000);
 
       // Look for anime link (various selectors)
-      const animeLink = page.locator('a[href*="/category/"]').first();
-      const count = await animeLink.count();
+      // CRITICAL FIX: Get all anime links and filter out dub versions
+      const animeLinks = page.locator('a[href*="/category/"]');
+      const linkCount = await animeLinks.count();
 
-      if (count > 0) {
-        const href = await animeLink.getAttribute('href');
-        const animeUrl = href?.startsWith('http') ? href : `https://www14.gogoanimes.fi${href}`;
+      if (linkCount > 0) {
+        // Collect all non-dub anime URLs
+        const nonDubUrls: string[] = [];
 
-        console.log(`[SearchScraper] Found anime page: ${animeUrl}`);
+        for (let i = 0; i < Math.min(linkCount, 10); i++) {
+          const link = animeLinks.nth(i);
+          const href = await link.getAttribute('href');
+          if (href) {
+            const fullUrl = href?.startsWith('http') ? href : `https://www14.gogoanimes.fi${href}`;
+
+            // Skip dub versions
+            if (isDubVersion(fullUrl)) {
+              console.log(`[SearchScraper] Skipping dub version: ${fullUrl}`);
+              continue;
+            }
+
+            nonDubUrls.push(fullUrl);
+          }
+        }
+
+        if (nonDubUrls.length === 0) {
+          console.log(`[SearchScraper] No non-dub anime links found, trying next search term`);
+          continue;
+        }
+
+        // Use the first non-dub result
+        const animeUrl = nonDubUrls[0];
+        console.log(`[SearchScraper] Found anime page (SUB): ${animeUrl}`);
 
         // Navigate to anime page
         await page.goto(animeUrl, {
@@ -377,20 +417,52 @@ async function scrapeWithSearch(
         await page.waitForTimeout(1000);
 
         // Try to find the specific episode
-        const epLink = page.locator(`a[href*="-episode-${episodeNumber}"]`).first();
-        const epCount = await epLink.count();
+        // CRITICAL FIX: Filter out dub episode links
+        const epLinks = page.locator(`a[href*="-episode-"]`);
+        const epCountAll = await epLinks.count();
 
         let watchUrl = '';
-        if (epCount > 0) {
-          const epHref = await epLink.getAttribute('href');
-          watchUrl = epHref?.startsWith('http') ? epHref : `https://www14.gogoanimes.fi${epHref}`;
-        } else {
-          // Try first available episode
-          const firstEp = page.locator('a[href*="-episode-"]').first();
-          const firstCount = await firstEp.count();
-          if (firstCount > 0) {
-            const firstHref = await firstEp.getAttribute('href');
-            watchUrl = firstHref?.startsWith('http') ? firstHref : `https://www14.gogoanimes.fi${firstHref}`;
+        let foundExactEpisode = false;
+
+        // First, try to find the exact episode (non-dub)
+        for (let i = 0; i < Math.min(epCountAll, 20); i++) {
+          const link = epLinks.nth(i);
+          const href = await link.getAttribute('href');
+          if (!href) continue;
+
+          const fullUrl = href.startsWith('http') ? href : `https://www14.gogoanimes.fi${href}`;
+
+          // Skip dub versions
+          if (isDubVersion(fullUrl)) {
+            continue;
+          }
+
+          // Check if this is the episode we're looking for
+          if (fullUrl.includes(`-episode-${episodeNumber}`)) {
+            watchUrl = fullUrl;
+            foundExactEpisode = true;
+            console.log(`[SearchScraper] Found exact episode (SUB): ${watchUrl}`);
+            break;
+          }
+        }
+
+        // If exact episode not found, use first available non-dub episode
+        if (!foundExactEpisode && epCountAll > 0) {
+          for (let i = 0; i < Math.min(epCountAll, 20); i++) {
+            const link = epLinks.nth(i);
+            const href = await link.getAttribute('href');
+            if (!href) continue;
+
+            const fullUrl = href.startsWith('http') ? href : `https://www14.gogoanimes.fi${href}`;
+
+            // Skip dub versions
+            if (isDubVersion(fullUrl)) {
+              continue;
+            }
+
+            watchUrl = fullUrl;
+            console.log(`[SearchScraper] Using first available episode (SUB): ${watchUrl}`);
+            break;
           }
         }
 
@@ -493,9 +565,11 @@ export async function getEpisodeSources(
     language?: 'sub' | 'dub';
   } = {}
 ): Promise<EpisodeSources> {
-  const { title = `Anime ${animeId}` } = options;
+  const { title = `Anime ${animeId}`, language = 'sub' } = options;
 
-  console.log(`[VideoSources] Fetching: ${title} - Episode ${episodeNumber}`);
+  // NOTE: Scrapers always prefer SUB (Japanese audio) versions
+  // DUB versions are filtered out to ensure Japanese audio with subtitles
+  console.log(`[VideoSources] Fetching: ${title} - Episode ${episodeNumber} (language: ${language})`);
 
   // Add overall timeout to prevent waiting too long
   const SCRAPER_TIMEOUT = 28000; // 28 seconds max for all scraping attempts
