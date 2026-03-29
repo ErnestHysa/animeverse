@@ -10,7 +10,7 @@ import { Flag, X, Send, CheckCircle2 } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
 import { toast } from "react-hot-toast";
-import { reportBrokenVideo } from "@/lib/video-sources";
+import { reportBrokenVideo } from "@/lib/video-sources-robust";
 
 interface ReportDialogProps {
   isOpen: boolean;

@@ -1,6 +1,7 @@
 /**
  * Search Page
  * Search anime with advanced filters
+ * Supports browsing with filters even without a search query
  */
 
 import { Header } from "@/components/layout/header";
@@ -23,28 +24,37 @@ interface SearchParamsValues {
   year?: string;
   format?: string;
   status?: string;
+  season?: string;
+  minScore?: string;
 }
 
 interface SearchPageProps {
   searchParams: Promise<SearchParamsValues>;
 }
 
-async function searchAnime(params: SearchParamsValues) {
-  const query = params.q;
-  const sort = params.sort || "POPULARITY_DESC";
+function hasActiveFilters(params: SearchParamsValues): boolean {
+  return !!(params.genre || params.year || params.format || params.status || params.season || params.minScore || params.sort);
+}
 
-  // Return empty if no query provided (undefined or empty string)
-  if (!query || query.trim() === "") {
-    return [];
+async function searchAnime(params: SearchParamsValues) {
+  const query = params.q?.trim();
+  const sort = params.sort || (query ? "SEARCH_MATCH" : "POPULARITY_DESC");
+
+  // Return popular anime if no query AND no active filters
+  if (!query && !hasActiveFilters(params)) {
+    const result = await anilist.getPopular(1, 48);
+    return result.data?.Page.media ?? [];
   }
 
   const result = await anilist.search({
-    search: query,
+    search: query || undefined,
     sort,
     genre: params.genre,
     year: params.year ? parseInt(params.year) : undefined,
     format: params.format,
     status: params.status,
+    season: params.season as "WINTER" | "SPRING" | "SUMMER" | "FALL" | undefined,
+    minScore: params.minScore ? parseInt(params.minScore) : undefined,
     perPage: 48,
   });
 
@@ -56,9 +66,9 @@ async function searchAnime(params: SearchParamsValues) {
 // ===================================
 
 export default async function SearchPage({ searchParams }: SearchPageProps) {
-  // Await searchParams (Next.js 16 requires this)
   const params = await searchParams;
   const query = params.q || "";
+  const filtersActive = hasActiveFilters(params);
 
   return (
     <>
@@ -74,29 +84,31 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
               </h1>
               <p className="text-muted-foreground">
                 {query
-                  ? "Search results"
-                  : "Enter a search term to find anime"}
+                  ? `${filtersActive ? "Filtered " : ""}search results`
+                  : filtersActive
+                  ? "Filtered browse results"
+                  : "Discover popular anime or search & filter by genre, season, year"}
               </p>
             </div>
           </div>
 
-          {/* Filters */}
-          {query && (
-            <AnimeFilters
-              currentFilters={{
-                genre: params.genre,
-                year: params.year,
-                format: params.format,
-                status: params.status,
-                sort: params.sort,
-              }}
-              query={query}
-            />
-          )}
+          {/* Filters - always shown */}
+          <AnimeFilters
+            currentFilters={{
+              genre: params.genre,
+              year: params.year,
+              format: params.format,
+              status: params.status,
+              sort: params.sort,
+              season: params.season,
+              minScore: params.minScore,
+            }}
+            query={query}
+          />
 
           {/* Anime Grid */}
           <Suspense fallback={<AnimeGridSkeleton count={24} />}>
-            <SearchResults query={query} params={params} />
+            <SearchResults query={query} params={params} filtersActive={filtersActive} />
           </Suspense>
         </div>
       </main>
@@ -106,31 +118,29 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 }
 
 // Separate component for search results with Suspense
-async function SearchResults({ query, params }: { query: string; params: SearchParamsValues }) {
+async function SearchResults({ query, params, filtersActive }: { query: string; params: SearchParamsValues; filtersActive: boolean }) {
   const anime = await searchAnime(params);
-
-  if (!query) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
-          <Search className="w-8 h-8 text-muted-foreground" />
-        </div>
-        <h3 className="text-lg font-medium mb-2">Search for Anime</h3>
-        <p className="text-muted-foreground max-w-sm">
-          Use the search bar in the header to find your favorite anime.
-        </p>
-      </div>
-    );
-  }
 
   return (
     <>
-      <div className="mb-4 text-muted-foreground">
+      <div className="mb-4 text-sm text-muted-foreground">
         {anime.length > 0
-          ? `Found ${anime.length} results`
-          : "No results found - try adjusting your filters"}
+          ? `Showing ${anime.length} ${query ? "results" : filtersActive ? "filtered anime" : "popular anime"}`
+          : "No results found — try adjusting your filters"}
       </div>
-      <AnimeGrid anime={anime} />
+      {anime.length > 0 ? (
+        <AnimeGrid anime={anime} />
+      ) : (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+            <Search className="w-8 h-8 text-muted-foreground" />
+          </div>
+          <h3 className="text-lg font-medium mb-2">No Results Found</h3>
+          <p className="text-muted-foreground max-w-sm">
+            Try a different search term or adjust your filters.
+          </p>
+        </div>
+      )}
     </>
   );
 }

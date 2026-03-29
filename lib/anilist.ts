@@ -36,7 +36,7 @@ const QUERIES = {
 
   airing: `query Airing($page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } airingSchedules(airingAt_greater: ${Math.floor(Date.now() / 1000)}, sort: TIME) { id airingAt timeUntilAiring episode media { ${MEDIA_MINIMAL_FRAGMENT} } } } }`,
 
-  search: `query Search($search: String, $page: Int, $perPage: Int, $sort: [MediaSort], $format: [MediaFormat], $genre: String, $status: MediaStatus, $year: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME search: $search sort: $sort format_in: $format genre: $genre status: $status seasonYear: $year) { ${MEDIA_FULL_FRAGMENT} } } }`,
+  search: `query Search($search: String, $page: Int, $perPage: Int, $sort: [MediaSort], $format: [MediaFormat], $genre: String, $status: MediaStatus, $year: Int, $season: MediaSeason, $minScore: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME search: $search sort: $sort format_in: $format genre: $genre status: $status seasonYear: $year season: $season averageScore_greater: $minScore) { ${MEDIA_FULL_FRAGMENT} } } }`,
 
   byId: `query ById($id: Int) { Media(id: $id, type: ANIME) { ${MEDIA_FULL_FRAGMENT} } }`,
 
@@ -138,6 +138,8 @@ class AniListClient {
     genre?: string;
     status?: string;
     year?: number;
+    season?: "WINTER" | "SPRING" | "SUMMER" | "FALL";
+    minScore?: number;
   }): Promise<APIResult<SearchResponse>> {
     const {
       search: searchQuery,
@@ -148,6 +150,8 @@ class AniListClient {
       genre,
       status,
       year,
+      season,
+      minScore,
     } = params;
 
     const variables: Record<string, unknown> = { page, perPage, sort };
@@ -157,6 +161,8 @@ class AniListClient {
     if (genre) variables.genre = genre;
     if (status) variables.status = status;
     if (year) variables.year = year;
+    if (season) variables.season = season;
+    if (minScore && minScore > 0) variables.minScore = minScore;
 
     return this.query<SearchResponse>(QUERIES.search, variables);
   }
@@ -206,6 +212,72 @@ class AniListClient {
   async getByTag(tag: string, page: number = 1, perPage: number = 24): Promise<APIResult<TrendingResponse>> {
     const query = `query ByTag($tag: String!, $page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME, tag_in: [$tag], sort: POPULARITY_DESC) { ${MEDIA_FULL_FRAGMENT} } } }`;
     return this.query<TrendingResponse>(query, { tag, page, perPage });
+  }
+
+  /**
+   * Get newly released anime (started recently, sorted by start date)
+   */
+  async getNewReleases(page: number = 1, perPage: number = 12): Promise<APIResult<TrendingResponse>> {
+    const query = `query NewReleases($page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME, sort: START_DATE_DESC, status_not: NOT_YET_RELEASED) { ${MEDIA_FULL_FRAGMENT} } } }`;
+    return this.query<TrendingResponse>(query, { page, perPage });
+  }
+
+  /**
+   * Get top-rated anime
+   */
+  async getTopRated(page: number = 1, perPage: number = 24): Promise<APIResult<TrendingResponse>> {
+    const query = `query TopRated($page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME, sort: SCORE_DESC, status: FINISHED) { ${MEDIA_FULL_FRAGMENT} } } }`;
+    return this.query<TrendingResponse>(query, { page, perPage });
+  }
+
+  /**
+   * Get hidden gems: high-scoring anime that aren't extremely popular
+   * These are great shows that flew under the radar
+   */
+  async getHiddenGems(page: number = 1, perPage: number = 24): Promise<APIResult<TrendingResponse>> {
+    const query = `query HiddenGems($page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME, sort: SCORE_DESC, averageScore_greater: 79, popularity_lesser: 80000, status: FINISHED, episodes_greater: 1) { ${MEDIA_FULL_FRAGMENT} } } }`;
+    return this.query<TrendingResponse>(query, { page, perPage });
+  }
+
+  /**
+   * Save a media list entry to AniList (requires user auth token)
+   * Used for reverse-sync: marking episodes watched in AnimeVerse → AniList
+   */
+  async saveMediaListEntry(
+    token: string,
+    mediaId: number,
+    progress: number,
+    status: "CURRENT" | "COMPLETED" | "PLANNING" | "PAUSED" | "DROPPED" | "REPEATING"
+  ): Promise<APIResult<{ SaveMediaListEntry: { id: number; status: string; progress: number } }>> {
+    const mutation = `mutation SaveProgress($mediaId: Int, $progress: Int, $status: MediaListStatus) {
+      SaveMediaListEntry(mediaId: $mediaId, progress: $progress, status: $status) {
+        id status progress score
+      }
+    }`;
+    try {
+      const response = await fetch(this.url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ query: mutation, variables: { mediaId, progress, status } }),
+      });
+      const data = await response.json();
+      if (!response.ok || data.errors) {
+        return {
+          data: null,
+          error: { message: data.errors?.[0]?.message || `HTTP ${response.status}` },
+        };
+      }
+      return { data: data.data, error: null };
+    } catch (error) {
+      return {
+        data: null,
+        error: { message: error instanceof Error ? error.message : "Network error" },
+      };
+    }
   }
 }
 

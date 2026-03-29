@@ -6,13 +6,14 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { EnhancedVideoPlayer, type VideoQuality } from "@/components/player/enhanced-video-player";
 import { GlassCard } from "@/components/ui/glass-card";
 import { AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "react-hot-toast";
-import { usePreferences } from "@/store";
+import { usePreferences, useStore } from "@/store";
+import { anilist } from "@/lib/anilist";
 import logger from "@/lib/logger";
 
 interface VideoSourceLoaderProps {
@@ -85,6 +86,34 @@ export function VideoSourceLoader({
   onEpisodeEnd,
 }: VideoSourceLoaderProps) {
   const { preferences } = usePreferences();
+
+  // AniList reverse-sync: push episode progress back to AniList when authenticated
+  const anilistToken = useStore((s) => s.anilistToken);
+  const isAuthenticated = useStore((s) => s.isAuthenticated);
+  const updateAniListEntryLocally = useStore((s) => s.updateAniListEntryLocally);
+  const anilistSyncedRef = useRef(false); // prevent duplicate syncs per episode
+
+  const syncProgressToAniList = useCallback(async () => {
+    if (!isAuthenticated || !anilistToken || anilistSyncedRef.current) return;
+    anilistSyncedRef.current = true;
+    try {
+      const result = await anilist.saveMediaListEntry(anilistToken, animeId, episodeNumber, "CURRENT");
+      if (result.error) {
+        logger.warn("[AniList Sync] Failed:", result.error.message);
+        return;
+      }
+      updateAniListEntryLocally(animeId, episodeNumber, "CURRENT");
+      toast.success("Synced to AniList ✓", { duration: 2000, position: "bottom-right" });
+    } catch (err) {
+      logger.warn("[AniList Sync] Error:", err);
+    }
+  }, [isAuthenticated, anilistToken, animeId, episodeNumber, updateAniListEntryLocally]);
+
+  // Reset sync flag when episode changes
+  useEffect(() => {
+    anilistSyncedRef.current = false;
+  }, [animeId, episodeNumber]);
+
   const [sources, setSources] = useState<{
     type: "magnet" | "torrent" | "direct";
     url: string;
@@ -537,7 +566,10 @@ export function VideoSourceLoader({
         nextEpisodeUrl={nextEpisodeUrl}
         prevEpisodeUrl={prevEpisodeUrl}
         onError={handleVideoError}
-        onEpisodeEnd={onEpisodeEnd}
+        onEpisodeEnd={() => {
+          syncProgressToAniList();
+          onEpisodeEnd?.();
+        }}
         allServers={allServers}
         allLanguages={allLanguages}
         onServerChange={handleServerChange}

@@ -34,6 +34,16 @@ export function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/hidden-gems" className="hover:text-foreground transition-colors">
+                  Hidden Gems
+                </Link>
+              </li>
+              <li>
+                <Link href="/top-rated" className="hover:text-foreground transition-colors">
+                  Top Rated
+                </Link>
+              </li>
+              <li>
                 <Link href="/coming-soon" className="hover:text-foreground transition-colors">
                   Coming Soon
                 </Link>

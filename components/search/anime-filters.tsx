@@ -17,6 +17,8 @@ export interface FilterOptions {
   format?: string;
   status?: string;
   sort?: string;
+  season?: string;
+  minScore?: string;
 }
 
 const GENRES = [
@@ -28,6 +30,21 @@ const GENRES = [
 const FORMATS = ["TV", "TV_SHORT", "MOVIE", "SPECIAL", "OVA", "ONA"];
 
 const STATUSES = ["RELEASING", "FINISHED", "UPCOMING", "CANCELLED"];
+
+const SEASONS = [
+  { value: "WINTER", label: "❄️ Winter (Jan–Mar)" },
+  { value: "SPRING", label: "🌸 Spring (Apr–Jun)" },
+  { value: "SUMMER", label: "☀️ Summer (Jul–Sep)" },
+  { value: "FALL", label: "🍂 Fall (Oct–Dec)" },
+];
+
+const SCORE_OPTIONS = [
+  { value: "", label: "Any" },
+  { value: "90", label: "90+ (Masterpiece)" },
+  { value: "80", label: "80+ (Great)" },
+  { value: "70", label: "70+ (Good)" },
+  { value: "60", label: "60+ (Fine)" },
+];
 
 const SORT_OPTIONS = [
   { value: "POPULARITY_DESC", label: "Most Popular" },
@@ -57,6 +74,7 @@ const MOOD_PRESETS = [
 interface AnimeFiltersProps {
   currentFilters: FilterOptions;
   query: string;
+  defaultExpanded?: boolean;
 }
 
 // Memoized filter button to prevent unnecessary re-renders
@@ -87,10 +105,10 @@ const FilterButton = memo(function FilterButton({
   );
 });
 
-export const AnimeFilters = memo(function AnimeFilters({ currentFilters, query }: AnimeFiltersProps) {
+export const AnimeFilters = memo(function AnimeFilters({ currentFilters, query, defaultExpanded = false }: AnimeFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   // Memoize hasActiveFilters to prevent recalculation
   const hasActiveFilters = useMemo(
@@ -246,6 +264,30 @@ export const AnimeFilters = memo(function AnimeFilters({ currentFilters, query }
             </div>
           </div>
 
+          {/* Season */}
+          <div>
+            <label className="text-sm font-medium mb-2 block">Season</label>
+            <div className="flex flex-wrap gap-2">
+              <FilterButton
+                value=""
+                isActive={!currentFilters.season}
+                onClick={() => updateFilter("season", "")}
+              >
+                All Seasons
+              </FilterButton>
+              {SEASONS.map((season) => (
+                <FilterButton
+                  key={season.value}
+                  value={season.value}
+                  isActive={currentFilters.season === season.value}
+                  onClick={() => updateFilter("season", season.value)}
+                >
+                  {season.label}
+                </FilterButton>
+              ))}
+            </div>
+          </div>
+
           {/* Year */}
           <div>
             <label className="text-sm font-medium mb-2 block">Year</label>
@@ -261,6 +303,23 @@ export const AnimeFilters = memo(function AnimeFilters({ currentFilters, query }
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Min Score */}
+          <div>
+            <label className="text-sm font-medium mb-2 block">Minimum Score</label>
+            <div className="flex flex-wrap gap-2">
+              {SCORE_OPTIONS.map((option) => (
+                <FilterButton
+                  key={option.value}
+                  value={option.value}
+                  isActive={(currentFilters.minScore || "") === option.value}
+                  onClick={() => updateFilter("minScore", option.value)}
+                >
+                  {option.label}
+                </FilterButton>
+              ))}
+            </div>
           </div>
 
           {/* Clear Filters */}

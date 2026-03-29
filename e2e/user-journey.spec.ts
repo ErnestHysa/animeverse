@@ -117,7 +117,8 @@ test.describe('Journey 1: New User Discovery', () => {
     await searchButton.click();
 
     // Search bar should appear with autoFocus
-    const searchInput = page.locator('input[type="search"]');
+    // Use the overlay-specific search input (it appears after clicking search button)
+    const searchInput = page.locator('input[type="search"]').first();
     await expect(searchInput).toBeVisible({ timeout: SHORT_TIMEOUT });
 
     // Type character by character to properly trigger React controlled input

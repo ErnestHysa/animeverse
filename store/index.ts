@@ -140,6 +140,7 @@ export interface StoreState {
   syncAniListData: (mediaList: unknown[]) => void;
   migrateAniListData: (mediaList: AniListMediaEntry[]) => void;
   getAniListEntry: (mediaId: number) => AniListMediaEntry | undefined;
+  updateAniListEntryLocally: (mediaId: number, progress: number, status: AniListStatus) => void;
 
   // Achievements
   achievements: { [key: string]: number }; // achievementId -> progress
@@ -577,6 +578,24 @@ export const useStore = create<StoreState>()(
       getAniListEntry: (mediaId: number) => {
         return get().anilistMediaList.find((entry) => entry.mediaId === mediaId);
       },
+
+      updateAniListEntryLocally: (mediaId: number, progress: number, status: AniListStatus) =>
+        set((state) => {
+          const existing = state.anilistMediaList.find((e) => e.mediaId === mediaId);
+          if (existing) {
+            return {
+              anilistMediaList: state.anilistMediaList.map((e) =>
+                e.mediaId === mediaId ? { ...e, progress, status } : e
+              ),
+            };
+          }
+          return {
+            anilistMediaList: [
+              ...state.anilistMediaList,
+              { mediaId, status, progress, score: 0 },
+            ],
+          };
+        }),
 
       // ===================================
       // Achievements

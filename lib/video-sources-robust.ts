@@ -676,3 +676,21 @@ export async function searchAnime(query: string): Promise<Array<{
     return [];
   }
 }
+
+export async function reportBrokenVideo(data: {
+  animeId: number;
+  episodeNumber: number;
+  source: string;
+  issue: string;
+}): Promise<void> {
+  if (typeof window !== "undefined") {
+    const reports = JSON.parse(localStorage.getItem("video-reports") || "[]");
+    reports.push({
+      animeId: data.animeId,
+      episodeNumber: data.episodeNumber,
+      reason: data.issue,
+      timestamp: Date.now(),
+    });
+    localStorage.setItem("video-reports", JSON.stringify(reports));
+  }
+}

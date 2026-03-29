@@ -15,7 +15,7 @@ import { ImageWithFallback } from "@/components/ui/image-with-fallback";
 import { CacheAnime } from "@/components/anime/cache-anime";
 import { anilist } from "@/lib/anilist";
 import { Button } from "@/components/ui/button";
-import { Play, TrendingUp, Star, Clock, Eye } from "lucide-react";
+import { Play, TrendingUp, Star, Clock, Eye, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 import type { Media } from "@/types/anilist";
@@ -88,6 +88,11 @@ async function getAiringAnime() {
 async function getMostViewedAnime() {
   // Get page 2 of popular to show different anime than All Time Popular
   const result = await anilist.getPopular(2, 12);
+  return result.data?.Page.media ?? [];
+}
+
+async function getNewReleases() {
+  const result = await anilist.getNewReleases(1, 12);
   return result.data?.Page.media ?? [];
 }
 
@@ -237,6 +242,27 @@ async function MostViewedSection({ anime }: { anime: Media[] }) {
   );
 }
 
+async function NewReleasesSection({ anime }: { anime: Media[] }) {
+  if (anime.length === 0) return null;
+
+  return (
+    <section className="mb-16" aria-labelledby="new-releases-heading">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center" aria-hidden="true">
+            <Sparkles className="w-5 h-5 text-green-500" />
+          </div>
+          <h2 id="new-releases-heading" className="text-2xl font-display font-semibold">New Releases</h2>
+        </div>
+        <Link href="/search?sort=START_DATE_DESC" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+          View All
+        </Link>
+      </div>
+      <AnimeGrid anime={anime} />
+    </section>
+  );
+}
+
 async function SeasonalSection({ anime }: { anime: Media[] }) {
   if (anime.length === 0) return null;
 
@@ -338,12 +364,13 @@ async function AIRecommendationsSectionWrapper({ allAnime }: { allAnime: Media[]
 // ===================================
 
 export default async function HomePage() {
-  const [trendingAnime, popularAnime, seasonalAnime, airingAnime, mostViewedAnime] = await Promise.all([
+  const [trendingAnime, popularAnime, seasonalAnime, airingAnime, mostViewedAnime, newReleasesAnime] = await Promise.all([
     getTrendingAnime(),
     getPopularAnime(),
     getSeasonalAnime(),
     getAiringAnime(),
     getMostViewedAnime(),
+    getNewReleases(),
   ]);
 
   return (
@@ -353,7 +380,7 @@ export default async function HomePage() {
         {/* Visually hidden h1 for accessibility and SEO */}
         <h1 className="sr-only">AnimeVerse - Watch Anime Online Free</h1>
         <div className="container mx-auto px-4 pt-24 pb-12">
-          <CacheAnime media={[...trendingAnime, ...popularAnime, ...seasonalAnime, ...mostViewedAnime]} />
+          <CacheAnime media={[...trendingAnime, ...popularAnime, ...seasonalAnime, ...mostViewedAnime, ...newReleasesAnime]} />
 
           {/* Hero Section */}
           <Suspense fallback={<HeroSkeleton />}>
@@ -385,6 +412,9 @@ export default async function HomePage() {
 
           {/* Most Viewed Section */}
           <MostViewedSection anime={mostViewedAnime} />
+
+          {/* New Releases Section */}
+          <NewReleasesSection anime={newReleasesAnime} />
 
           {/* Seasonal Section */}
           <SeasonalSection anime={seasonalAnime} />
