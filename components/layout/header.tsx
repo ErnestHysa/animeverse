@@ -209,6 +209,7 @@ export const Header = memo(function Header() {
                     {[
                       { href: "/seasonal", icon: <Tv className="w-4 h-4" />, label: "Seasonal" },
                       { href: "/hidden-gems", icon: <Gem className="w-4 h-4" />, label: "Hidden Gems" },
+                      { href: "/top-rated", icon: <Trophy className="w-4 h-4" />, label: "Top Rated" },
                       { href: "/popular", icon: <TrendingUp className="w-4 h-4" />, label: "All-Time Popular" },
                       { href: "/genres", icon: <Tags className="w-4 h-4" />, label: "Genres" },
                       { href: "/random", icon: <Shuffle className="w-4 h-4" />, label: "Random Pick" },
@@ -532,6 +533,9 @@ export const Header = memo(function Header() {
               </MobileNavLink>
               <MobileNavLink href="/hidden-gems" icon={<Gem className="w-5 h-5" />}>
                 Hidden Gems
+              </MobileNavLink>
+              <MobileNavLink href="/top-rated" icon={<Trophy className="w-5 h-5" />}>
+                Top Rated
               </MobileNavLink>
               <MobileNavLink href="/seasonal" icon={<Tv className="w-5 h-5" />}>
                 Seasonal
