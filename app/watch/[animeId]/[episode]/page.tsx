@@ -158,6 +158,7 @@ function EpisodesList({ anime, currentEpisode }: { anime: Media; currentEpisode:
       malId={anime.idMal}
       totalEpisodes={totalEpisodes}
       currentEpisode={currentEpisode}
+      streamingEpisodes={anime.streamingEpisodes ?? undefined}
     />
   );
 }

@@ -34,8 +34,8 @@ export interface SubtitleSource {
 // ============================================
 
 const CONFIG = {
-  requestTimeout: 12000, // 12 seconds per API
-  totalTimeout: 35000,   // 35 seconds total
+  requestTimeout: 8000,  // 8 seconds per API
+  totalTimeout: 14000,   // 14 seconds total
   maxRetries: 2,
   userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
 };

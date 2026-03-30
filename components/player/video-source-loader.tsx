@@ -146,6 +146,7 @@ export function VideoSourceLoader({
   const [retryCount, setRetryCount] = useState(0);
   const [isRetrying, setIsRetrying] = useState(false);
   const [isFallback, setIsFallback] = useState(false);
+  const [loadingSeconds, setLoadingSeconds] = useState(0);
 
   // NEW: Subtitle state
   const [subtitleTracks, setSubtitleTracks] = useState<Array<{
@@ -336,6 +337,34 @@ export function VideoSourceLoader({
     }
   }, [animeId, episodeNumber, animeTitle, malId, onError, preferences.defaultQuality]);
 
+  // Reset loadingSeconds counter whenever a new load starts
+  useEffect(() => {
+    if (loading) {
+      setLoadingSeconds(0);
+    }
+  }, [loading]);
+
+  // Increment loadingSeconds every second while loading
+  useEffect(() => {
+    if (!loading) return;
+    const interval = setInterval(() => {
+      setLoadingSeconds((s) => s + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [loading]);
+
+  // Auto-fallback to demo video after 12 seconds of loading
+  useEffect(() => {
+    if (loadingSeconds >= 12 && loading) {
+      const demoSources = [
+        { url: 'https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8', quality: 'auto' as const, label: 'Demo (Sintel)' }
+      ];
+      setSources({ type: 'direct', url: demoSources[0].url, qualities: demoSources });
+      setIsFallback(true);
+      setLoading(false);
+    }
+  }, [loadingSeconds, loading]);
+
   // Initial fetch and re-fetch when language changes
   useEffect(() => {
     fetchSources(currentLanguage);
@@ -434,6 +463,7 @@ export function VideoSourceLoader({
 
   // Loading state
   if (loading) {
+    const isSlow = loadingSeconds >= 8;
     return (
       <GlassCard className="aspect-video flex items-center justify-center animate-fadeIn">
         <div className="text-center">
@@ -455,6 +485,33 @@ export function VideoSourceLoader({
             <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
             <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
           </div>
+          {/* Progress indicator */}
+          {!isRetrying && (
+            <p className="text-xs text-muted-foreground mt-3">
+              {loadingSeconds}s elapsed
+            </p>
+          )}
+          {isSlow && (
+            <div className="mt-4 max-w-xs mx-auto space-y-3">
+              <p className="text-xs text-yellow-400">
+                This is taking longer than expected. The video source may be unavailable.
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const demoSources = [
+                    { url: 'https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8', quality: 'auto' as const, label: 'Demo (Sintel)' }
+                  ];
+                  setSources({ type: 'direct', url: demoSources[0].url, qualities: demoSources });
+                  setIsFallback(true);
+                  setLoading(false);
+                }}
+              >
+                Use Demo Video
+              </Button>
+            </div>
+          )}
           {isRetrying && (
             <p className="text-xs text-muted-foreground mt-4 max-w-xs mx-auto">
               This is taking longer than usual. The server might be busy.

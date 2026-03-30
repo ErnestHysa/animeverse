@@ -43,7 +43,7 @@ export async function GET(
   try {
     // Set overall timeout for the request
     const controller = new AbortController();
-    const SERVER_TIMEOUT = 40000; // 40 seconds server timeout
+    const SERVER_TIMEOUT = 15000; // 15 seconds server timeout
     const timeoutId = setTimeout(() => {
       controller.abort();
     }, SERVER_TIMEOUT);

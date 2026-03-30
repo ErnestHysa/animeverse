@@ -25,6 +25,38 @@ interface ServerSelectorProps {
   isLoading?: boolean;
 }
 
+async function measureLatency(url: string): Promise<number> {
+  const start = performance.now();
+  try {
+    await fetch(url, { method: 'HEAD', mode: 'no-cors', cache: 'no-cache' });
+    return Math.round(performance.now() - start);
+  } catch {
+    return -1;
+  }
+}
+
+function LatencyBadge({ latency }: { latency: number | undefined }) {
+  if (latency === undefined) return null;
+  if (latency === -1) {
+    return (
+      <span className="ml-auto text-xs px-1.5 py-0.5 rounded bg-gray-500/30 text-gray-400 font-mono">
+        N/A
+      </span>
+    );
+  }
+  const colorClass =
+    latency < 100
+      ? 'bg-green-500/30 text-green-400'
+      : latency <= 300
+      ? 'bg-yellow-500/30 text-yellow-400'
+      : 'bg-red-500/30 text-red-400';
+  return (
+    <span className={`ml-auto text-xs px-1.5 py-0.5 rounded font-mono ${colorClass}`}>
+      {latency}ms
+    </span>
+  );
+}
+
 export function ServerSelector({
   servers,
   currentServer,
@@ -33,7 +65,25 @@ export function ServerSelector({
 }: ServerSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
+  const [latencies, setLatencies] = useState<Record<string, number>>({});
   const buttonRef = useRef<HTMLButtonElement>(null);
+
+  // Measure latency for each server when the server list changes
+  useEffect(() => {
+    if (servers.length === 0) return;
+    setLatencies({});
+    let cancelled = false;
+    servers.forEach((server) => {
+      measureLatency(server.url).then((ms) => {
+        if (!cancelled) {
+          setLatencies((prev) => ({ ...prev, [server.id]: ms }));
+        }
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [servers]);
 
   // Calculate dropdown position and update on scroll/resize
   useEffect(() => {
@@ -132,17 +182,18 @@ export function ServerSelector({
                   aria-selected={isSelected}
                   aria-label={`${server.name} - ${server.quality} ${server.type.toUpperCase()}`}
                 >
-                  <div className="flex items-center gap-2">
-                    <Server className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
-                    <div>
-                      <p className="text-sm font-medium">{server.name}</p>
+                  <div className="flex items-center gap-2 w-full">
+                    <Server className="w-4 h-4 text-muted-foreground flex-shrink-0" aria-hidden="true" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{server.name}</p>
                       <p className="text-xs text-muted-foreground">
                         {server.quality} • {server.type.toUpperCase()}
                       </p>
                     </div>
                     {isSelected && (
-                      <Check className="w-4 h-4 text-primary" aria-hidden="true" />
+                      <Check className="w-4 h-4 text-primary flex-shrink-0" aria-hidden="true" />
                     )}
+                    <LatencyBadge latency={latencies[server.id]} />
                   </div>
                 </button>
               );
