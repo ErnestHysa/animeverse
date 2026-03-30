@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/skeleton";
 import { EpisodeCommentsSection } from "@/components/watch/episode-comments-section";
 import { CacheAnime } from "@/components/anime/cache-anime";
+import { MiniPlayerActivator } from "@/components/player/mini-player-activator";
 
 function LinkButton({ href, children }: { href: string; children: React.ReactNode }) {
   return (
@@ -100,6 +101,12 @@ async function VideoSection({ anime, episodeNum }: { anime: Media; episodeNum: n
         <span className="text-foreground flex-shrink-0">Episode {episodeNum}</span>
       </div>
 
+      <MiniPlayerActivator
+        animeId={anime.id}
+        animeTitle={englishTitle}
+        episode={episodeNum}
+        coverImage={anime.coverImage?.large ?? undefined}
+      />
       <VideoSourceLoader
         animeId={anime.id}
         episodeNumber={episodeNum}

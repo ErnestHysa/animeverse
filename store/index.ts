@@ -148,6 +148,21 @@ export interface StoreState {
   unlockAchievement: (achievementId: string) => void;
   updateAchievementProgress: (achievementId: string, progress: number) => void;
   checkAndUnlockAchievements: () => void;
+
+  // Per-anime language & server preferences
+  perAnimePrefs: Record<number, { language?: "sub" | "dub"; server?: string }>;
+  setPerAnimePref: (animeId: number, pref: { language?: "sub" | "dub"; server?: string }) => void;
+  getPerAnimePref: (animeId: number) => { language?: "sub" | "dub"; server?: string } | undefined;
+
+  // Mini player state (persists while browsing)
+  miniPlayer: {
+    animeId: number;
+    animeTitle: string;
+    episode: number;
+    coverImage?: string;
+  } | null;
+  setMiniPlayer: (state: StoreState["miniPlayer"]) => void;
+  clearMiniPlayer: () => void;
 }
 
 type PersistedStoreState = Partial<
@@ -164,6 +179,7 @@ type PersistedStoreState = Partial<
     | "anilistMediaList"
     | "achievements"
     | "unlockedAchievements"
+    | "perAnimePrefs"
   >
 >;
 
@@ -604,6 +620,24 @@ export const useStore = create<StoreState>()(
       achievements: {},
       unlockedAchievements: [],
 
+      // Per-anime language & server preferences
+      perAnimePrefs: {},
+
+      // Mini player
+      miniPlayer: null,
+      setMiniPlayer: (miniPlayerState) => set({ miniPlayer: miniPlayerState }),
+      clearMiniPlayer: () => set({ miniPlayer: null }),
+
+      setPerAnimePref: (animeId, pref) =>
+        set((state) => ({
+          perAnimePrefs: {
+            ...state.perAnimePrefs,
+            [animeId]: { ...state.perAnimePrefs[animeId], ...pref },
+          },
+        })),
+
+      getPerAnimePref: (animeId) => get().perAnimePrefs[animeId],
+
       unlockAchievement: (achievementId: string) =>
         set((state) => {
           if (state.unlockedAchievements.includes(achievementId)) return state;
@@ -825,6 +859,7 @@ export const useStore = create<StoreState>()(
           anilistMediaList: state.anilistMediaList,
           achievements: state.achievements,
           unlockedAchievements: state.unlockedAchievements,
+          perAnimePrefs: state.perAnimePrefs,
         }),
     }
   )

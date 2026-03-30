@@ -18,7 +18,7 @@ interface MarkAllWatchedProps {
 
 export function MarkAllWatched({ animeId, totalEpisodes }: MarkAllWatchedProps) {
   const [isMarking, setIsMarking] = useState(false);
-  const addWatchHistory = useStore((s) => s.addWatchHistory);
+  const addToWatchHistory = useStore((s) => s.addToWatchHistory);
   const watchHistory = useStore((s) => s.watchHistory);
 
   const watchedCount = watchHistory.filter(
@@ -32,10 +32,9 @@ export function MarkAllWatched({ animeId, totalEpisodes }: MarkAllWatchedProps) 
     setIsMarking(true);
     try {
       for (let ep = 1; ep <= totalEpisodes; ep++) {
-        addWatchHistory({
+        addToWatchHistory({
           mediaId: animeId,
           episodeNumber: ep,
-          timestamp: Date.now(),
           progress: 24 * 60, // 24 min in seconds (treated as completed)
           completed: true,
         });
@@ -44,7 +43,7 @@ export function MarkAllWatched({ animeId, totalEpisodes }: MarkAllWatchedProps) 
     } finally {
       setIsMarking(false);
     }
-  }, [animeId, totalEpisodes, addWatchHistory, isAllWatched, isMarking]);
+  }, [animeId, totalEpisodes, addToWatchHistory, isAllWatched, isMarking]);
 
   if (!totalEpisodes) return null;
 

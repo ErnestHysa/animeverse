@@ -21,6 +21,7 @@ import { AnimeActions } from "@/components/anime/anime-actions";
 import { CommentsSection } from "@/components/comments/comments-section";
 import { UserRating } from "@/components/anime/user-rating";
 import { MarkAllWatched } from "@/components/anime/mark-all-watched";
+import { AiringCountdown } from "@/components/anime/airing-countdown";
 import type { Media } from "@/types/anilist";
 import { CacheAnime } from "@/components/anime/cache-anime";
 
@@ -187,12 +188,12 @@ async function HeroSection({ anime }: { anime: Media }) {
                 )}
               </div>
 
-              {/* Next Airing */}
-              {nextAiring && (
-                <div className="flex items-center gap-2 text-primary">
-                  <span className="w-2 h-2 bg-primary rounded-full animate-pulse" />
-                  <span className="text-sm font-medium">{nextAiring}</span>
-                </div>
+              {/* Next Airing — live countdown */}
+              {anime.nextAiringEpisode && (
+                <AiringCountdown
+                  episode={anime.nextAiringEpisode.episode}
+                  airingAt={anime.nextAiringEpisode.airingAt}
+                />
               )}
 
               {/* Actions */}
