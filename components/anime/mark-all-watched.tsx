@@ -10,6 +10,7 @@ import { CheckCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useStore } from "@/store";
 import { toast } from "react-hot-toast";
+import { useAniListProgressSync } from "@/lib/anilist-sync";
 
 interface MarkAllWatchedProps {
   animeId: number;
@@ -20,6 +21,7 @@ export function MarkAllWatched({ animeId, totalEpisodes }: MarkAllWatchedProps) 
   const [isMarking, setIsMarking] = useState(false);
   const addToWatchHistory = useStore((s) => s.addToWatchHistory);
   const watchHistory = useStore((s) => s.watchHistory);
+  const { syncProgress } = useAniListProgressSync();
 
   const watchedCount = watchHistory.filter(
     (h) => h.mediaId === animeId && h.completed
@@ -39,11 +41,13 @@ export function MarkAllWatched({ animeId, totalEpisodes }: MarkAllWatchedProps) 
           completed: true,
         });
       }
+      // Push to AniList as COMPLETED (fire-and-forget)
+      syncProgress(animeId, totalEpisodes, totalEpisodes);
       toast.success(`Marked all ${totalEpisodes} episodes as watched!`);
     } finally {
       setIsMarking(false);
     }
-  }, [animeId, totalEpisodes, addToWatchHistory, isAllWatched, isMarking]);
+  }, [animeId, totalEpisodes, addToWatchHistory, isAllWatched, isMarking, syncProgress]);
 
   if (!totalEpisodes) return null;
 

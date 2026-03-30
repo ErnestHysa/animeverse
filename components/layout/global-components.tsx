@@ -10,6 +10,7 @@ import { registerDefaultShortcuts } from "@/lib/keyboard-shortcuts";
 import { useEffect } from "react";
 import { AppSuiteOrchestrator } from "@/components/layout/app-suite-orchestrator";
 import { MiniPlayer } from "@/components/player/mini-player";
+import { InstallPrompt } from "@/components/pwa/install-prompt";
 
 export function GlobalComponents() {
   useEffect(() => {
@@ -22,6 +23,7 @@ export function GlobalComponents() {
       <AppSuiteOrchestrator />
       <KeyboardShortcutsButton />
       <MiniPlayer />
+      <InstallPrompt />
     </>
   );
 }

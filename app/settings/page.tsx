@@ -44,7 +44,8 @@ import {
   type UserStats,
 } from "@/lib/stats";
 import { useStore } from "@/store";
-import { Clock, Flame, TrendingUp, BarChart3, Award } from "lucide-react";
+import { Clock, Flame, TrendingUp, BarChart3, Award, Keyboard } from "lucide-react";
+import { DEFAULT_SHORTCUTS } from "@/lib/keyboard-shortcuts";
 
 export default function SettingsPage() {
   const { preferences, updatePreferences, resetPreferences } = usePreferences();
@@ -239,21 +240,14 @@ export default function SettingsPage() {
         // Flatten the lists to get all entries
         const allEntries = lists.flatMap((list: { entries: unknown[] }) => list.entries || []);
 
-        // First sync the AniList data
+        // First sync the AniList data (synchronous Zustand set)
         syncAniListData(allEntries);
 
-        // Then migrate data to app structures (watch history, media cache, stats)
-        // Use setTimeout to allow state to update first
-        setTimeout(() => {
-          // Get the updated state from the store
-          const currentState = useStore.getState().anilistMediaList;
-          migrateAniListData(currentState);
-
-          // Recalculate stats display
-          calculateAndSetStats();
-
-          toast.success(`Synced ${allEntries.length} anime from AniList! Data migrated successfully.`);
-        }, 100);
+        // Zustand set() is synchronous — read the updated state immediately
+        const currentState = useStore.getState().anilistMediaList;
+        migrateAniListData(currentState);
+        calculateAndSetStats();
+        toast.success(`Synced ${allEntries.length} anime from AniList! Data migrated successfully.`);
       } else {
         const errorText = await response.text();
         console.error("AniList API error:", errorText);
@@ -1157,6 +1151,53 @@ export default function SettingsPage() {
                   </div>
                 </div>
               )}
+            </GlassCard>
+
+            {/* Keyboard Shortcuts Reference */}
+            <GlassCard className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <Keyboard className="w-5 h-5 text-primary" />
+                <h2 className="text-lg font-semibold">Keyboard Shortcuts</h2>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4">
+                Use these shortcuts anywhere in the app. Press <kbd className="px-1.5 py-0.5 bg-white/10 rounded text-xs font-mono">?</kbd> to show this panel.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {Object.values(DEFAULT_SHORTCUTS).map((shortcut) => (
+                  <div key={shortcut.key} className="flex items-center justify-between px-3 py-2 bg-white/5 rounded-lg">
+                    <span className="text-sm">{shortcut.description}</span>
+                    <kbd className="px-2 py-0.5 bg-white/10 border border-white/20 rounded text-xs font-mono ml-3 flex-shrink-0">
+                      {shortcut.key.toUpperCase()}
+                    </kbd>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between px-3 py-2 bg-white/5 rounded-lg">
+                  <span className="text-sm">Play / Pause</span>
+                  <kbd className="px-2 py-0.5 bg-white/10 border border-white/20 rounded text-xs font-mono ml-3 flex-shrink-0">Space</kbd>
+                </div>
+                <div className="flex items-center justify-between px-3 py-2 bg-white/5 rounded-lg">
+                  <span className="text-sm">Seek ±10 seconds</span>
+                  <div className="flex gap-1 ml-3 flex-shrink-0">
+                    <kbd className="px-2 py-0.5 bg-white/10 border border-white/20 rounded text-xs font-mono">←</kbd>
+                    <kbd className="px-2 py-0.5 bg-white/10 border border-white/20 rounded text-xs font-mono">→</kbd>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between px-3 py-2 bg-white/5 rounded-lg">
+                  <span className="text-sm">Volume</span>
+                  <div className="flex gap-1 ml-3 flex-shrink-0">
+                    <kbd className="px-2 py-0.5 bg-white/10 border border-white/20 rounded text-xs font-mono">↑</kbd>
+                    <kbd className="px-2 py-0.5 bg-white/10 border border-white/20 rounded text-xs font-mono">↓</kbd>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between px-3 py-2 bg-white/5 rounded-lg">
+                  <span className="text-sm">Fullscreen</span>
+                  <kbd className="px-2 py-0.5 bg-white/10 border border-white/20 rounded text-xs font-mono ml-3 flex-shrink-0">F</kbd>
+                </div>
+                <div className="flex items-center justify-between px-3 py-2 bg-white/5 rounded-lg">
+                  <span className="text-sm">Mute / Unmute</span>
+                  <kbd className="px-2 py-0.5 bg-white/10 border border-white/20 rounded text-xs font-mono ml-3 flex-shrink-0">M</kbd>
+                </div>
+              </div>
             </GlassCard>
 
             {/* Reset Button */}
