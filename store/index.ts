@@ -142,6 +142,14 @@ export interface StoreState {
   getAniListEntry: (mediaId: number) => AniListMediaEntry | undefined;
   updateAniListEntryLocally: (mediaId: number, progress: number, status: AniListStatus) => void;
 
+  // MAL Authentication
+  malToken: string | null;
+  malRefreshToken: string | null;
+  malTokenExpiresAt: number | null;
+  malUser: { id: number; name: string; picture: string } | null;
+  setMALAuth: (user: { id: number; name: string; picture: string }, token: string, refreshToken: string, expiresAt: number) => void;
+  clearMALAuth: () => void;
+
   // Achievements
   achievements: { [key: string]: number }; // achievementId -> progress
   unlockedAchievements: string[]; // achievementIds
@@ -177,6 +185,10 @@ type PersistedStoreState = Partial<
     | "anilistToken"
     | "isAuthenticated"
     | "anilistMediaList"
+    | "malToken"
+    | "malRefreshToken"
+    | "malTokenExpiresAt"
+    | "malUser"
     | "achievements"
     | "unlockedAchievements"
     | "perAnimePrefs"
@@ -205,6 +217,12 @@ export const useStore = create<StoreState>()(
       anilistToken: null,
       isAuthenticated: false,
       anilistMediaList: [],
+
+      // MAL Auth State
+      malToken: null,
+      malRefreshToken: null,
+      malTokenExpiresAt: null,
+      malUser: null,
 
       // ===================================
       // Favorites Actions
@@ -353,6 +371,26 @@ export const useStore = create<StoreState>()(
           anilistUser: null,
           anilistToken: null,
           isAuthenticated: false,
+        }),
+
+      // ===================================
+      // MAL Auth Actions
+      // ===================================
+
+      setMALAuth: (user, token, refreshToken, expiresAt) =>
+        set({
+          malUser: user,
+          malToken: token,
+          malRefreshToken: refreshToken,
+          malTokenExpiresAt: expiresAt,
+        }),
+
+      clearMALAuth: () =>
+        set({
+          malUser: null,
+          malToken: null,
+          malRefreshToken: null,
+          malTokenExpiresAt: null,
         }),
 
       syncAniListData: (mediaList: unknown[]) =>
@@ -857,6 +895,10 @@ export const useStore = create<StoreState>()(
           anilistToken: state.anilistToken,
           isAuthenticated: state.isAuthenticated,
           anilistMediaList: state.anilistMediaList,
+          malToken: state.malToken,
+          malRefreshToken: state.malRefreshToken,
+          malTokenExpiresAt: state.malTokenExpiresAt,
+          malUser: state.malUser,
           achievements: state.achievements,
           unlockedAchievements: state.unlockedAchievements,
           perAnimePrefs: state.perAnimePrefs,

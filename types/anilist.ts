@@ -141,6 +141,7 @@ export interface Character {
 export interface Staff {
   id: number;
   name: { first: string | null; last: string | null; full: string };
+  image?: { large: string; medium: string };
 }
 
 // ===================================

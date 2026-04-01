@@ -348,6 +348,30 @@ async function InfoSection({ anime }: { anime: Media }) {
             </div>
           </GlassCard>
         )}
+
+        {/* Staff */}
+        {anime.staff?.edges && anime.staff.edges.length > 0 && (
+          <GlassCard>
+            <h2 className="text-xl font-semibold mb-4">Staff</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              {anime.staff.edges.slice(0, 8).map((edge) => (
+                <div key={edge.node.id} className="text-center">
+                  <div className="relative aspect-square rounded-lg overflow-hidden bg-muted mb-2">
+                    <ImageWithFallback
+                      src={edge.node.image?.medium || edge.node.image?.large || ""}
+                      alt={edge.node.name.full}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 768px) 50vw, 25vw"
+                    />
+                  </div>
+                  <p className="text-sm font-medium truncate">{edge.node.name.full}</p>
+                  <p className="text-xs text-muted-foreground truncate">{edge.role}</p>
+                </div>
+              ))}
+            </div>
+          </GlassCard>
+        )}
       </div>
 
       {/* Sidebar */}

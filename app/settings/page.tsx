@@ -64,6 +64,13 @@ export default function SettingsPage() {
     migrateAniListData,
   } = useAniListAuth();
 
+  // MAL auth state
+  const malToken = useStore((s) => s.malToken);
+  const malUser = useStore((s) => s.malUser);
+  const setMALAuth = useStore((s) => s.setMALAuth);
+  const clearMALAuth = useStore((s) => s.clearMALAuth);
+  const [isSyncingMAL, setIsSyncingMAL] = useState(false);
+
   // AniList auth state
   const [showTokenInput, setShowTokenInput] = useState(false);
   const [accessToken, setAccessToken] = useState('');
@@ -338,7 +345,26 @@ export default function SettingsPage() {
       toast.error(`Authentication failed: ${errorDetails}`, { duration: 8000 });
       window.history.replaceState({}, "", "/settings");
     }
-  }, [isAuthenticated, anilistUser, anilistToken, setAniListAuth, fetchAniListData]);
+
+    // Handle MAL OAuth callback
+    const malAuthStatus = params.get("mal_auth");
+    if (malAuthStatus === "success") {
+      try {
+        const hashData = JSON.parse(decodeURIComponent(window.location.hash.slice(1)));
+        if (hashData.token && hashData.user) {
+          setMALAuth(hashData.user, hashData.token, hashData.refresh_token ?? "", hashData.expires_at ?? 0);
+          toast.success(`MAL connected: ${hashData.user.name}!`);
+        }
+      } catch {
+        // ignore hash parse error
+      }
+      window.history.replaceState({}, "", "/settings");
+    } else if (malAuthStatus === "error") {
+      const message = params.get("message");
+      toast.error(`MAL connection failed: ${message || "unknown error"}`);
+      window.history.replaceState({}, "", "/settings");
+    }
+  }, [isAuthenticated, anilistUser, anilistToken, setAniListAuth, fetchAniListData, setMALAuth]);
 
   // Login with AniList using Authorization Code Grant
   // This is the proper OAuth 2.0 flow with client_secret
@@ -417,6 +443,49 @@ export default function SettingsPage() {
   const handleAniListLogout = () => {
     clearAniListAuth();
     toast.success("Logged out from AniList");
+  };
+
+  // Connect to MAL
+  const handleMALLogin = () => {
+    window.location.href = "/auth/mal";
+  };
+
+  // Disconnect from MAL
+  const handleMALLogout = () => {
+    clearMALAuth();
+    toast.success("Disconnected from MyAnimeList");
+  };
+
+  // Sync watch history to MAL
+  const handleSyncToMAL = async () => {
+    if (!malToken) return;
+    setIsSyncingMAL(true);
+    try {
+      const { updateMALEntry, anilistStatusToMAL } = await import("@/lib/mal-api");
+      // Sync from AniList media list (which has MAL IDs)
+      const entries = useStore.getState().anilistMediaList.filter((e) => e.media?.idMal);
+      let synced = 0;
+      for (const entry of entries) {
+        if (!entry.media?.idMal) continue;
+        try {
+          await updateMALEntry(
+            malToken,
+            entry.media.idMal,
+            anilistStatusToMAL(entry.status),
+            entry.progress,
+            entry.score
+          );
+          synced++;
+        } catch {
+          // skip individual failures
+        }
+      }
+      toast.success(`Synced ${synced} entries to MAL`);
+    } catch (err) {
+      toast.error("MAL sync failed");
+    } finally {
+      setIsSyncingMAL(false);
+    }
   };
 
   return (
@@ -954,6 +1023,83 @@ export default function SettingsPage() {
                         Connecting allows you to sync your progress between AnimeVerse and AniList.
                       </p>
                     </div>
+                  </div>
+                </div>
+              )}
+            </GlassCard>
+
+            {/* MyAnimeList Integration */}
+            <GlassCard>
+              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                <LinkIcon className="w-5 h-5 text-blue-400" />
+                MyAnimeList Integration
+              </h2>
+
+              {malToken && malUser ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-4 p-4 bg-white/5 rounded-lg">
+                    {malUser.picture && (
+                      <img
+                        src={malUser.picture}
+                        alt={malUser.name}
+                        className="w-12 h-12 rounded-full object-cover"
+                      />
+                    )}
+                    <div className="flex-1">
+                      <p className="font-medium">{malUser.name}</p>
+                      <p className="text-sm text-muted-foreground">Connected to MyAnimeList</p>
+                    </div>
+                    <button
+                      onClick={handleMALLogout}
+                      className="px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg flex items-center gap-2 transition-colors text-sm"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Disconnect
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={handleSyncToMAL}
+                      disabled={isSyncingMAL}
+                      className="px-4 py-3 bg-blue-500/10 hover:bg-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg flex items-center justify-center gap-2 transition-colors text-sm text-blue-400"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${isSyncingMAL ? "animate-spin" : ""}`} />
+                      {isSyncingMAL ? "Syncing..." : "Push to MAL"}
+                    </button>
+                    <button
+                      onClick={handleMALLogout}
+                      className="px-4 py-3 bg-white/5 hover:bg-white/10 rounded-lg flex items-center justify-center gap-2 transition-colors text-sm"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Disconnect
+                    </button>
+                  </div>
+
+                  <p className="text-xs text-muted-foreground">
+                    Push your AniList watch progress to MAL with one click. Progress syncs bidirectionally as you watch.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="p-4 bg-white/5 rounded-lg text-center">
+                    <User className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+                    <p className="font-medium mb-1">Connect to MyAnimeList</p>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Keep your MAL list in sync automatically as you watch
+                    </p>
+                    <button
+                      onClick={handleMALLogin}
+                      className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                    >
+                      <LogIn className="w-4 h-4" />
+                      Login with MyAnimeList
+                    </button>
+                    <p className="text-xs text-muted-foreground mt-3">
+                      Requires{" "}
+                      <code className="text-xs bg-white/10 px-1 py-0.5 rounded">NEXT_PUBLIC_MAL_CLIENT_ID</code>{" "}
+                      to be configured
+                    </p>
                   </div>
                 </div>
               )}

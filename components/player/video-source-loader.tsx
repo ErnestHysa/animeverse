@@ -93,6 +93,10 @@ export function VideoSourceLoader({
   const updateAniListEntryLocally = useStore((s) => s.updateAniListEntryLocally);
   const anilistSyncedRef = useRef(false); // prevent duplicate syncs per episode
 
+  // MAL reverse-sync
+  const malToken = useStore((s) => s.malToken);
+  const malSyncedRef = useRef(false);
+
   const syncProgressToAniList = useCallback(async () => {
     if (!isAuthenticated || !anilistToken || anilistSyncedRef.current) return;
     anilistSyncedRef.current = true;
@@ -109,9 +113,22 @@ export function VideoSourceLoader({
     }
   }, [isAuthenticated, anilistToken, animeId, episodeNumber, updateAniListEntryLocally]);
 
-  // Reset sync flag when episode changes
+  const syncProgressToMAL = useCallback(async () => {
+    if (!malToken || !malId || malSyncedRef.current) return;
+    malSyncedRef.current = true;
+    try {
+      const { updateMALEntry } = await import("@/lib/mal-api");
+      await updateMALEntry(malToken, malId, "watching", episodeNumber);
+      logger.info("[MAL Sync] Pushed ep", episodeNumber, "malId", malId);
+    } catch (err) {
+      logger.warn("[MAL Sync] Error:", err);
+    }
+  }, [malToken, malId, episodeNumber]);
+
+  // Reset sync flags when episode changes
   useEffect(() => {
     anilistSyncedRef.current = false;
+    malSyncedRef.current = false;
   }, [animeId, episodeNumber]);
 
   const [sources, setSources] = useState<{
@@ -625,6 +642,7 @@ export function VideoSourceLoader({
         onError={handleVideoError}
         onEpisodeEnd={() => {
           syncProgressToAniList();
+          syncProgressToMAL();
           onEpisodeEnd?.();
         }}
         allServers={allServers}
