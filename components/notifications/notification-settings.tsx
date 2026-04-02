@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Bell, BellOff, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,9 +20,14 @@ import {
 import { useFavorites, useWatchlist } from "@/store";
 
 export function NotificationSettings() {
-  // Use lazy initializers to avoid setState in effect
-  const [permission, setPermission] = useState(() => getNotificationPermission());
-  const [isSupported] = useState(() => areNotificationsSupported());
+  // Initialize with "default" to match server render; update after mount
+  const [permission, setPermission] = useState<NotificationPermission>("default");
+  const [isSupported, setIsSupported] = useState(false);
+
+  useEffect(() => {
+    setIsSupported(areNotificationsSupported());
+    setPermission(getNotificationPermission());
+  }, []);
   const [requesting, setRequesting] = useState(false);
   const [topicSettings, setTopicSettings] = useState(() => getNotificationTopicSettings());
   const { favorites } = useFavorites();

@@ -19,6 +19,9 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { AnimeActions } from "@/components/anime/anime-actions";
 import { CommentsSection } from "@/components/comments/comments-section";
+import { UserRating } from "@/components/anime/user-rating";
+import { MarkAllWatched } from "@/components/anime/mark-all-watched";
+import { AiringCountdown } from "@/components/anime/airing-countdown";
 import type { Media } from "@/types/anilist";
 import { CacheAnime } from "@/components/anime/cache-anime";
 
@@ -172,14 +175,25 @@ async function HeroSection({ anime }: { anime: Media }) {
                     </div>
                   </div>
                 )}
+                {anime.idMal && (
+                  <a
+                    href={`https://myanimelist.net/anime/${anime.idMal}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 px-2.5 py-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 rounded-lg text-xs transition-colors self-center"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    MAL
+                  </a>
+                )}
               </div>
 
-              {/* Next Airing */}
-              {nextAiring && (
-                <div className="flex items-center gap-2 text-primary">
-                  <span className="w-2 h-2 bg-primary rounded-full animate-pulse" />
-                  <span className="text-sm font-medium">{nextAiring}</span>
-                </div>
+              {/* Next Airing — live countdown */}
+              {anime.nextAiringEpisode && (
+                <AiringCountdown
+                  episode={anime.nextAiringEpisode.episode}
+                  airingAt={anime.nextAiringEpisode.airingAt}
+                />
               )}
 
               {/* Actions */}
@@ -191,12 +205,15 @@ async function HeroSection({ anime }: { anime: Media }) {
                   </span>
                 </WatchLinkButton>
                 <AnimeActions animeId={anime.id} animeTitle={title} />
+                {anime.episodes && anime.episodes > 0 && (
+                  <MarkAllWatched animeId={anime.id} totalEpisodes={anime.episodes} />
+                )}
               </div>
 
               {/* External Links */}
-              {anime.externalLinks && anime.externalLinks.length > 0 && (
+              {(anime.externalLinks && anime.externalLinks.length > 0 || anime.idMal) && (
                 <div className="flex flex-wrap gap-2">
-                  {anime.externalLinks.map((link, i: number) => (
+                  {anime.externalLinks?.map((link, i: number) => (
                     <a
                       key={i}
                       href={link.url}
@@ -208,6 +225,20 @@ async function HeroSection({ anime }: { anime: Media }) {
                       <span>{link.site}</span>
                     </a>
                   ))}
+                  {anime.idMal &&
+                    !anime.externalLinks?.some((l) =>
+                      l.site.toLowerCase().includes("myanimelist")
+                    ) && (
+                      <a
+                        href={`https://myanimelist.net/anime/${anime.idMal}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 px-3 py-2 bg-white/5 rounded-lg text-sm hover:bg-white/10 transition-colors"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        <span>MyAnimeList</span>
+                      </a>
+                    )}
                 </div>
               )}
             </div>
@@ -317,10 +348,37 @@ async function InfoSection({ anime }: { anime: Media }) {
             </div>
           </GlassCard>
         )}
+
+        {/* Staff */}
+        {anime.staff?.edges && anime.staff.edges.length > 0 && (
+          <GlassCard>
+            <h2 className="text-xl font-semibold mb-4">Staff</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              {anime.staff.edges.slice(0, 8).map((edge) => (
+                <div key={edge.node.id} className="text-center">
+                  <div className="relative aspect-square rounded-lg overflow-hidden bg-muted mb-2">
+                    <ImageWithFallback
+                      src={edge.node.image?.medium || edge.node.image?.large || ""}
+                      alt={edge.node.name.full}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 768px) 50vw, 25vw"
+                    />
+                  </div>
+                  <p className="text-sm font-medium truncate">{edge.node.name.full}</p>
+                  <p className="text-xs text-muted-foreground truncate">{edge.role}</p>
+                </div>
+              ))}
+            </div>
+          </GlassCard>
+        )}
       </div>
 
       {/* Sidebar */}
       <div className="space-y-6">
+        {/* User Rating */}
+        <UserRating animeId={anime.id} animeTitle={getAnimeTitle(anime)} />
+
         {/* Stats */}
         <GlassCard>
           <h3 className="font-semibold mb-4">Statistics</h3>

@@ -6,7 +6,7 @@
 "use client";
 
 import { useState } from "react";
-import { useStore } from "@/store";
+import { usePreferences } from "@/store";
 import {
   Type,
   Palette,
@@ -112,7 +112,7 @@ const PRESET_THEMES = [
 ];
 
 export function SubtitleSettings({ className = "" }: SubtitleSettingsProps) {
-  const { preferences, updatePreferences } = useStore();
+  const { preferences, updatePreferences } = usePreferences();
   const [previewText, setPreviewText] = useState("This is how your subtitles will look");
 
   // Provide default values for existing users without subtitleStyle

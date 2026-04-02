@@ -21,6 +21,7 @@ import {
   Copy,
   X,
   Camera,
+  Sparkles,
 } from "lucide-react";
 import { cn, formatTime } from "@/lib/utils";
 import { usePreferences, useStore } from "@/store";
@@ -244,6 +245,17 @@ export function EnhancedVideoPlayer({
   // Theater mode
   const [isTheaterMode, setIsTheaterMode] = useState(false);
 
+  // Chromecast
+  const [isCasting, setIsCasting] = useState(false);
+
+  // AirPlay availability
+  const [airPlayAvailable, setAirPlayAvailable] = useState(false);
+
+  // Ambient / glow mode
+  const [isAmbientMode, setIsAmbientMode] = useState(false);
+  const ambientCanvasRef = useRef<HTMLCanvasElement>(null);
+  const ambientRafRef = useRef<number>(0);
+
   // PIP
   const [isPip, setIsPip] = useState(false);
 
@@ -278,6 +290,7 @@ export function EnhancedVideoPlayer({
   // Store for watch history
   const { addToWatchHistory } = useStore();
 
+
   // Dynamic intro/outro timestamps from AniSkip API
   const [skipTimestamps, setSkipTimestamps] = useState<IntroOutroTimestamps>({});
 
@@ -300,6 +313,91 @@ export function EnhancedVideoPlayer({
     setSubtitleBackground((current) => (current === normalizedBackground ? current : normalizedBackground));
     setSubtitlePosition((current) => (current === subtitleStyle.position ? current : subtitleStyle.position));
   }, [preferences.subtitleStyle]);
+
+  // AirPlay: detect availability via WebKit API
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    // WebKit AirPlay availability event
+    const handleAirPlayAvailability = (event: Event) => {
+      setAirPlayAvailable((event as CustomEvent).detail?.availability === "available");
+    };
+    video.addEventListener("webkitplaybacktargetavailabilitychanged", handleAirPlayAvailability);
+    return () => video.removeEventListener("webkitplaybacktargetavailabilitychanged", handleAirPlayAvailability);
+  }, []);
+
+  // Chromecast: initialise SDK once it's loaded
+  useEffect(() => {
+    type CastContextInstance = {
+      setOptions: (o: object) => void;
+      addEventListener: (e: string, cb: (ev: { sessionState: string }) => void) => void;
+      requestSession: () => void;
+    };
+    type CastWindow = {
+      cast?: {
+        framework?: {
+          CastContext?: { getInstance: () => CastContextInstance };
+          SessionState?: Record<string, string>;
+        };
+      };
+      __onGCastApiAvailable?: (isAvailable: boolean) => void;
+    };
+
+    const initCast = () => {
+      if (typeof window === "undefined") return;
+      const w = window as unknown as CastWindow;
+      const CastContext = w.cast?.framework?.CastContext;
+      if (!CastContext) return;
+      try {
+        const ctx = CastContext.getInstance();
+        ctx.setOptions({ receiverApplicationId: "CC1AD845", autoJoinPolicy: "origin_scoped" });
+        ctx.addEventListener("SESSION_STATE_CHANGED", (ev) => {
+          const states = (window as unknown as CastWindow).cast?.framework?.SessionState;
+          if (!states) return;
+          if (ev.sessionState === states.SESSION_STARTED) setIsCasting(true);
+          if (ev.sessionState === states.SESSION_ENDING) setIsCasting(false);
+        });
+      } catch {
+        // Cast SDK not available
+      }
+    };
+
+    const w = window as unknown as CastWindow;
+    if (w.__onGCastApiAvailable) {
+      initCast();
+    } else {
+      w.__onGCastApiAvailable = (isAvailable: boolean) => {
+        if (isAvailable) initCast();
+      };
+    }
+  }, []);
+
+  // Ambient mode: draw blurred video frames to canvas behind player
+  useEffect(() => {
+    const canvas = ambientCanvasRef.current;
+    const video = videoRef.current;
+    if (!canvas || !video || !isAmbientMode) {
+      cancelAnimationFrame(ambientRafRef.current);
+      return;
+    }
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let lastDraw = 0;
+    const draw = (timestamp: number) => {
+      if (timestamp - lastDraw > 66) { // ~15fps is enough for ambient glow
+        lastDraw = timestamp;
+        if (!video.paused && video.readyState >= 2) {
+          canvas.width = 64;
+          canvas.height = 36;
+          ctx.drawImage(video, 0, 0, 64, 36);
+        }
+      }
+      ambientRafRef.current = requestAnimationFrame(draw);
+    };
+    ambientRafRef.current = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(ambientRafRef.current);
+  }, [isAmbientMode]);
 
   // Computed timestamps with fallback to defaults
   const introStart = skipTimestamps.intro?.start ?? 85;
@@ -332,6 +430,7 @@ export function EnhancedVideoPlayer({
           timestamp: Date.now(),
         };
         localStorage.setItem(key, JSON.stringify(data));
+
       } catch (e) {
         // Silently fail - app will work without persistence
       }
@@ -1854,6 +1953,32 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
     setIsTheaterMode((t) => !t);
   };
 
+  // AirPlay: show native picker
+  const handleAirPlay = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    try {
+      (video as HTMLVideoElement & { webkitShowPlaybackTargetPicker?: () => void }).webkitShowPlaybackTargetPicker?.();
+    } catch {
+      // not supported
+    }
+  };
+
+  // Chromecast: request session
+  const handleCast = () => {
+    type CastWin = { cast?: { framework?: { CastContext?: { getInstance: () => { requestSession: () => void } } } } };
+    try {
+      const ctx = (window as unknown as CastWin).cast?.framework?.CastContext?.getInstance();
+      if (ctx) {
+        ctx.requestSession();
+      } else {
+        toast.error("Chromecast not available");
+      }
+    } catch {
+      toast.error("Chromecast not available");
+    }
+  };
+
   const takeScreenshot = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -2118,10 +2243,19 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
+    <div className={cn("relative", !isTheaterMode && "w-full")}>
+      {/* Ambient glow canvas — rendered behind the player, blurred */}
+      {isAmbientMode && !isTheaterMode && (
+        <canvas
+          ref={ambientCanvasRef}
+          className="absolute -inset-8 w-[calc(100%+4rem)] h-[calc(100%+4rem)] opacity-60 blur-3xl scale-110 pointer-events-none z-0"
+          aria-hidden="true"
+        />
+      )}
     <div
       ref={containerRef}
       className={cn(
-        "relative bg-black rounded-xl overflow-hidden group w-full",
+        "relative bg-black rounded-xl overflow-hidden group w-full z-10",
         isTheaterMode ? "fixed inset-0 z-50 rounded-none" : "",
         !isTheaterMode && "max-w-full",
         className
@@ -2137,6 +2271,8 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
         playsInline
         crossOrigin="anonymous"
         preload="auto"
+        // AirPlay support
+        {...({ "x-webkit-airplay": "allow" } as React.HTMLAttributes<HTMLVideoElement>)}
       />
 
       {/* Loading/Buffering Overlay */}
@@ -2787,6 +2923,52 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
               <Camera className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>
 
+            {/* Ambient Mode */}
+            <button
+              onClick={() => setIsAmbientMode((v) => !v)}
+              className={cn(
+                "p-1 sm:p-1.5 hover:bg-white/10 rounded-full transition-colors min-w-[32px] min-h-[32px] sm:min-w-0 sm:min-h-0",
+                isAmbientMode && "bg-purple-500/30 text-purple-300"
+              )}
+              aria-label={isAmbientMode ? "Disable ambient mode" : "Ambient mode"}
+              title={isAmbientMode ? "Disable ambient glow" : "Ambient glow mode"}
+            >
+              <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            </button>
+
+            {/* AirPlay */}
+            {airPlayAvailable && (
+              <button
+                onClick={handleAirPlay}
+                className="p-1 sm:p-1.5 hover:bg-white/10 rounded-full transition-colors min-w-[32px] min-h-[32px] sm:min-w-0 sm:min-h-0"
+                aria-label="AirPlay"
+                title="AirPlay to Apple TV"
+              >
+                <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M5 17l7-7 7 7H5zM2 19h20v2H2v-2z" />
+                  <path d="M12 2C6.477 2 2 6.477 2 12h2a8 8 0 1 1 16 0h2C22 6.477 17.523 2 12 2z" opacity="0.5" />
+                </svg>
+              </button>
+            )}
+
+            {/* Chromecast */}
+            <button
+              onClick={handleCast}
+              className={cn(
+                "p-1 sm:p-1.5 hover:bg-white/10 rounded-full transition-colors min-w-[32px] min-h-[32px] sm:min-w-0 sm:min-h-0",
+                isCasting && "bg-blue-500/30 text-blue-300"
+              )}
+              aria-label={isCasting ? "Stop casting" : "Cast to TV"}
+              title={isCasting ? "Stop Chromecast" : "Cast to Chromecast"}
+            >
+              <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M1 18v3h3c0-1.66-1.34-3-3-3z" />
+                <path d="M1 14v2c2.76 0 5 2.24 5 5h2c0-3.87-3.13-7-7-7z" />
+                <path d="M1 10v2c4.97 0 9 4.03 9 9h2c0-6.08-4.93-11-11-11z" />
+                <path d="M21 3H3c-1.1 0-2 .9-2 2v3h2V5h18v14h-7v2h7c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z" />
+              </svg>
+            </button>
+
             {/* Theater Mode - now visible on all screens */}
             <button
               onClick={toggleTheaterMode}
@@ -2833,6 +3015,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
           <X className="w-5 h-5" />
         </button>
       )}
+    </div>
     </div>
   );
 }

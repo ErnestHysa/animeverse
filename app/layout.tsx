@@ -76,6 +76,11 @@ export default function RootLayout({
           <ServiceWorkerRegister />
           <GlobalComponents />
         </ThemeProvider>
+        {/* Google Cast SDK — loads async, only activates on supported browsers */}
+        <script
+          src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"
+          async
+        />
         <script
           dangerouslySetInnerHTML={{
             __html: `

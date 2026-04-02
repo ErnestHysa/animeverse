@@ -44,7 +44,8 @@ import {
   type UserStats,
 } from "@/lib/stats";
 import { useStore } from "@/store";
-import { Clock, Flame, TrendingUp, BarChart3, Award } from "lucide-react";
+import { Clock, Flame, TrendingUp, BarChart3, Award, Keyboard } from "lucide-react";
+import { DEFAULT_SHORTCUTS } from "@/lib/keyboard-shortcuts";
 
 export default function SettingsPage() {
   const { preferences, updatePreferences, resetPreferences } = usePreferences();
@@ -63,10 +64,17 @@ export default function SettingsPage() {
     migrateAniListData,
   } = useAniListAuth();
 
+  // MAL auth state
+  const malToken = useStore((s) => s.malToken);
+  const malUser = useStore((s) => s.malUser);
+  const setMALAuth = useStore((s) => s.setMALAuth);
+  const clearMALAuth = useStore((s) => s.clearMALAuth);
+  const [isSyncingMAL, setIsSyncingMAL] = useState(false);
+
   // AniList auth state
   const [showTokenInput, setShowTokenInput] = useState(false);
   const [accessToken, setAccessToken] = useState('');
-  const [clientId] = useState(process.env.NEXT_PUBLIC_ANILIST_CLIENT_ID || "37660");
+  const [clientId] = useState(process.env.NEXT_PUBLIC_ANILIST_CLIENT_ID ?? "");
   const [isSyncing, setIsSyncing] = useState(false);
   const [anilistFilter, setAnilistFilter] = useState<'all' | 'watching' | 'completed' | 'planning' | 'paused' | 'dropped'>('all');
 
@@ -239,21 +247,14 @@ export default function SettingsPage() {
         // Flatten the lists to get all entries
         const allEntries = lists.flatMap((list: { entries: unknown[] }) => list.entries || []);
 
-        // First sync the AniList data
+        // First sync the AniList data (synchronous Zustand set)
         syncAniListData(allEntries);
 
-        // Then migrate data to app structures (watch history, media cache, stats)
-        // Use setTimeout to allow state to update first
-        setTimeout(() => {
-          // Get the updated state from the store
-          const currentState = useStore.getState().anilistMediaList;
-          migrateAniListData(currentState);
-
-          // Recalculate stats display
-          calculateAndSetStats();
-
-          toast.success(`Synced ${allEntries.length} anime from AniList! Data migrated successfully.`);
-        }, 100);
+        // Zustand set() is synchronous — read the updated state immediately
+        const currentState = useStore.getState().anilistMediaList;
+        migrateAniListData(currentState);
+        calculateAndSetStats();
+        toast.success(`Synced ${allEntries.length} anime from AniList! Data migrated successfully.`);
       } else {
         const errorText = await response.text();
         console.error("AniList API error:", errorText);
@@ -344,15 +345,37 @@ export default function SettingsPage() {
       toast.error(`Authentication failed: ${errorDetails}`, { duration: 8000 });
       window.history.replaceState({}, "", "/settings");
     }
-  }, [isAuthenticated, anilistUser, anilistToken, setAniListAuth, fetchAniListData]);
+
+    // Handle MAL OAuth callback
+    const malAuthStatus = params.get("mal_auth");
+    if (malAuthStatus === "success") {
+      try {
+        const hashData = JSON.parse(decodeURIComponent(window.location.hash.slice(1)));
+        if (hashData.token && hashData.user) {
+          setMALAuth(hashData.user, hashData.token, hashData.refresh_token ?? "", hashData.expires_at ?? 0);
+          toast.success(`MAL connected: ${hashData.user.name}!`);
+        }
+      } catch {
+        // ignore hash parse error
+      }
+      window.history.replaceState({}, "", "/settings");
+    } else if (malAuthStatus === "error") {
+      const message = params.get("message");
+      toast.error(`MAL connection failed: ${message || "unknown error"}`);
+      window.history.replaceState({}, "", "/settings");
+    }
+  }, [isAuthenticated, anilistUser, anilistToken, setAniListAuth, fetchAniListData, setMALAuth]);
 
   // Login with AniList using Authorization Code Grant
   // This is the proper OAuth 2.0 flow with client_secret
   const handleAniListLogin = () => {
+    if (!clientId) {
+      toast.error("AniList OAuth is not configured. Set NEXT_PUBLIC_ANILIST_CLIENT_ID in your environment.", { duration: 8000 });
+      return;
+    }
     const redirectUri = `${window.location.origin}/auth/anilist/callback`;
     const authUrl = `https://anilist.co/api/v2/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
 
-    // Show toast with expected redirect URI for verification
     toast(`Redirecting to AniList...\n\nMake sure your AniList app has this redirect URL:\n${redirectUri}`, {
       duration: 5000,
       icon: '🔗',
@@ -423,6 +446,49 @@ export default function SettingsPage() {
   const handleAniListLogout = () => {
     clearAniListAuth();
     toast.success("Logged out from AniList");
+  };
+
+  // Connect to MAL
+  const handleMALLogin = () => {
+    window.location.href = "/auth/mal";
+  };
+
+  // Disconnect from MAL
+  const handleMALLogout = () => {
+    clearMALAuth();
+    toast.success("Disconnected from MyAnimeList");
+  };
+
+  // Sync watch history to MAL
+  const handleSyncToMAL = async () => {
+    if (!malToken) return;
+    setIsSyncingMAL(true);
+    try {
+      const { updateMALEntry, anilistStatusToMAL } = await import("@/lib/mal-api");
+      // Sync from AniList media list (which has MAL IDs)
+      const entries = useStore.getState().anilistMediaList.filter((e) => e.media?.idMal);
+      let synced = 0;
+      for (const entry of entries) {
+        if (!entry.media?.idMal) continue;
+        try {
+          await updateMALEntry(
+            malToken,
+            entry.media.idMal,
+            anilistStatusToMAL(entry.status),
+            entry.progress,
+            entry.score
+          );
+          synced++;
+        } catch {
+          // skip individual failures
+        }
+      }
+      toast.success(`Synced ${synced} entries to MAL`);
+    } catch (err) {
+      toast.error("MAL sync failed");
+    } finally {
+      setIsSyncingMAL(false);
+    }
   };
 
   return (
@@ -576,16 +642,16 @@ export default function SettingsPage() {
                     </p>
                   </div>
                   <button
-                    onClick={() => handleSavePreference("hideAdultContent", !("hideAdultContent" in preferences && (preferences as unknown as Record<string, unknown>).hideAdultContent as boolean))}
+                    onClick={() => handleSavePreference("hideAdultContent", !preferences.hideAdultContent)}
                     className={cn(
                       "w-12 h-6 rounded-full transition-colors relative",
-                      "hideAdultContent" in preferences && (preferences as unknown as Record<string, unknown>).hideAdultContent ? "bg-primary" : "bg-white/10"
+                      preferences.hideAdultContent ? "bg-primary" : "bg-white/10"
                     )}
                   >
                     <div
                       className={cn(
                         "absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform",
-                        "hideAdultContent" in preferences && (preferences as unknown as Record<string, unknown>).hideAdultContent ? "translate-x-6" : ""
+                        preferences.hideAdultContent ? "translate-x-6" : ""
                       )}
                     />
                   </button>
@@ -600,16 +666,16 @@ export default function SettingsPage() {
                     </p>
                   </div>
                   <button
-                    onClick={() => handleSavePreference("showFillerEpisodes", !("showFillerEpisodes" in preferences ? false : (preferences as unknown as Record<string, unknown>).showFillerEpisodes as boolean))}
+                    onClick={() => handleSavePreference("showFillerEpisodes", !preferences.showFillerEpisodes)}
                     className={cn(
                       "w-12 h-6 rounded-full transition-colors relative",
-                      !("showFillerEpisodes" in preferences) || (preferences as unknown as Record<string, unknown>).showFillerEpisodes ? "bg-primary" : "bg-white/10"
+                      preferences.showFillerEpisodes ? "bg-primary" : "bg-white/10"
                     )}
                   >
                     <div
                       className={cn(
                         "absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform",
-                        !("showFillerEpisodes" in preferences) || (preferences as unknown as Record<string, unknown>).showFillerEpisodes ? "translate-x-6" : ""
+                        preferences.showFillerEpisodes ? "translate-x-6" : ""
                       )}
                     />
                   </button>
@@ -620,24 +686,34 @@ export default function SettingsPage() {
                   <div className="mb-3">
                     <p className="font-medium">Streaming Method</p>
                     <p className="text-sm text-muted-foreground">
-                      Direct streaming is the supported playback mode for this release.
+                      Choose how video sources are loaded. Direct streaming is the default.
                     </p>
                   </div>
                   <div className="flex gap-2">
                     {[
-                      { value: "direct", label: "Direct Streaming" },
+                      { value: "direct", label: "Direct", available: true },
+                      { value: "hybrid", label: "Hybrid", available: false },
+                      { value: "webtorrent", label: "WebTorrent", available: false },
                     ].map((method) => (
                       <button
                         key={method.value}
-                        onClick={() => handleSavePreference("streamingMethod", method.value)}
+                        onClick={() => method.available && handleSavePreference("streamingMethod", method.value)}
+                        disabled={!method.available}
+                        title={method.available ? undefined : "Coming soon"}
                         className={cn(
                           "flex-1 px-4 py-2 rounded-lg border transition-colors text-sm",
-                          preferences.streamingMethod === method.value
+                          !method.available && "opacity-40 cursor-not-allowed",
+                          method.available && preferences.streamingMethod === method.value
                             ? "bg-primary border-primary"
-                            : "bg-white/5 border-white/10 hover:bg-white/10"
+                            : method.available
+                            ? "bg-white/5 border-white/10 hover:bg-white/10"
+                            : "bg-white/5 border-white/10"
                         )}
                       >
                         {method.label}
+                        {!method.available && (
+                          <span className="block text-[10px] text-muted-foreground mt-0.5">soon</span>
+                        )}
                       </button>
                     ))}
                   </div>
@@ -965,6 +1041,83 @@ export default function SettingsPage() {
               )}
             </GlassCard>
 
+            {/* MyAnimeList Integration */}
+            <GlassCard>
+              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                <LinkIcon className="w-5 h-5 text-blue-400" />
+                MyAnimeList Integration
+              </h2>
+
+              {malToken && malUser ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-4 p-4 bg-white/5 rounded-lg">
+                    {malUser.picture && (
+                      <img
+                        src={malUser.picture}
+                        alt={malUser.name}
+                        className="w-12 h-12 rounded-full object-cover"
+                      />
+                    )}
+                    <div className="flex-1">
+                      <p className="font-medium">{malUser.name}</p>
+                      <p className="text-sm text-muted-foreground">Connected to MyAnimeList</p>
+                    </div>
+                    <button
+                      onClick={handleMALLogout}
+                      className="px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg flex items-center gap-2 transition-colors text-sm"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Disconnect
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={handleSyncToMAL}
+                      disabled={isSyncingMAL}
+                      className="px-4 py-3 bg-blue-500/10 hover:bg-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg flex items-center justify-center gap-2 transition-colors text-sm text-blue-400"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${isSyncingMAL ? "animate-spin" : ""}`} />
+                      {isSyncingMAL ? "Syncing..." : "Push to MAL"}
+                    </button>
+                    <button
+                      onClick={handleMALLogout}
+                      className="px-4 py-3 bg-white/5 hover:bg-white/10 rounded-lg flex items-center justify-center gap-2 transition-colors text-sm"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Disconnect
+                    </button>
+                  </div>
+
+                  <p className="text-xs text-muted-foreground">
+                    Push your AniList watch progress to MAL with one click. Progress syncs bidirectionally as you watch.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="p-4 bg-white/5 rounded-lg text-center">
+                    <User className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+                    <p className="font-medium mb-1">Connect to MyAnimeList</p>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Keep your MAL list in sync automatically as you watch
+                    </p>
+                    <button
+                      onClick={handleMALLogin}
+                      className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                    >
+                      <LogIn className="w-4 h-4" />
+                      Login with MyAnimeList
+                    </button>
+                    <p className="text-xs text-muted-foreground mt-3">
+                      Requires{" "}
+                      <code className="text-xs bg-white/10 px-1 py-0.5 rounded">NEXT_PUBLIC_MAL_CLIENT_ID</code>{" "}
+                      to be configured
+                    </p>
+                  </div>
+                </div>
+              )}
+            </GlassCard>
+
             {/* Notifications */}
             <GlassCard>
               <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
@@ -1157,6 +1310,53 @@ export default function SettingsPage() {
                   </div>
                 </div>
               )}
+            </GlassCard>
+
+            {/* Keyboard Shortcuts Reference */}
+            <GlassCard className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <Keyboard className="w-5 h-5 text-primary" />
+                <h2 className="text-lg font-semibold">Keyboard Shortcuts</h2>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4">
+                Use these shortcuts anywhere in the app. Press <kbd className="px-1.5 py-0.5 bg-white/10 rounded text-xs font-mono">?</kbd> to show this panel.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {Object.values(DEFAULT_SHORTCUTS).map((shortcut) => (
+                  <div key={shortcut.key} className="flex items-center justify-between px-3 py-2 bg-white/5 rounded-lg">
+                    <span className="text-sm">{shortcut.description}</span>
+                    <kbd className="px-2 py-0.5 bg-white/10 border border-white/20 rounded text-xs font-mono ml-3 flex-shrink-0">
+                      {shortcut.key.toUpperCase()}
+                    </kbd>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between px-3 py-2 bg-white/5 rounded-lg">
+                  <span className="text-sm">Play / Pause</span>
+                  <kbd className="px-2 py-0.5 bg-white/10 border border-white/20 rounded text-xs font-mono ml-3 flex-shrink-0">Space</kbd>
+                </div>
+                <div className="flex items-center justify-between px-3 py-2 bg-white/5 rounded-lg">
+                  <span className="text-sm">Seek ±10 seconds</span>
+                  <div className="flex gap-1 ml-3 flex-shrink-0">
+                    <kbd className="px-2 py-0.5 bg-white/10 border border-white/20 rounded text-xs font-mono">←</kbd>
+                    <kbd className="px-2 py-0.5 bg-white/10 border border-white/20 rounded text-xs font-mono">→</kbd>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between px-3 py-2 bg-white/5 rounded-lg">
+                  <span className="text-sm">Volume</span>
+                  <div className="flex gap-1 ml-3 flex-shrink-0">
+                    <kbd className="px-2 py-0.5 bg-white/10 border border-white/20 rounded text-xs font-mono">↑</kbd>
+                    <kbd className="px-2 py-0.5 bg-white/10 border border-white/20 rounded text-xs font-mono">↓</kbd>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between px-3 py-2 bg-white/5 rounded-lg">
+                  <span className="text-sm">Fullscreen</span>
+                  <kbd className="px-2 py-0.5 bg-white/10 border border-white/20 rounded text-xs font-mono ml-3 flex-shrink-0">F</kbd>
+                </div>
+                <div className="flex items-center justify-between px-3 py-2 bg-white/5 rounded-lg">
+                  <span className="text-sm">Mute / Unmute</span>
+                  <kbd className="px-2 py-0.5 bg-white/10 border border-white/20 rounded text-xs font-mono ml-3 flex-shrink-0">M</kbd>
+                </div>
+              </div>
             </GlassCard>
 
             {/* Reset Button */}

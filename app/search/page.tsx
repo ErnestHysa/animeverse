@@ -8,6 +8,7 @@ import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { AnimeGrid } from "@/components/anime/anime-grid";
 import { AnimeFilters } from "@/components/search/anime-filters";
+import { RecentSearches } from "@/components/search/recent-searches";
 import { anilist } from "@/lib/anilist";
 import { Search } from "lucide-react";
 import { Suspense } from "react";
@@ -91,6 +92,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
               </p>
             </div>
           </div>
+
+          {/* Recent searches - only when no active query */}
+          <RecentSearches currentQuery={query} />
 
           {/* Filters - always shown */}
           <AnimeFilters

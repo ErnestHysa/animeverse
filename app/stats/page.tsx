@@ -24,6 +24,7 @@ import {
   Target,
   Zap,
 } from "lucide-react";
+import { ShareStatsCard } from "@/components/stats/share-stats-card";
 
 interface StatCardProps {
   icon: React.ReactNode;
@@ -209,9 +210,18 @@ export default function StatsPage() {
       <Header />
 
       <main className="flex-1 container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2">Viewing Statistics</h1>
-          <p className="text-muted-foreground">Track your anime watching journey</p>
+        <div className="mb-8 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-4xl font-bold mb-2">Viewing Statistics</h1>
+            <p className="text-muted-foreground">Track your anime watching journey</p>
+          </div>
+          <ShareStatsCard
+            totalEpisodes={stats.totalEpisodes}
+            totalHours={Math.floor(stats.totalWatchTime / 60)}
+            uniqueAnime={stats.uniqueAnimeCount}
+            topGenre={stats.sortedGenres[0]?.[0] ?? ""}
+            completionRate={stats.completionRate}
+          />
         </div>
 
         {/* Overview Stats */}

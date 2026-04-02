@@ -7,9 +7,17 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { Play, Clock, CheckCircle, Filter } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Play, Clock, CheckCircle, Filter, CornerDownRight } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { useStore } from "@/store";
+
+interface StreamingEpisodeData {
+  site: string;
+  title: string | null;
+  thumbnail: string | null;
+  url: string;
+}
 
 interface EpisodeListProps {
   animeId: number;
@@ -17,6 +25,7 @@ interface EpisodeListProps {
   totalEpisodes: number;
   currentEpisode: number;
   showFillers?: boolean;
+  streamingEpisodes?: StreamingEpisodeData[];
 }
 
 export function EpisodeList({
@@ -25,11 +34,14 @@ export function EpisodeList({
   totalEpisodes,
   currentEpisode,
   showFillers = true,
+  streamingEpisodes,
 }: EpisodeListProps) {
+  const router = useRouter();
   const watchHistory = useStore((state) => state.watchHistory);
   const preferences = useStore((state) => state.preferences);
   const [fillerEpisodes, setFillerEpisodes] = useState<Set<number>>(new Set());
   const [showOnlyUnwatched, setShowOnlyUnwatched] = useState(false);
+  const [jumpToEp, setJumpToEp] = useState("");
   const currentRef = useRef<HTMLAnchorElement>(null);
 
   // Load filler data
@@ -66,6 +78,33 @@ export function EpisodeList({
       });
     }
   }
+
+  // Build a map from episode number to title from streamingEpisodes data.
+  // AniList titles are formatted as "Episode N - Title" or just "Episode N".
+  const streamingEpisodeTitleMap = new Map<number, string>();
+  if (streamingEpisodes) {
+    for (const ep of streamingEpisodes) {
+      if (!ep.title) continue;
+      // Try to parse "Episode N - Title" pattern
+      const match = ep.title.match(/^Episode\s+(\d+)(?:\s+-\s+(.+))?$/i);
+      if (match) {
+        const epNum = parseInt(match[1], 10);
+        const subtitle = match[2]?.trim();
+        if (!Number.isNaN(epNum) && subtitle) {
+          streamingEpisodeTitleMap.set(epNum, subtitle);
+        }
+      }
+    }
+  }
+
+  const handleJumpTo = (e: React.FormEvent) => {
+    e.preventDefault();
+    const epNum = parseInt(jumpToEp, 10);
+    if (!isNaN(epNum) && epNum >= 1 && epNum <= totalEpisodes) {
+      router.push(`/watch/${animeId}/${epNum}`);
+      setJumpToEp("");
+    }
+  };
 
   const episodes = Array.from({ length: totalEpisodes }, (_, i) => i + 1);
   const filteredEpisodes = showOnlyUnwatched
@@ -111,6 +150,28 @@ export function EpisodeList({
             />
           </div>
         </div>
+      )}
+
+      {/* Jump to episode */}
+      {totalEpisodes > 10 && (
+        <form onSubmit={handleJumpTo} className="flex gap-1.5 mb-3">
+          <input
+            type="number"
+            min={1}
+            max={totalEpisodes}
+            value={jumpToEp}
+            onChange={(e) => setJumpToEp(e.target.value)}
+            placeholder={`Ep 1–${totalEpisodes}`}
+            className="flex-1 px-2.5 py-1.5 bg-white/5 border border-white/10 rounded-lg text-sm focus:outline-none focus:border-primary"
+          />
+          <button
+            type="submit"
+            className="px-2.5 py-1.5 bg-primary/20 hover:bg-primary/30 text-primary rounded-lg text-sm transition-colors"
+            title="Jump to episode"
+          >
+            <CornerDownRight className="w-4 h-4" />
+          </button>
+        </form>
       )}
 
       <div className="space-y-1 max-h-[60vh] overflow-y-auto pr-1 scrollbar-thin">
@@ -164,7 +225,14 @@ export function EpisodeList({
               {/* Episode info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <p className="text-sm font-medium truncate">Episode {epNum}</p>
+                  <p className="text-sm font-medium truncate">
+                    Episode {epNum}
+                    {streamingEpisodeTitleMap.has(epNum) && (
+                      <span className="text-muted-foreground font-normal">
+                        {" "}&ndash;{" "}{streamingEpisodeTitleMap.get(epNum)}
+                      </span>
+                    )}
+                  </p>
                   {isFiller && (
                     <span className="text-xs px-1.5 py-0.5 bg-orange-500/20 text-orange-400 rounded flex-shrink-0">
                       Filler

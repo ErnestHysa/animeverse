@@ -25,26 +25,25 @@ export interface AnimeCardProps {
   hasDub?: boolean;
 }
 
-// Custom hook to get simulcast status without impure render
-function useSimulcastStatus(airingAt: number | null | undefined): boolean {
-  const [isSimulcast, setIsSimulcast] = useState(false);
-
-  useEffect(() => {
-    if (!airingAt) return;
-
-    const checkSimulcast = () => {
-      const now = Date.now();
-      const airingTime = airingAt * 1000;
-      setIsSimulcast(airingTime - now < 24 * 60 * 60 * 1000 && airingTime > now);
-    };
-
-    checkSimulcast();
-    const interval = setInterval(checkSimulcast, 60000); // Update every minute
-
-    return () => clearInterval(interval);
-  }, [airingAt]);
-
-  return isSimulcast;
+// Simulcast = currently releasing in the current or most-recent seasonal window
+function isSimulcastAnime(anime: Media): boolean {
+  if (anime.status !== "RELEASING") return false;
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1; // 1-12
+  const currentSeason =
+    month >= 1 && month <= 3 ? "WINTER" :
+    month >= 4 && month <= 6 ? "SPRING" :
+    month >= 7 && month <= 9 ? "SUMMER" : "FALL";
+  const prevYear = month <= 3 ? year - 1 : year;
+  const prevSeason =
+    currentSeason === "WINTER" ? "FALL" :
+    currentSeason === "SPRING" ? "WINTER" :
+    currentSeason === "SUMMER" ? "SPRING" : "SUMMER";
+  return (
+    (anime.seasonYear === year && anime.season === currentSeason) ||
+    (anime.seasonYear === prevYear && anime.season === prevSeason)
+  );
 }
 
 export const AnimeCard = memo(function AnimeCard({
@@ -66,8 +65,8 @@ export const AnimeCard = memo(function AnimeCard({
   const [showHoverPanel, setShowHoverPanel] = useState(false);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
-  // Check if simulcast (airs within 24 hours of Japan broadcast)
-  const isSimulcast = useSimulcastStatus(anime.nextAiringEpisode?.airingAt);
+  // Simulcast = currently airing this season or last season
+  const isSimulcast = isSimulcastAnime(anime);
 
   const handleMouseEnter = () => {
     hoverTimeoutRef.current = setTimeout(() => setShowHoverPanel(true), 500);
