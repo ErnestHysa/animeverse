@@ -74,7 +74,7 @@ export default function SettingsPage() {
   // AniList auth state
   const [showTokenInput, setShowTokenInput] = useState(false);
   const [accessToken, setAccessToken] = useState('');
-  const [clientId] = useState(process.env.NEXT_PUBLIC_ANILIST_CLIENT_ID || "37660");
+  const [clientId] = useState(process.env.NEXT_PUBLIC_ANILIST_CLIENT_ID ?? "");
   const [isSyncing, setIsSyncing] = useState(false);
   const [anilistFilter, setAnilistFilter] = useState<'all' | 'watching' | 'completed' | 'planning' | 'paused' | 'dropped'>('all');
 
@@ -369,10 +369,13 @@ export default function SettingsPage() {
   // Login with AniList using Authorization Code Grant
   // This is the proper OAuth 2.0 flow with client_secret
   const handleAniListLogin = () => {
+    if (!clientId) {
+      toast.error("AniList OAuth is not configured. Set NEXT_PUBLIC_ANILIST_CLIENT_ID in your environment.", { duration: 8000 });
+      return;
+    }
     const redirectUri = `${window.location.origin}/auth/anilist/callback`;
     const authUrl = `https://anilist.co/api/v2/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
 
-    // Show toast with expected redirect URI for verification
     toast(`Redirecting to AniList...\n\nMake sure your AniList app has this redirect URL:\n${redirectUri}`, {
       duration: 5000,
       icon: '🔗',
@@ -639,16 +642,16 @@ export default function SettingsPage() {
                     </p>
                   </div>
                   <button
-                    onClick={() => handleSavePreference("hideAdultContent", !("hideAdultContent" in preferences && (preferences as unknown as Record<string, unknown>).hideAdultContent as boolean))}
+                    onClick={() => handleSavePreference("hideAdultContent", !preferences.hideAdultContent)}
                     className={cn(
                       "w-12 h-6 rounded-full transition-colors relative",
-                      "hideAdultContent" in preferences && (preferences as unknown as Record<string, unknown>).hideAdultContent ? "bg-primary" : "bg-white/10"
+                      preferences.hideAdultContent ? "bg-primary" : "bg-white/10"
                     )}
                   >
                     <div
                       className={cn(
                         "absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform",
-                        "hideAdultContent" in preferences && (preferences as unknown as Record<string, unknown>).hideAdultContent ? "translate-x-6" : ""
+                        preferences.hideAdultContent ? "translate-x-6" : ""
                       )}
                     />
                   </button>
@@ -663,16 +666,16 @@ export default function SettingsPage() {
                     </p>
                   </div>
                   <button
-                    onClick={() => handleSavePreference("showFillerEpisodes", !("showFillerEpisodes" in preferences ? false : (preferences as unknown as Record<string, unknown>).showFillerEpisodes as boolean))}
+                    onClick={() => handleSavePreference("showFillerEpisodes", !preferences.showFillerEpisodes)}
                     className={cn(
                       "w-12 h-6 rounded-full transition-colors relative",
-                      !("showFillerEpisodes" in preferences) || (preferences as unknown as Record<string, unknown>).showFillerEpisodes ? "bg-primary" : "bg-white/10"
+                      preferences.showFillerEpisodes ? "bg-primary" : "bg-white/10"
                     )}
                   >
                     <div
                       className={cn(
                         "absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform",
-                        !("showFillerEpisodes" in preferences) || (preferences as unknown as Record<string, unknown>).showFillerEpisodes ? "translate-x-6" : ""
+                        preferences.showFillerEpisodes ? "translate-x-6" : ""
                       )}
                     />
                   </button>
@@ -683,24 +686,34 @@ export default function SettingsPage() {
                   <div className="mb-3">
                     <p className="font-medium">Streaming Method</p>
                     <p className="text-sm text-muted-foreground">
-                      Direct streaming is the supported playback mode for this release.
+                      Choose how video sources are loaded. Direct streaming is the default.
                     </p>
                   </div>
                   <div className="flex gap-2">
                     {[
-                      { value: "direct", label: "Direct Streaming" },
+                      { value: "direct", label: "Direct", available: true },
+                      { value: "hybrid", label: "Hybrid", available: false },
+                      { value: "webtorrent", label: "WebTorrent", available: false },
                     ].map((method) => (
                       <button
                         key={method.value}
-                        onClick={() => handleSavePreference("streamingMethod", method.value)}
+                        onClick={() => method.available && handleSavePreference("streamingMethod", method.value)}
+                        disabled={!method.available}
+                        title={method.available ? undefined : "Coming soon"}
                         className={cn(
                           "flex-1 px-4 py-2 rounded-lg border transition-colors text-sm",
-                          preferences.streamingMethod === method.value
+                          !method.available && "opacity-40 cursor-not-allowed",
+                          method.available && preferences.streamingMethod === method.value
                             ? "bg-primary border-primary"
-                            : "bg-white/5 border-white/10 hover:bg-white/10"
+                            : method.available
+                            ? "bg-white/5 border-white/10 hover:bg-white/10"
+                            : "bg-white/5 border-white/10"
                         )}
                       >
                         {method.label}
+                        {!method.available && (
+                          <span className="block text-[10px] text-muted-foreground mt-0.5">soon</span>
+                        )}
                       </button>
                     ))}
                   </div>
