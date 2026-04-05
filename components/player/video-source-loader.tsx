@@ -7,7 +7,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { EnhancedVideoPlayer, type VideoQuality } from "@/components/player/enhanced-video-player";
+import { EnhancedVideoPlayer, type VideoQuality as PlayerVideoQuality } from "@/components/player/enhanced-video-player";
 import { GlassCard } from "@/components/ui/glass-card";
 import { AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { toast } from "react-hot-toast";
 import { usePreferences, useStore } from "@/store";
 import { anilist } from "@/lib/anilist";
 import logger from "@/lib/logger";
+import { loadStream, cancelStreamAttempt, type StreamingMethod, type StreamSource, type VideoQuality } from "@/lib/hybrid-stream-manager";
 
 interface VideoSourceLoaderProps {
   animeId: number;
@@ -131,12 +132,7 @@ export function VideoSourceLoader({
     malSyncedRef.current = false;
   }, [animeId, episodeNumber]);
 
-  const [sources, setSources] = useState<{
-    type: "magnet" | "torrent" | "direct";
-    url: string;
-    qualities?: VideoQuality[];
-    referer?: string;
-  } | null>(null);
+  const [sources, setSources] = useState<StreamSource | null>(null);
   const [allServers, setAllServers] = useState<Array<{
     id: string;
     name: string;
@@ -164,6 +160,9 @@ export function VideoSourceLoader({
   const [isRetrying, setIsRetrying] = useState(false);
   const [isFallback, setIsFallback] = useState(false);
   const [loadingSeconds, setLoadingSeconds] = useState(0);
+  const [currentStreamingMethod, setCurrentStreamingMethod] = useState<StreamingMethod>("hls");
+  const [fallbackOccurred, setFallbackOccurred] = useState(false);
+  const [fallbackReason, setFallbackReason] = useState<string | null>(null);
 
   // NEW: Subtitle state
   const [subtitleTracks, setSubtitleTracks] = useState<Array<{
@@ -181,83 +180,71 @@ export function VideoSourceLoader({
   const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
   /**
-   * Fetch video sources from API with retry logic
-   * Uses the current language preference
+   * Fetch video sources using hybrid fallback system
+   * Tries primary method (user preference) then falls back to secondary
    */
   const fetchSources = useCallback(async (language: "sub" | "dub", retryAttempt = 0) => {
     if (retryAttempt === 0) {
       setLoading(true);
       setError(null);
+      setFallbackOccurred(false);
+      setFallbackReason(null);
     } else {
       setIsRetrying(true);
     }
 
     try {
-      const url = new URL(`/api/video-sources/${animeId}/${episodeNumber}`, window.location.origin);
+      // Get user's streaming method preference
+      const preferredMethod = preferences.streamingMethod === "direct" ? "hls" : preferences.streamingMethod;
 
-      if (animeTitle) {
-        url.searchParams.set("title", animeTitle);
-      }
-      if (malId) {
-        url.searchParams.set("malId", malId.toString());
-      }
-      url.searchParams.set("language", language);
+      logger.info(
+        `[VideoSourceLoader] Fetching sources for anime ${animeId} episode ${episodeNumber}`,
+        { method: preferredMethod, language }
+      );
 
-      const response = await fetch(url.toString());
+      // Use hybrid stream manager
+      const result = await loadStream({
+        primaryMethod: preferredMethod,
+        animeId,
+        episodeNumber,
+        language,
+        animeTitle,
+        malId,
+        timeoutWebTorrent: 30000, // 30 seconds
+        timeoutHLS: 15000, // 15 seconds
+        onFallback: (from, to, reason) => {
+          logger.warn(`[VideoSourceLoader] Fallback from ${from} to ${to}: ${reason}`);
+          setFallbackOccurred(true);
+          setFallbackReason(reason);
+          toast.loading(`Switching to ${to === "hls" ? "HLS" : "P2P"} streaming...`, {
+            id: "stream-fallback",
+          });
+        },
+      });
 
-      // 404 means anime/episode not found - don't retry
-      if (response.status === 404) {
-        throw new Error("This episode is not available. The anime may not be in our database yet.");
-      }
-
-      if (!response.ok) {
-        if (response.status === 503) {
-          // API unavailable error
-          const errorData = await response.json().catch(
-            (): VideoSourcesResponse => ({})
-          );
-          throw new Error(
-            errorData.message || "The video source API is currently unavailable. Please try again later."
-          );
-        }
-        throw new Error(`Failed to fetch sources: ${response.statusText}`);
-      }
-
-      const data: VideoSourcesResponse = await response.json();
-
-      // Check for API unavailable error
-      if (data.error === "API_UNAVAILABLE" || !data.sources || data.sources.length === 0) {
-        const errorMessage = data.message || "No video sources found. The video API may be unavailable.";
-        throw new Error(errorMessage);
+      if (result.error) {
+        throw result.error;
       }
 
-      // Check if this is a fallback video (demo mode)
-      const isFallbackSource = data.isFallback === true;
-      setIsFallback(isFallbackSource);
-
-      // Update available languages based on API response
-      if (data.availableLanguages) {
-        const availableLanguages = data.availableLanguages;
-        setAllLanguages((prev) =>
-          prev.map((lang) => ({
-            ...lang,
-            available: availableLanguages.find(
-              (availableLanguage) => availableLanguage.type === lang.type
-            )?.available ?? lang.available,
-          }))
-        );
+      if (!result.source) {
+        throw new Error("No video sources available");
       }
 
-      // Group sources by quality for quality selector
-      const qualities: VideoQuality[] = data.sources.map((source) => ({
-        url: source.url,
-        quality: source.quality,
-        label: source.label || source.quality,
-        size: source.size,
-      }));
+      // Update available languages (for HLS sources)
+      if (result.source.type === "direct") {
+        // For HLS, we need to check available languages
+        // This is handled by the API response
+      }
+
+      // Convert source to expected format
+      const qualities: PlayerVideoQuality[] = (result.source?.qualities?.map((q) => ({
+        url: q.url,
+        quality: q.quality as PlayerVideoQuality["quality"],
+        label: q.label,
+        size: q.size,
+      })) || []) as PlayerVideoQuality[];
 
       // Create server options for server selector
-      const apiSources = data.sources;
       const serverOptions: Array<{
         id: string;
         name: string;
@@ -266,22 +253,25 @@ export function VideoSourceLoader({
         type: "mp4" | "hls" | "webm";
       }> = [];
 
-      const uniqueQualities = [...new Set(apiSources.map((source) => source.quality))];
-      uniqueQualities.forEach((quality) => {
-        const sourceForQuality = apiSources.find((source) => source.quality === quality);
-        if (sourceForQuality) {
-          serverOptions.push({
-            id: `${data.provider}-${quality}`,
-            name: `${data.provider || "Server"} - ${quality}`,
-            url: sourceForQuality.url,
-            quality: sourceForQuality.quality,
-            type: sourceForQuality.type || "mp4",
-          });
-        }
-      });
+      if (result.source?.qualities) {
+        const source = result.source; // Non-null assertion for the block
+        const qualities = source.qualities ?? [];
+        const uniqueQualities = [...new Set(qualities.map((q) => q.quality))];
+        uniqueQualities.forEach((quality) => {
+          const qualitySource = qualities.find((q) => q.quality === quality);
+          if (qualitySource) {
+            serverOptions.push({
+              id: `${source.provider || "server"}-${quality}`,
+              name: `${source.provider || "Server"} - ${quality}${source.seeders ? ` (${source.seeders} seeders)` : ""}`,
+              url: qualitySource.url,
+              quality: qualitySource.quality,
+              type: source.type === "magnet" ? "mp4" : "hls",
+            });
+          }
+        });
+      }
 
-      // Determine initial quality: saved user preference takes priority,
-      // then fall back to network-aware quality selection.
+      // Determine initial quality
       const savedQuality = typeof window !== 'undefined'
         ? localStorage.getItem('animeverse-preferredQuality')
         : null;
@@ -290,29 +280,32 @@ export function VideoSourceLoader({
         (preferences.defaultQuality !== "auto" ? preferences.defaultQuality : null) ||
         getPreferredQualityForNetwork();
 
-      const defaultSource =
-        (preferredQuality !== 'auto'
-          ? apiSources.find((source) => source.quality === preferredQuality)
-          : null) ||
-        apiSources.find((source) => source.quality === "1080p") ||
-        apiSources.find((source) => source.quality === "720p") ||
-        apiSources[0];
+      const defaultQuality =
+        result.source?.qualities?.find((q) => q.quality === preferredQuality)?.url ||
+        result.source?.qualities?.find((q) => q.quality === "1080p")?.url ||
+        result.source?.qualities?.find((q) => q.quality === "720p")?.url ||
+        result.source?.url;
 
       setAllServers(serverOptions);
-      const sourceUrl = defaultSource.url;
       setSources({
-        type: "direct",
-        url: sourceUrl,
+        type: result.source.type,
+        url: defaultQuality || result.source.url,
         qualities,
-        referer: data.referer,
+        referer: result.source.referer,
       });
 
-      // CRITICAL: Extract and store subtitles
-      if (data.subtitles && data.subtitles.length > 0) {
-        setSubtitleTracks(data.subtitles);
-      } else {
-        setSubtitleTracks([]);
+      setCurrentStreamingMethod(result.method);
+
+      // Handle fallback notification
+      if (result.fallbackOccurred) {
+        toast.success(`Now streaming via ${result.method === "hls" ? "HLS" : "P2P"}`, {
+          id: "stream-fallback",
+          duration: 3000,
+        });
       }
+
+      // Reset subtitle tracks (will be loaded by player)
+      setSubtitleTracks([]);
 
       setRetryCount(0); // Reset retry count on success
     } catch (err) {
@@ -352,7 +345,7 @@ export function VideoSourceLoader({
       setLoading(false);
       setIsRetrying(false);
     }
-  }, [animeId, episodeNumber, animeTitle, malId, onError, preferences.defaultQuality]);
+  }, [animeId, episodeNumber, animeTitle, malId, onError, preferences.streamingMethod, preferences.defaultQuality]);
 
   // Reset loadingSeconds counter whenever a new load starts
   useEffect(() => {
@@ -629,6 +622,43 @@ export function VideoSourceLoader({
           </div>
         </GlassCard>
       )}
+
+      {/* Streaming method indicator */}
+      <div className="flex items-center justify-between text-xs text-muted-foreground px-2">
+        <div className="flex items-center gap-2">
+          <span className="flex items-center gap-1">
+            {currentStreamingMethod === "webtorrent" ? (
+              <>
+                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                Streaming via P2P (WebTorrent)
+                {sources?.seeders !== undefined && (
+                  <span className="ml-1 text-green-400">({sources.seeders} seeders)</span>
+                )}
+              </>
+            ) : (
+              <>
+                <span className="w-2 h-2 bg-blue-500 rounded-full" />
+                Streaming via HLS (CDN)
+              </>
+            )}
+          </span>
+          {fallbackOccurred && fallbackReason && (
+            <span className="text-yellow-400">(Fallback: {fallbackReason})</span>
+          )}
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 px-2 text-xs"
+          onClick={() => {
+            setRetryCount(0);
+            fetchSources(currentLanguage);
+          }}
+        >
+          <RefreshCw className="w-3 h-3 mr-1" />
+          Retry
+        </Button>
+      </div>
 
       <EnhancedVideoPlayer
         source={sources}

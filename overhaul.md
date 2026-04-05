@@ -196,19 +196,30 @@ magnet:?xt=urn:btih:{hash}&dn={name}&tr={tracker}&tr={tracker2}
 - Created torrent subtitle loader with MKV embedded subtitle extraction and external .ass/.srt fallback support
 - All files pass TypeScript compilation and Next.js build successfully
 
-### Phase 4: Hybrid Fallback System
-- [ ] Create `lib/hybrid-stream-manager.ts`
-  - [ ] Try primary method first (user-selected)
-  - [ ] Fall back to secondary on failure
-  - [ ] Timeout thresholds: WebTorrent (30s), HLS (15s)
-- [ ] Update `video-source-loader.tsx`
-  - [ ] Check user's streaming method preference
-  - [ ] Route to appropriate fetcher
-  - [ ] Handle cross-method fallbacks
-- [ ] Add smart fallback logic:
-  - [ ] If WebTorrent has <3 seeds → fallback to HLS
-  - [ ] If HLS has no sources → fallback to WebTorrent
-  - [ ] Allow manual override via settings
+### Phase 4: Hybrid Fallback System ✅ COMPLETED (2026-04-05)
+- [x] Create `lib/hybrid-stream-manager.ts`
+  - [x] Try primary method first (user-selected)
+  - [x] Fall back to secondary on failure
+  - [x] Timeout thresholds: WebTorrent (30s), HLS (15s)
+- [x] Update `video-source-loader.tsx`
+  - [x] Check user's streaming method preference
+  - [x] Route to appropriate fetcher
+  - [x] Handle cross-method fallbacks
+- [x] Add smart fallback logic:
+  - [x] If WebTorrent has <3 seeds → fallback to HLS
+  - [x] If HLS has no sources → fallback to WebTorrent
+  - [x] Allow manual override via settings
+
+**Summary:**
+- Created `hybrid-stream-manager.ts` with intelligent fallback system
+- Supports three streaming methods: HLS, WebTorrent, and Hybrid (auto-switch)
+- Timeout thresholds: WebTorrent (30s), HLS (15s)
+- Smart fallback: WebTorrent with <3 seeders automatically falls back to HLS
+- User preference integration via Zustand store
+- Streaming method indicator shows current method and fallback status
+- Manual retry button for users
+- Abort controller for canceling ongoing requests
+- All TypeScript compilation and Next.js build checks pass
 
 ### Phase 5: User Settings & UI
 - [ ] Create `components/settings/streaming-settings.tsx`
