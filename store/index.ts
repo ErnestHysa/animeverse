@@ -92,6 +92,7 @@ export interface UserPreferences {
   showFillerEpisodes: boolean; // Filler episode visibility
   subtitleStyle: SubtitleStyle;
   subtitleLanguage: string; // Default subtitle language code
+  preferDubs: boolean; // Prefer dubbed versions for P2P streaming
 }
 
 export interface StoreState {
@@ -157,10 +158,10 @@ export interface StoreState {
   updateAchievementProgress: (achievementId: string, progress: number) => void;
   checkAndUnlockAchievements: () => void;
 
-  // Per-anime language & server preferences
-  perAnimePrefs: Record<number, { language?: "sub" | "dub"; server?: string }>;
-  setPerAnimePref: (animeId: number, pref: { language?: "sub" | "dub"; server?: string }) => void;
-  getPerAnimePref: (animeId: number) => { language?: "sub" | "dub"; server?: string } | undefined;
+  // Per-anime language, server, and streaming method preferences
+  perAnimePrefs: Record<number, { language?: "sub" | "dub"; server?: string; streamingMethod?: "webtorrent" | "direct" | "hybrid" }>;
+  setPerAnimePref: (animeId: number, pref: { language?: "sub" | "dub"; server?: string; streamingMethod?: "webtorrent" | "direct" | "hybrid" }) => void;
+  getPerAnimePref: (animeId: number) => { language?: "sub" | "dub"; server?: string; streamingMethod?: "webtorrent" | "direct" | "hybrid" } | undefined;
 
   // Mini player state (persists while browsing)
   miniPlayer: {
@@ -823,7 +824,7 @@ export const useStore = create<StoreState>()(
     }),
     {
       name: "animeverse-stream-storage",
-      version: 2,
+      version: 3,
       storage: createJSONStorage(() => ({
         getItem: (name) => {
           try {
@@ -869,8 +870,8 @@ export const useStore = create<StoreState>()(
               fontColor: "#FFFFFF",
               backgroundColor: "#000000",
               backgroundOpacity: 50,
-              position: "bottom",
-              edgeStyle: "drop-shadow",
+              position: "bottom" as const,
+              edgeStyle: "drop-shadow" as const,
               textShadow: true,
               windowColor: "#000000",
               windowOpacity: 0,
@@ -878,8 +879,18 @@ export const useStore = create<StoreState>()(
           }
         }
 
-        if (state.preferences && state.preferences.streamingMethod !== "direct") {
-          state.preferences.streamingMethod = "direct";
+        if (version < 2) {
+          // Ensure streamingMethod is set to direct for older versions
+          if (state.preferences && state.preferences.streamingMethod !== "direct") {
+            state.preferences.streamingMethod = "direct";
+          }
+        }
+
+        if (version < 3) {
+          // Add preferDubs for existing users
+          if (state.preferences && state.preferences.preferDubs === undefined) {
+            state.preferences.preferDubs = false;
+          }
         }
 
         return state;

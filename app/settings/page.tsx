@@ -36,6 +36,7 @@ import { toast } from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import { NotificationSettings } from "@/components/notifications/notification-settings";
 import { SubtitleSettings } from "@/components/settings/subtitle-settings";
+import { StreamingSettings } from "@/components/settings/streaming-settings";
 import {
   calculateStats,
   formatWatchTime,
@@ -686,20 +687,19 @@ export default function SettingsPage() {
                   <div className="mb-3">
                     <p className="font-medium">Streaming Method</p>
                     <p className="text-sm text-muted-foreground">
-                      Choose how video sources are loaded. Direct streaming is the default.
+                      Choose how video sources are loaded. See Streaming Settings below for more details.
                     </p>
                   </div>
                   <div className="flex gap-2">
                     {[
-                      { value: "direct", label: "Direct", available: true },
-                      { value: "hybrid", label: "Hybrid", available: false },
-                      { value: "webtorrent", label: "WebTorrent", available: false },
+                      { value: "direct", label: "HLS (Direct)", available: true },
+                      { value: "hybrid", label: "Hybrid", available: true },
+                      { value: "webtorrent", label: "P2P/Torrent", available: true },
                     ].map((method) => (
                       <button
                         key={method.value}
                         onClick={() => method.available && handleSavePreference("streamingMethod", method.value)}
                         disabled={!method.available}
-                        title={method.available ? undefined : "Coming soon"}
                         className={cn(
                           "flex-1 px-4 py-2 rounded-lg border transition-colors text-sm",
                           !method.available && "opacity-40 cursor-not-allowed",
@@ -711,9 +711,6 @@ export default function SettingsPage() {
                         )}
                       >
                         {method.label}
-                        {!method.available && (
-                          <span className="block text-[10px] text-muted-foreground mt-0.5">soon</span>
-                        )}
                       </button>
                     ))}
                   </div>
@@ -728,6 +725,15 @@ export default function SettingsPage() {
                 Subtitle Appearance
               </h2>
               <SubtitleSettings />
+            </GlassCard>
+
+            {/* Streaming Settings */}
+            <GlassCard>
+              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                <Settings className="w-5 h-5 text-primary" />
+                Streaming Method
+              </h2>
+              <StreamingSettings />
             </GlassCard>
 
             {/* Appearance */}

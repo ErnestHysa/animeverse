@@ -87,6 +87,7 @@ export function VideoSourceLoader({
   onEpisodeEnd,
 }: VideoSourceLoaderProps) {
   const { preferences } = usePreferences();
+  const getPerAnimePref = useStore((s) => s.getPerAnimePref);
 
   // AniList reverse-sync: push episode progress back to AniList when authenticated
   const anilistToken = useStore((s) => s.anilistToken);
@@ -97,6 +98,10 @@ export function VideoSourceLoader({
   // MAL reverse-sync
   const malToken = useStore((s) => s.malToken);
   const malSyncedRef = useRef(false);
+
+  // Get per-anime streaming preference (overrides global preference)
+  const perAnimePref = getPerAnimePref(animeId);
+  const effectiveStreamingMethod = perAnimePref?.streamingMethod || preferences.streamingMethod;
 
   const syncProgressToAniList = useCallback(async () => {
     if (!isAuthenticated || !anilistToken || anilistSyncedRef.current) return;
@@ -194,12 +199,12 @@ export function VideoSourceLoader({
     }
 
     try {
-      // Get user's streaming method preference
-      const preferredMethod = preferences.streamingMethod === "direct" ? "hls" : preferences.streamingMethod;
+      // Get effective streaming method (per-anime preference overrides global)
+      const preferredMethod = effectiveStreamingMethod === "direct" ? "hls" : effectiveStreamingMethod;
 
       logger.info(
         `[VideoSourceLoader] Fetching sources for anime ${animeId} episode ${episodeNumber}`,
-        { method: preferredMethod, language }
+        { method: preferredMethod, language, perAnimeOverride: !!perAnimePref?.streamingMethod }
       );
 
       // Use hybrid stream manager
@@ -345,7 +350,7 @@ export function VideoSourceLoader({
       setLoading(false);
       setIsRetrying(false);
     }
-  }, [animeId, episodeNumber, animeTitle, malId, onError, preferences.streamingMethod, preferences.defaultQuality]);
+  }, [animeId, episodeNumber, animeTitle, malId, onError, effectiveStreamingMethod, preferences.defaultQuality, perAnimePref]);
 
   // Reset loadingSeconds counter whenever a new load starts
   useEffect(() => {

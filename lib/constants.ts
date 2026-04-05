@@ -201,6 +201,7 @@ export const DEFAULT_PREFERENCES = {
     windowOpacity: 0,
   },
   subtitleLanguage: "en",
+  preferDubs: false, // Prefer dubbed versions for P2P streaming
 } as const;
 
 // ===================================

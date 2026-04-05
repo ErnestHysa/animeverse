@@ -221,21 +221,31 @@ magnet:?xt=urn:btih:{hash}&dn={name}&tr={tracker}&tr={tracker2}
 - Abort controller for canceling ongoing requests
 - All TypeScript compilation and Next.js build checks pass
 
-### Phase 5: User Settings & UI
-- [ ] Create `components/settings/streaming-settings.tsx`
-  - [ ] Radio buttons for streaming method:
-    - [ ] HLS (Default, Current)
-    - [ ] P2P/Torrent (Experimental)
-    - [ ] Hybrid (Auto-switch)
-  - [ ] Quality preference dropdown
-  - [ ] "Prefer dubs" checkbox for torrents
-- [ ] Add per-anime streaming preference
-  - [ ] Store in Zustand with persistence
-  - [ ] Override global setting per anime
-- [ ] Add player indicators:
-  - [ ] Show "Streaming via [Method]" badge
-  - [ ] Display seed/peer count for torrents
-  - [ ] Show fallback warnings
+### Phase 5: User Settings & UI ✅ COMPLETED (2026-04-05)
+- [x] Create `components/settings/streaming-settings.tsx`
+  - [x] Radio buttons for streaming method:
+    - [x] HLS (Default, Current)
+    - [x] P2P/Torrent (Experimental)
+    - [x] Hybrid (Auto-switch)
+  - [x] Quality preference dropdown
+  - [x] "Prefer dubs" checkbox for torrents
+- [x] Add per-anime streaming preference
+  - [x] Store in Zustand with persistence
+  - [x] Override global setting per anime
+- [x] Add player indicators:
+  - [x] Show "Streaming via [Method]" badge
+  - [x] Display seed/peer count for torrents
+  - [x] Show fallback warnings
+
+**Summary:**
+- Created `streaming-settings.tsx` component with HLS/WebTorrent/Hybrid selection, quality dropdown, and prefer dubs toggle
+- Extended `perAnimePrefs` in store to include `streamingMethod` with persistence
+- Added `preferDubs` to UserPreferences type with migration (version 3)
+- Updated video-source-loader to use per-anime streaming preference override
+- Player indicators already implemented in video-source-loader showing streaming method, seed count, and fallback warnings
+- Integrated StreamingSettings component into settings page
+- Enabled all streaming method options (HLS, Hybrid, P2P/Torrent) in playback settings
+- All TypeScript compilation and Next.js build checks pass
 
 ### Phase 6: Performance & Optimization
 - [ ] Implement torrent preloading
