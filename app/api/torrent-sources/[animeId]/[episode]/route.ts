@@ -4,11 +4,18 @@
  *
  * GET /api/torrent-sources/[animeId]/[episode]
  * - Returns torrent sources with magnet links
- * - Queries local database and public trackers
+ * - Queries local cache and scrapes public trackers
  * - Falls back to HLS sources if no torrents available
+ *
+ * Phase 2: Implements Nyaa.si, Nyaa.land, AniDex scrapers with caching
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import {
+  findTorrentSources,
+  getTorrentSourcesWithFallback,
+  type MagnetLink,
+} from "@/lib/torrent-finder";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,6 +25,7 @@ interface TorrentSource {
   infoHash: string;
   quality: string;
   size: string;
+  sizeBytes: number;
   seeders: number;
   leechers: number;
   provider: string;
@@ -26,6 +34,8 @@ interface TorrentSource {
 
 interface TorrentSourcesResponse {
   torrents: TorrentSource[];
+  sources: string[];
+  primarySource?: string;
   fallbackAvailable: boolean;
   message?: string;
 }
@@ -45,6 +55,7 @@ export async function GET(
       return NextResponse.json(
         {
           torrents: [],
+          sources: [],
           fallbackAvailable: true,
           message: "Invalid animeId or episode",
         },
@@ -52,21 +63,56 @@ export async function GET(
       );
     }
 
-    // TODO: Phase 2 - Query local database for cached magnet links
-    // const cachedTorrents = await queryTorrentDatabase(animeId, episode);
+    const animeIdNum = parseInt(animeId, 10);
+    const episodeNum = parseInt(episode, 10);
 
-    // TODO: Phase 2 - Scrape Nyaa.si for torrent sources
-    // const nyaaTorrents = await scrapeNyaa(animeId, episode);
+    if (isNaN(animeIdNum) || isNaN(episodeNum)) {
+      return NextResponse.json(
+        {
+          torrents: [],
+          sources: [],
+          fallbackAvailable: true,
+          message: "Invalid animeId or episode format",
+        },
+        { status: 400 }
+      );
+    }
 
-    // TODO: Phase 2 - Validate magnet links via DHT
-    // const validatedTorrents = await validateMagnets(nyaaTorrents);
+    // Get anime title from query params (optional but recommended)
+    const { searchParams } = new URL(request.url);
+    const animeTitle = searchParams.get("title") || undefined;
 
-    // For now, return empty response with fallback flag
-    // This allows the frontend to fall back to HLS streaming
+    // Find torrent sources with fallback
+    const result = await getTorrentSourcesWithFallback(
+      animeIdNum,
+      episodeNum,
+      animeTitle
+    );
+
+    // Transform to response format
+    const torrents: TorrentSource[] = result.torrents.map((t) => ({
+      magnet: t.magnet,
+      infoHash: t.infoHash,
+      quality: t.quality,
+      size: formatBytes(t.size),
+      sizeBytes: t.size,
+      seeders: t.seeders,
+      leechers: t.leechers,
+      provider: t.provider,
+      title: t.title,
+    }));
+
     return NextResponse.json({
-      torrents: [],
+      torrents,
+      sources: result.sources,
+      primarySource: result.primarySource,
       fallbackAvailable: true,
-      message: "Torrent sources coming soon in Phase 2. HLS fallback available.",
+      message:
+        torrents.length > 0
+          ? `Found ${torrents.length} torrent source(s)`
+          : animeTitle
+          ? `No torrents found for "${animeTitle}" episode ${episodeNum}. HLS fallback available.`
+          : "No torrents found. Try providing anime title in query params. HLS fallback available.",
     });
   } catch (error) {
     console.error("Error fetching torrent sources:", error);
@@ -75,6 +121,7 @@ export async function GET(
     return NextResponse.json(
       {
         torrents: [],
+        sources: [],
         fallbackAvailable: true,
         message: "Failed to fetch torrent sources. HLS fallback available.",
       },
@@ -119,4 +166,17 @@ export async function POST(
       { status: 500 }
     );
   }
+}
+
+/**
+ * Format bytes to human-readable string
+ */
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B";
+
+  const k = 1024;
+  const sizes = ["B", "KiB", "MiB", "GiB", "TiB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
 }

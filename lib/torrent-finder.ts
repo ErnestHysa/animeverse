@@ -53,6 +53,46 @@ export interface TorrentDatabaseSchema {
 }
 
 // ===================================
+// Helper Functions
+// ===================================
+
+/**
+ * Decode HTML entities (e.g., &amp; -> &)
+ */
+function decodeHtmlEntities(text: string): string {
+  const entities: Record<string, string> = {
+    "&amp;": "&",
+    "&lt;": "<",
+    "&gt;": ">",
+    "&quot;": '"',
+    "&#39;": "'",
+    "&apos;": "'",
+  };
+
+  return text.replace(/&[^;]+;/g, (entity) => entities[entity] || entity);
+}
+
+/**
+ * Parse size string (e.g., "1.5 GiB") to bytes
+ */
+function parseSize(sizeStr: string): number {
+  const match = sizeStr.match(/^(\d+(?:\.\d+)?)\s*(KiB|MiB|GiB|TiB)$/i);
+  if (!match) return 0;
+
+  const value = parseFloat(match[1]);
+  const unit = match[2].toLowerCase();
+
+  const multipliers: Record<string, number> = {
+    kib: 1024,
+    mib: 1024 ** 2,
+    gib: 1024 ** 3,
+    tib: 1024 ** 4,
+  };
+
+  return value * (multipliers[unit] || 1);
+}
+
+// ===================================
 // Magnet Link Utilities
 // ===================================
 
@@ -154,55 +194,348 @@ export function extractFansubGroup(title: string): string | null {
 }
 
 // ===================================
-// TODO: Phase 2 - Scraper Functions
+// Phase 2: Scraper Functions
 // ===================================
 
 /**
  * Scrape Nyaa.si for anime torrents
- * TODO: Implement in Phase 2
+ * @param animeTitle - Anime title to search
+ * @param episode - Episode number
+ * @param maxResults - Maximum number of results to return (default: 10)
+ * @returns Array of magnet links with metadata
  */
 export async function scrapeNyaa(
   animeTitle: string,
-  episode: number
+  episode: number,
+  maxResults: number = 10
 ): Promise<MagnetLink[]> {
-  // Placeholder for Phase 2 implementation
-  console.log(`[Phase 2] Would scrape Nyaa.si for: ${animeTitle} Episode ${episode}`);
-  return [];
+  try {
+    // Build search query
+    const searchQuery = `${animeTitle} episode ${episode}`.replace(/\s+/g, " ");
+    const searchUrl = `https://nyaa.si/?q=${encodeURIComponent(searchQuery)}&s=seeders&o=desc`;
+
+    console.log(`[Nyaa.si] Searching: ${searchQuery}`);
+
+    // Fetch the page
+    const response = await fetch(searchUrl, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const html = await response.text();
+
+    // Parse HTML and extract torrent data
+    const magnets: MagnetLink[] = [];
+
+    // Match torrent rows using a more compatible pattern
+    const rows: string[] = [];
+    let currentRow = "";
+    let inRow = false;
+
+    for (const line of html.split("\n")) {
+      if (line.includes('<tr class="default"')) {
+        inRow = true;
+        currentRow = line;
+      } else if (inRow) {
+        currentRow += line;
+        if (line.includes("</tr>")) {
+          rows.push(currentRow);
+          inRow = false;
+          currentRow = "";
+        }
+      }
+    }
+
+    if (!rows) {
+      console.log(`[Nyaa.si] No results found for: ${searchQuery}`);
+      return [];
+    }
+
+    // Parse each row
+    for (const row of rows.slice(0, maxResults)) {
+      // Extract title
+      const titleMatch = row.match(
+        /<a[^>]*href="\/view\/\d+"[^>]*title="([^"]+)"/
+      );
+      const title = titleMatch ? titleMatch[1].trim() : "";
+
+      // Extract magnet link
+      const magnetMatch = row.match(/href="(magnet:\?[^"]+)"/);
+      if (!magnetMatch) continue;
+
+      const magnet = decodeHtmlEntities(magnetMatch[1]);
+      const parsed = parseMagnetLink(magnet);
+      if (!parsed) continue;
+
+      // Extract seeders and leechers
+      const seedersMatch = row.match(/<td[^>]*class="[^"]*text-center[^"]*"[^>]*>(\d+)<\/td>/g);
+      const seeders =
+        seedersMatch && seedersMatch.length >= 2
+          ? parseInt(seedersMatch[seedersMatch.length - 2].replace(/<td[^>]*class="[^"]*text-center[^"]*"[^>]*>(\d+)<\/td>/, "$1"))
+          : 0;
+      const leechers =
+        seedersMatch && seedersMatch.length >= 1
+          ? parseInt(seedersMatch[seedersMatch.length - 1].replace(/<td[^>]*class="[^"]*text-center[^"]*"[^>]*>(\d+)<\/td>/, "$1"))
+          : 0;
+
+      // Extract size
+      const sizeMatch = row.match(/(\d+(?:\.\d+)?)\s*(KiB|MiB|GiB)/i);
+      const size = sizeMatch ? parseSize(sizeMatch[0]) : 0;
+
+      // Extract quality
+      const quality = extractQuality(title);
+
+      magnets.push({
+        magnet,
+        infoHash: parsed.infoHash,
+        title,
+        quality,
+        size,
+        seeders,
+        leechers,
+        provider: "nyaa.si",
+      });
+    }
+
+    console.log(`[Nyaa.si] Found ${magnets.length} results for: ${searchQuery}`);
+    return magnets;
+  } catch (error) {
+    console.error(`[Nyaa.si] Error scraping:`, error);
+    return [];
+  }
 }
 
 /**
  * Scrape Nyaa.land (mirror) for anime torrents
- * TODO: Implement in Phase 2
+ * @param animeTitle - Anime title to search
+ * @param episode - Episode number
+ * @param maxResults - Maximum number of results to return (default: 10)
+ * @returns Array of magnet links with metadata
  */
 export async function scrapeNyaaLand(
   animeTitle: string,
-  episode: number
+  episode: number,
+  maxResults: number = 10
 ): Promise<MagnetLink[]> {
-  // Placeholder for Phase 2 implementation
-  console.log(`[Phase 2] Would scrape Nyaa.land for: ${animeTitle} Episode ${episode}`);
-  return [];
+  try {
+    // Nyaa.land is a mirror with the same structure
+    const searchQuery = `${animeTitle} episode ${episode}`.replace(/\s+/g, " ");
+    const searchUrl = `https://nyaa.land/?q=${encodeURIComponent(searchQuery)}&s=seeders&o=desc`;
+
+    console.log(`[Nyaa.land] Searching: ${searchQuery}`);
+
+    const response = await fetch(searchUrl, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const html = await response.text();
+
+    // Same parsing logic as Nyaa.si
+    const magnets: MagnetLink[] = [];
+    const rows: string[] = [];
+    let currentRow = "";
+    let inRow = false;
+
+    for (const line of html.split("\n")) {
+      if (line.includes('<tr class="default"')) {
+        inRow = true;
+        currentRow = line;
+      } else if (inRow) {
+        currentRow += line;
+        if (line.includes("</tr>")) {
+          rows.push(currentRow);
+          inRow = false;
+          currentRow = "";
+        }
+      }
+    }
+
+    if (!rows) {
+      console.log(`[Nyaa.land] No results found for: ${searchQuery}`);
+      return [];
+    }
+
+    for (const row of rows.slice(0, maxResults)) {
+      const titleMatch = row.match(
+        /<a[^>]*href="\/view\/\d+"[^>]*title="([^"]+)"/
+      );
+      const title = titleMatch ? titleMatch[1].trim() : "";
+
+      const magnetMatch = row.match(/href="(magnet:\?[^"]+)"/);
+      if (!magnetMatch) continue;
+
+      const magnet = decodeHtmlEntities(magnetMatch[1]);
+      const parsed = parseMagnetLink(magnet);
+      if (!parsed) continue;
+
+      const seedersMatch = row.match(/<td[^>]*class="[^"]*text-center[^"]*"[^>]*>(\d+)<\/td>/g);
+      const seeders =
+        seedersMatch && seedersMatch.length >= 2
+          ? parseInt(seedersMatch[seedersMatch.length - 2].replace(/<td[^>]*class="[^"]*text-center[^"]*"[^>]*>(\d+)<\/td>/, "$1"))
+          : 0;
+      const leechers =
+        seedersMatch && seedersMatch.length >= 1
+          ? parseInt(seedersMatch[seedersMatch.length - 1].replace(/<td[^>]*class="[^"]*text-center[^"]*"[^>]*>(\d+)<\/td>/, "$1"))
+          : 0;
+
+      const sizeMatch = row.match(/(\d+(?:\.\d+)?)\s*(KiB|MiB|GiB)/i);
+      const size = sizeMatch ? parseSize(sizeMatch[0]) : 0;
+
+      const quality = extractQuality(title);
+
+      magnets.push({
+        magnet,
+        infoHash: parsed.infoHash,
+        title,
+        quality,
+        size,
+        seeders,
+        leechers,
+        provider: "nyaa.land",
+      });
+    }
+
+    console.log(`[Nyaa.land] Found ${magnets.length} results for: ${searchQuery}`);
+    return magnets;
+  } catch (error) {
+    console.error(`[Nyaa.land] Error scraping:`, error);
+    return [];
+  }
 }
 
 /**
  * Scrape AniDex for anime torrents
- * TODO: Implement in Phase 2
+ * @param animeTitle - Anime title to search
+ * @param episode - Episode number
+ * @param maxResults - Maximum number of results to return (default: 10)
+ * @returns Array of magnet links with metadata
  */
 export async function scrapeAniDex(
   animeTitle: string,
-  episode: number
+  episode: number,
+  maxResults: number = 10
 ): Promise<MagnetLink[]> {
-  // Placeholder for Phase 2 implementation
-  console.log(`[Phase 2] Would scrape AniDex for: ${animeTitle} Episode ${episode}`);
-  return [];
+  try {
+    // AniDex has different HTML structure
+    const searchQuery = `${animeTitle} episode ${episode}`.replace(/\s+/g, " ");
+    const searchUrl = `https://anidex.info/?q=${encodeURIComponent(searchQuery)}`;
+
+    console.log(`[AniDex] Searching: ${searchQuery}`);
+
+    const response = await fetch(searchUrl, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const html = await response.text();
+
+    const magnets: MagnetLink[] = [];
+
+    // AniDex uses different HTML structure
+    // Look for magnet links in torrent rows
+    const magnetRegex = /href="(magnet:\?[^"]+)"/g;
+    const magnetMatches: RegExpMatchArray[] = [];
+    let match;
+    while ((match = magnetRegex.exec(html)) !== null) {
+      magnetMatches.push(match);
+    }
+
+    // AniDex structure: Look for torrent entries
+    const entries: string[] = [];
+    let currentEntry = "";
+    let inEntry = false;
+
+    for (const line of html.split("\n")) {
+      if (line.includes('<tr') && line.includes('torrent')) {
+        inEntry = true;
+        currentEntry = line;
+      } else if (inEntry) {
+        currentEntry += line;
+        if (line.includes("</tr>")) {
+          entries.push(currentEntry);
+          inEntry = false;
+          currentEntry = "";
+        }
+      }
+    }
+
+    if (!entries) {
+      console.log(`[AniDex] No results found for: ${searchQuery}`);
+      return [];
+    }
+
+    for (const entry of entries.slice(0, maxResults)) {
+      // Extract title from link
+      const titleMatch = entry.match(/<td[^>]*class="[^"]*title[^"]*"[^>]*>\s*<a[^>]*>([^<]+)<\/a>/);
+      const title = titleMatch ? titleMatch[1].trim() : "";
+
+      const magnetMatch = entry.match(/href="(magnet:\?[^"]+)"/);
+      if (!magnetMatch) continue;
+
+      const magnet = decodeHtmlEntities(magnetMatch[1]);
+      const parsed = parseMagnetLink(magnet);
+      if (!parsed) continue;
+
+      // Extract seeders/leechers from AniDex structure
+      const seedersMatch = entry.match(/<td[^>]*class="[^"]*seeders?[^"]*"[^>]*>(\d+)<\/td>/);
+      const leechersMatch = entry.match(/<td[^>]*class="[^"]*leechers?[^"]*"[^>]*>(\d+)<\/td>/);
+
+      const seeders = seedersMatch ? parseInt(seedersMatch[1]) : 0;
+      const leechers = leechersMatch ? parseInt(leechersMatch[1]) : 0;
+
+      const sizeMatch = entry.match(/(\d+(?:\.\d+)?)\s*(KiB|MiB|GiB)/i);
+      const size = sizeMatch ? parseSize(sizeMatch[0]) : 0;
+
+      const quality = extractQuality(title);
+
+      magnets.push({
+        magnet,
+        infoHash: parsed.infoHash,
+        title,
+        quality,
+        size,
+        seeders,
+        leechers,
+        provider: "anidex",
+      });
+    }
+
+    console.log(`[AniDex] Found ${magnets.length} results for: ${searchQuery}`);
+    return magnets;
+  } catch (error) {
+    console.error(`[AniDex] Error scraping:`, error);
+    return [];
+  }
 }
 
 // ===================================
-// TODO: Phase 2 - DHT Validation
+// Phase 2: DHT Validation
 // ===================================
 
 /**
  * Validate magnet link via DHT to check seeders
- * TODO: Implement in Phase 2
+ * Note: This is a simplified validation. Full DHT requires WebTorrent client.
+ * @param magnet - Magnet link to validate
+ * @returns Validation result with seeder/leecher counts and video check
  */
 export async function validateMagnetViaDHT(magnet: string): Promise<{
   infoHash: string;
@@ -210,14 +543,71 @@ export async function validateMagnetViaDHT(magnet: string): Promise<{
   leechers: number;
   hasVideo: boolean;
 }> {
-  // Placeholder for Phase 2 implementation
-  console.log(`[Phase 2] Would validate magnet via DHT: ${magnet.substring(0, 50)}...`);
+  const parsed = parseMagnetLink(magnet);
+  if (!parsed) {
+    return {
+      infoHash: "",
+      seeders: 0,
+      leechers: 0,
+      hasVideo: false,
+    };
+  }
+
+  // Phase 2: Basic validation
+  // Full DHT validation requires WebTorrent client which is browser-side
+  // For now, we'll validate the magnet link structure and cache it
+  // Real seeder/leecher counts will come from the scraper
+
+  console.log(`[DHT Validation] Checking infoHash: ${parsed.infoHash}`);
+
+  // Check if title suggests video content
+  const title = parsed.title || "";
+  const hasVideo = isVideoTorrent(title);
+
   return {
-    infoHash: "",
-    seeders: 0,
-    leechers: 0,
-    hasVideo: false,
+    infoHash: parsed.infoHash,
+    seeders: 0, // Will be updated by scraper
+    leechers: 0, // Will be updated by scraper
+    hasVideo,
   };
+}
+
+/**
+ * Check if torrent is likely to contain video based on title
+ */
+function isVideoTorrent(title: string): boolean {
+  const videoExtensions = [".mkv", ".mp4", ".avi", ".mov", ".wmv", ".flv", ".webm"];
+  const videoKeywords = [
+    "x264",
+    "x265",
+    "h264",
+    "h265",
+    "hevc",
+    "1080p",
+    "720p",
+    "480p",
+    "webrip",
+    "bluray",
+    "bd",
+  ];
+
+  const titleLower = title.toLowerCase();
+
+  // Check for video file extensions
+  for (const ext of videoExtensions) {
+    if (titleLower.includes(ext)) {
+      return true;
+    }
+  }
+
+  // Check for video keywords
+  for (const keyword of videoKeywords) {
+    if (titleLower.includes(keyword)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 // ===================================
@@ -280,14 +670,90 @@ export const TORRENT_DATABASE_SCHEMA = {
 } as const;
 
 // ===================================
-// Phase 1: Cache Utilities
+// Phase 2: Database Cache (File-Based)
 // ===================================
 
 /**
- * In-memory cache for magnet links (Phase 1)
- * TODO: Replace with database in Phase 1
+ * Simple file-based cache for magnet links
+ * Database path: .data/torrent-cache.json
  */
-const magnetCache = new Map<string, TorrentSearchResult>();
+const CACHE_DIR = ".data";
+const CACHE_FILE = `${CACHE_DIR}/torrent-cache.json`;
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+interface CacheEntry {
+  animeId: number;
+  episode: number;
+  magnets: MagnetLink[];
+  timestamp: number;
+}
+
+interface CacheData {
+  entries: Record<string, CacheEntry>;
+  lastUpdated: number;
+}
+
+/**
+ * Ensure cache directory exists
+ */
+function ensureCacheDir(): void {
+  if (typeof window === "undefined") {
+    // Node.js environment
+    const fs = require("fs");
+    const path = require("path");
+    const cachePath = path.join(process.cwd(), CACHE_DIR);
+    if (!fs.existsSync(cachePath)) {
+      fs.mkdirSync(cachePath, { recursive: true });
+    }
+  }
+}
+
+/**
+ * Load cache from file
+ */
+function loadCache(): CacheData {
+  try {
+    if (typeof window !== "undefined") {
+      // Browser environment - use localStorage
+      const cached = localStorage.getItem("torrent-cache");
+      return cached ? JSON.parse(cached) : { entries: {}, lastUpdated: 0 };
+    } else {
+      // Node.js environment
+      const fs = require("fs");
+      const path = require("path");
+      const cachePath = path.join(process.cwd(), CACHE_FILE);
+      if (fs.existsSync(cachePath)) {
+        const data = fs.readFileSync(cachePath, "utf-8");
+        return JSON.parse(data);
+      }
+    }
+  } catch (error) {
+    console.error("[Cache] Error loading cache:", error);
+  }
+  return { entries: {}, lastUpdated: 0 };
+}
+
+/**
+ * Save cache to file
+ */
+function saveCache(data: CacheData): void {
+  try {
+    data.lastUpdated = Date.now();
+    if (typeof window !== "undefined") {
+      // Browser environment - use localStorage
+      localStorage.setItem("torrent-cache", JSON.stringify(data));
+    } else {
+      // Node.js environment
+      ensureCacheDir();
+      const fs = require("fs");
+      const path = require("path");
+      const cachePath = path.join(process.cwd(), CACHE_FILE);
+      fs.writeFileSync(cachePath, JSON.stringify(data, null, 2));
+    }
+  } catch (error) {
+    console.error("[Cache] Error saving cache:", error);
+  }
+}
 
 /**
  * Cache key generator
@@ -302,48 +768,101 @@ export function getCacheKey(animeId: number, episode: number): string {
 export function getCachedMagnets(
   animeId: number,
   episode: number
-): TorrentSearchResult | undefined {
+): MagnetLink[] | undefined {
+  const cache = loadCache();
   const key = getCacheKey(animeId, episode);
-  return magnetCache.get(key);
+  const entry = cache.entries[key];
+
+  if (!entry) {
+    return undefined;
+  }
+
+  // Check if cache is still valid
+  const age = Date.now() - entry.timestamp;
+  if (age > CACHE_TTL) {
+    // Cache expired, remove it
+    delete cache.entries[key];
+    saveCache(cache);
+    return undefined;
+  }
+
+  console.log(`[Cache] HIT for ${key} (${Math.round(age / 1000)}s old)`);
+  return entry.magnets;
 }
 
 /**
- * Cache magnet links with 5-minute TTL
+ * Cache magnet links with TTL
  */
 export function cacheMagnets(
   animeId: number,
   episode: number,
   magnets: MagnetLink[]
 ): void {
+  const cache = loadCache();
   const key = getCacheKey(animeId, episode);
-  magnetCache.set(key, {
+
+  cache.entries[key] = {
     animeId,
     episode,
     magnets,
     timestamp: Date.now(),
-  });
+  };
 
-  // Clear cache after 5 minutes
-  setTimeout(() => {
-    magnetCache.delete(key);
-  }, 5 * 60 * 1000);
+  saveCache(cache);
+  console.log(`[Cache] STORED ${key} with ${magnets.length} magnets`);
+
+  // Clean up old entries
+  cleanupOldCache(cache);
+}
+
+/**
+ * Clean up old cache entries
+ */
+function cleanupOldCache(cache: CacheData): void {
+  const now = Date.now();
+  const keysToDelete: string[] = [];
+
+  for (const [key, entry] of Object.entries(cache.entries)) {
+    const age = now - entry.timestamp;
+    // Delete entries older than 1 hour
+    if (age > 60 * 60 * 1000) {
+      keysToDelete.push(key);
+    }
+  }
+
+  for (const key of keysToDelete) {
+    delete cache.entries[key];
+  }
+
+  if (keysToDelete.length > 0) {
+    saveCache(cache);
+    console.log(`[Cache] Cleaned up ${keysToDelete.length} old entries`);
+  }
 }
 
 /**
  * Clear all cached magnet links
  */
 export function clearMagnetCache(): void {
-  magnetCache.clear();
+  const cache = { entries: {}, lastUpdated: Date.now() };
+  saveCache(cache);
+  console.log("[Cache] Cleared all cache");
 }
 
 // ===================================
 // Phase 1: Main Entry Point
 // ===================================
 
+// ===================================
+// Phase 2: Main Entry Point with Fallback
+// ===================================
+
 /**
  * Find torrent sources for an anime episode
- * Phase 1: Returns empty array (infrastructure only)
- * Phase 2: Will scrape Nyaa and validate via DHT
+ * @param animeId - Anilist anime ID
+ * @param episode - Episode number
+ * @param animeTitle - Anime title for searching (optional but recommended)
+ * @returns Array of magnet links sorted by seeders (descending)
  */
 export async function findTorrentSources(
   animeId: number,
@@ -352,32 +871,57 @@ export async function findTorrentSources(
 ): Promise<MagnetLink[]> {
   // Check cache first
   const cached = getCachedMagnets(animeId, episode);
-  if (cached && Date.now() - cached.timestamp < 5 * 60 * 1000) {
-    return cached.magnets;
+  if (cached && cached.length > 0) {
+    return cached;
   }
 
-  // TODO: Phase 2 - Implement scraping logic
-  // if (animeTitle) {
-  //   const results = await Promise.allSettled([
-  //     scrapeNyaa(animeTitle, episode),
-  //     scrapeNyaaLand(animeTitle, episode),
-  //     scrapeAniDex(animeTitle, episode),
-  //   ]);
-  //
-  //   const magnets = results
-  //     .filter((r) => r.status === "fulfilled")
-  //     .flatMap((r) => r.status === "fulfilled" ? r.value : []);
-  //
-  //   cacheMagnets(animeId, episode, magnets);
-  //   return magnets;
-  // }
+  if (!animeTitle) {
+    console.warn(`[Torrent] No anime title provided for animeId ${animeId}`);
+    return [];
+  }
 
-  return [];
+  console.log(`[Torrent] Finding sources for: ${animeTitle} Episode ${episode}`);
+
+  // Try all sources in parallel with timeout
+  const results = await Promise.allSettled([
+    withTimeout(scrapeNyaa(animeTitle, episode), 15000),
+    withTimeout(scrapeNyaaLand(animeTitle, episode), 15000),
+    withTimeout(scrapeAniDex(animeTitle, episode), 15000),
+  ]);
+
+  // Collect all successful results
+  const allMagnets: MagnetLink[] = [];
+
+  for (const result of results) {
+    if (result.status === "fulfilled" && result.value.length > 0) {
+      allMagnets.push(...result.value);
+    }
+  }
+
+  // Remove duplicates by infoHash
+  const uniqueMagnets = removeDuplicateMagnets(allMagnets);
+
+  // Sort by seeders (descending)
+  uniqueMagnets.sort((a, b) => b.seeders - a.seeders);
+
+  // Cache the results
+  if (uniqueMagnets.length > 0) {
+    cacheMagnets(animeId, episode, uniqueMagnets);
+  }
+
+  console.log(
+    `[Torrent] Found ${uniqueMagnets.length} unique magnets for ${animeTitle} Episode ${episode}`
+  );
+
+  return uniqueMagnets;
 }
 
 /**
  * Get torrent sources from multiple providers with fallback
- * Phase 1: Infrastructure only
+ * @param animeId - Anilist anime ID
+ * @param episode - Episode number
+ * @param animeTitle - Anime title for searching
+ * @returns Torrents with metadata about which sources were used
  */
 export async function getTorrentSourcesWithFallback(
   animeId: number,
@@ -390,9 +934,41 @@ export async function getTorrentSourcesWithFallback(
 }> {
   const torrents = await findTorrentSources(animeId, episode, animeTitle);
 
+  // Determine which sources contributed
+  const sources = new Set<string>();
+  torrents.forEach((t) => sources.add(t.provider));
+
   return {
     torrents,
-    sources: [], // TODO: Phase 2 - Track which sources were queried
-    primarySource: undefined, // TODO: Phase 2 - Return primary source
+    sources: Array.from(sources),
+    primarySource: torrents.length > 0 ? torrents[0].provider : undefined,
   };
+}
+
+/**
+ * Remove duplicate magnet links by infoHash
+ */
+function removeDuplicateMagnets(magnets: MagnetLink[]): MagnetLink[] {
+  const seen = new Set<string>();
+  const unique: MagnetLink[] = [];
+
+  for (const magnet of magnets) {
+    if (!seen.has(magnet.infoHash)) {
+      seen.add(magnet.infoHash);
+      unique.push(magnet);
+    }
+  }
+
+  return unique;
+}
+
+/**
+ * Add timeout to a promise
+ */
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error(`Timeout after ${timeoutMs}ms`)), timeoutMs);
+  });
+
+  return Promise.race([promise, timeoutPromise]);
 }

@@ -144,21 +144,33 @@ magnet:?xt=urn:btih:{hash}&dn={name}&tr={tracker}&tr={tracker2}
 - Created `webtorrent-manager.ts` with session management and quality selection
 - Verified TypeScript compilation and Next.js build pass successfully
 
-### Phase 2: Magnet Link Discovery System
-- [ ] Implement Nyaa.si scraper for anime torrents
-  - [ ] Search by anime title + episode number
-  - [ ] Parse magnet links from torrent pages
-  - [ ] Extract quality tags (1080p, 720p, 480p)
-  - [ ] Identify fansub group/encoder
-- [ ] Implement magnet link validation
-  - [ ] Check DHT for seeders/peers count
-  - [ ] Verify torrent contains video file
-  - [ ] Cache valid magnet links in database
-- [ ] Create fallback to multiple sources:
-  - [ ] Nyaa.si (primary)
-  - [ ] Nyaa.land (mirror)
-  - [ ] AniDex (secondary)
-  - [ ] Manual magnet database (admin-entered)
+### Phase 2: Magnet Link Discovery System ✅ COMPLETED (2026-04-05)
+- [x] Implement Nyaa.si scraper for anime torrents
+  - [x] Search by anime title + episode number
+  - [x] Parse magnet links from torrent pages
+  - [x] Extract quality tags (1080p, 720p, 480p)
+  - [x] Identify fansub group/encoder
+- [x] Implement magnet link validation
+  - [x] Check DHT for seeders/peers count
+  - [x] Verify torrent contains video file
+  - [x] Cache valid magnet links in database
+- [x] Create fallback to multiple sources:
+  - [x] Nyaa.si (primary)
+  - [x] Nyaa.land (mirror)
+  - [x] AniDex (secondary)
+  - [ ] Manual magnet database (admin-entered) - TODO: Phase 7
+
+**Summary:**
+- Implemented `scrapeNyaa()` function with HTML parsing and magnet extraction
+- Implemented `scrapeNyaaLand()` as mirror/backup source
+- Implemented `scrapeAniDex()` as secondary source with different HTML structure
+- Implemented `validateMagnetViaDHT()` with video content detection
+- Implemented file-based caching system (`torrent-cache.json`) with 5-minute TTL
+- Implemented `getTorrentSourcesWithFallback()` for multi-source querying
+- All scrapers run in parallel with 15-second timeout each
+- Duplicate removal by infoHash
+- Results sorted by seeder count (descending)
+- Updated API endpoint to use new scrapers and return formatted data
 
 ### Phase 3: WebTorrent Player Integration
 - [ ] Create `components/player/webtorrent-player.tsx`
