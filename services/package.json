@@ -1,17 +1,20 @@
 {
   "name": "anime-stream-seed-server",
   "version": "1.0.0",
-  "description": "WebTorrent seed server for anime streaming",
+  "description": "WebTorrent seed server and scraper for anime streaming",
   "main": "seed-server.js",
   "scripts": {
     "start": "node seed-server.js",
     "dev": "nodemon seed-server.js",
+    "scrape": "node anime-scraper.js",
     "pm2:start": "pm2 start seed-server.js --name anime-seed-server",
     "pm2:stop": "pm2 stop anime-seed-server",
     "pm2:restart": "pm2 restart anime-seed-server",
     "pm2:logs": "pm2 logs anime-seed-server",
-    "pm2:status": "pm2 status anime-seed-server"
-  },
+    "pm2:status": "pm2 status anime-seed-server",
+    "pm2:start-scraper": "pm2 start anime-scraper.js --name anime-scraper --cron '0 2 * * *'",
+    "pm2:stop-scraper": "pm2 stop anime-scraper",
+    "pm2:scraper-logs": "pm2 logs anime-scraper"
   "dependencies": {
     "webtorrent": "^2.1.34"
   },

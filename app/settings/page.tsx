@@ -38,6 +38,7 @@ import { NotificationSettings } from "@/components/notifications/notification-se
 import { SubtitleSettings } from "@/components/settings/subtitle-settings";
 import { StreamingSettings } from "@/components/settings/streaming-settings";
 import { PerformanceSettings } from "@/components/settings/performance-settings";
+import { SeedTrackingSettings } from "@/components/settings/seed-tracking-settings";
 import {
   calculateStats,
   formatWatchTime,
@@ -744,6 +745,15 @@ export default function SettingsPage() {
                 Performance & Optimization
               </h2>
               <PerformanceSettings />
+            </GlassCard>
+
+            {/* Seed Tracking Settings (Phase 7) */}
+            <GlassCard>
+              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                <Award className="w-5 h-5 text-primary" />
+                Seed Statistics & Achievements
+              </h2>
+              <SeedTrackingSettings />
             </GlassCard>
 
             {/* Appearance */}
