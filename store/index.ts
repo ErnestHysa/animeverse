@@ -80,6 +80,26 @@ export interface SubtitleStyle {
   windowOpacity: number; // 0-100
 }
 
+export interface PreloadConfig {
+  enabled: boolean;
+  preloadThreshold: number; // seconds remaining to trigger preload
+  targetBytes: number; // bytes to preload (default: 100MB)
+  wifiOnly: boolean; // only preload when on WiFi
+}
+
+export interface BandwidthConfig {
+  uploadLimit: number; // bytes per second, 0 = unlimited
+  downloadLimit: number; // bytes per second, 0 = unlimited
+  mode: "unlimited" | "custom" | "adaptive";
+  adaptiveEnabled: boolean;
+  wifiOnly: boolean; // only limit when on WiFi
+}
+
+export interface DHTConfig {
+  enablePreconnect: boolean;
+  preferTrackers: boolean; // use trackers before DHT
+}
+
 export interface UserPreferences {
   defaultQuality: "360p" | "480p" | "720p" | "1080p" | "auto";
   autoplay: boolean;
@@ -93,6 +113,11 @@ export interface UserPreferences {
   subtitleStyle: SubtitleStyle;
   subtitleLanguage: string; // Default subtitle language code
   preferDubs: boolean; // Prefer dubbed versions for P2P streaming
+
+  // Phase 6: Performance & Optimization
+  preloadConfig: PreloadConfig;
+  bandwidthConfig: BandwidthConfig;
+  dhtConfig: DHTConfig;
 }
 
 export interface StoreState {
@@ -824,7 +849,7 @@ export const useStore = create<StoreState>()(
     }),
     {
       name: "animeverse-stream-storage",
-      version: 3,
+      version: 4,
       storage: createJSONStorage(() => ({
         getItem: (name) => {
           try {
@@ -890,6 +915,35 @@ export const useStore = create<StoreState>()(
           // Add preferDubs for existing users
           if (state.preferences && state.preferences.preferDubs === undefined) {
             state.preferences.preferDubs = false;
+          }
+        }
+
+        if (version < 4) {
+          // Add Phase 6: Performance & Optimization settings
+          if (state.preferences) {
+            if (!state.preferences.preloadConfig) {
+              state.preferences.preloadConfig = {
+                enabled: true,
+                preloadThreshold: 120,
+                targetBytes: 100 * 1024 * 1024, // 100MB
+                wifiOnly: true,
+              };
+            }
+            if (!state.preferences.bandwidthConfig) {
+              state.preferences.bandwidthConfig = {
+                uploadLimit: 0,
+                downloadLimit: 0,
+                mode: "unlimited",
+                adaptiveEnabled: false,
+                wifiOnly: false,
+              };
+            }
+            if (!state.preferences.dhtConfig) {
+              state.preferences.dhtConfig = {
+                enablePreconnect: true,
+                preferTrackers: true,
+              };
+            }
           }
         }
 

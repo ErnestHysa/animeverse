@@ -202,6 +202,25 @@ export const DEFAULT_PREFERENCES = {
   },
   subtitleLanguage: "en",
   preferDubs: false, // Prefer dubbed versions for P2P streaming
+
+  // Phase 6: Performance & Optimization
+  preloadConfig: {
+    enabled: true,
+    preloadThreshold: 120, // 2 minutes remaining
+    targetBytes: 100 * 1024 * 1024, // 100MB
+    wifiOnly: true,
+  },
+  bandwidthConfig: {
+    uploadLimit: 0, // Unlimited by default
+    downloadLimit: 0, // Unlimited by default
+    mode: "unlimited" as const,
+    adaptiveEnabled: false,
+    wifiOnly: false,
+  },
+  dhtConfig: {
+    enablePreconnect: true,
+    preferTrackers: true,
+  },
 } as const;
 
 // ===================================

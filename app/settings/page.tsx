@@ -37,6 +37,7 @@ import { cn } from "@/lib/utils";
 import { NotificationSettings } from "@/components/notifications/notification-settings";
 import { SubtitleSettings } from "@/components/settings/subtitle-settings";
 import { StreamingSettings } from "@/components/settings/streaming-settings";
+import { PerformanceSettings } from "@/components/settings/performance-settings";
 import {
   calculateStats,
   formatWatchTime,
@@ -734,6 +735,15 @@ export default function SettingsPage() {
                 Streaming Method
               </h2>
               <StreamingSettings />
+            </GlassCard>
+
+            {/* Performance Settings (Phase 6) */}
+            <GlassCard>
+              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                <Zap className="w-5 h-5 text-primary" />
+                Performance & Optimization
+              </h2>
+              <PerformanceSettings />
             </GlassCard>
 
             {/* Appearance */}

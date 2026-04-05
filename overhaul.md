@@ -247,20 +247,33 @@ magnet:?xt=urn:btih:{hash}&dn={name}&tr={tracker}&tr={tracker2}
 - Enabled all streaming method options (HLS, Hybrid, P2P/Torrent) in playback settings
 - All TypeScript compilation and Next.js build checks pass
 
-### Phase 6: Performance & Optimization
-- [ ] Implement torrent preloading
-  - [ ] Start downloading next episode in background
-  - [ ] Cache first 100MB of next episode
-- [ ] Add WebTorrent seed server (Node.js)
-  - [ ] Run as separate process/service
-  - [ ] Seed popular content from CDN sources
-  - [ ] Ensure availability for new releases
-- [ ] Optimize DHT connection
-  - [ ] Pre-connect to known DHT nodes
-  - [ ] Reduce peer discovery time
-- [ ] Add bandwidth throttling options
-  - [ ] Limit upload speed (user setting)
-  - [ ] Adaptive based on network quality
+### Phase 6: Performance & Optimization ✅ COMPLETED (2026-04-05)
+- [x] Implement torrent preloading
+  - [x] Start downloading next episode in background
+  - [x] Cache first 100MB of next episode
+- [x] Add WebTorrent seed server (Node.js)
+  - [x] Run as separate process/service
+  - [x] Seed popular content from CDN sources
+  - [x] Ensure availability for new releases
+- [x] Optimize DHT connection
+  - [x] Pre-connect to known DHT nodes
+  - [x] Reduce peer discovery time
+- [x] Add bandwidth throttling options
+  - [x] Limit upload speed (user setting)
+  - [x] Adaptive based on network quality
+
+**Summary:**
+- Created `lib/torrent-preloader.ts` with background preloading, configurable threshold and target bytes, WiFi-only option, and automatic cleanup
+- Created `lib/dht-optimizer.ts` with DHT node caching, pre-connection to known nodes, tracker optimization, and connection statistics
+- Created `lib/bandwidth-manager.ts` with upload/download throttling, adaptive bandwidth based on network quality, real-time monitoring, and WiFi-only limiting
+- Created `services/seed-server.js` standalone Node.js service with PM2 support, torrent management, seed ratio tracking, periodic cleanup, and HTTP status endpoint
+- Created `services/package.json` with WebTorrent dependency and npm scripts
+- Updated store with Phase 6 preferences: preloadConfig, bandwidthConfig, dhtConfig
+- Updated DEFAULT_PREFERENCES in lib/constants.ts with Phase 6 settings
+- Created `components/settings/performance-settings.tsx` with full UI for all Phase 6 options
+- Updated store migration to version 4 for Phase 6 preferences
+- Integrated PerformanceSettings component into settings page
+- All TypeScript compilation and Next.js build checks pass
 
 ### Phase 7: Content Acquisition & Seeding
 - [ ] Create admin panel for magnet management
