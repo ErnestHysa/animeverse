@@ -6,19 +6,26 @@
  * PUT /api/admin/alerts/:id/resolve - Resolve an alert
  *
  * Phase 9: Monitoring & Analytics
+ * Phase 11: Production Deployment - Added authentication
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { getAlertsManager } from "@/lib/alerts-manager";
+import { isAdminRequest } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
  * GET /api/admin/alerts
- * Get all alerts
+ * Get all alerts (admin only)
  */
 export async function GET(request: NextRequest) {
+  // Check admin access
+  if (!(await isAdminRequest(request))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const searchParams = request.nextUrl.searchParams;
     const activeOnly = searchParams.get("active") === "true";
@@ -43,12 +50,17 @@ export async function GET(request: NextRequest) {
 
 /**
  * PUT /api/admin/alerts/[id]/resolve
- * Resolve an alert
+ * Resolve an alert (admin only)
  */
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  // Check admin access
+  if (!(await isAdminRequest(request))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const alertsManager = getAlertsManager();
     alertsManager.resolveAlert(params.id);

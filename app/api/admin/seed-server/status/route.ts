@@ -5,9 +5,11 @@
  * GET /api/admin/seed-server/status
  *
  * Phase 9: Monitoring & Analytics
+ * Phase 11: Production Deployment - Added authentication
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { isAdminRequest } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,9 +28,14 @@ let seedServerStatus = {
 
 /**
  * GET /api/admin/seed-server/status
- * Get seed server status
+ * Get seed server status (admin only)
  */
 export async function GET(request: NextRequest) {
+  // Check admin access
+  if (!(await isAdminRequest(request))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     // In production, fetch from actual seed server
     // For now, return mock data with some randomness

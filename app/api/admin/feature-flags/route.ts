@@ -8,16 +8,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { featureFlagManager, FEATURE_FLAGS } from '@/lib/feature-flags';
 
-// Admin check (replace with your auth logic)
-function isAdmin(request: NextRequest): boolean {
-  // TODO: Implement proper admin authentication
-  const authHeader = request.headers.get('authorization');
-  return authHeader === `Bearer ${process.env.ADMIN_API_KEY}`;
+// Admin check using JWT authentication
+import { isAdminRequest } from '@/lib/auth';
+
+async function isAdmin(request: NextRequest): Promise<boolean> {
+  return isAdminRequest(request);
 }
 
 export async function GET(request: NextRequest) {
   // Check admin access
-  if (!isAdmin(request)) {
+  if (!(await isAdmin(request))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   // Check admin access
-  if (!isAdmin(request)) {
+  if (!(await isAdmin(request))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

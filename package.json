@@ -33,6 +33,7 @@
     "@types/ws": "^8.18.1",
     "archiver": "^7.0.1",
     "axios": "^1.14.0",
+    "bcrypt": "^6.0.0",
     "cheerio": "^1.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -40,8 +41,10 @@
     "framer-motion": "^12.38.0",
     "graphql-request": "^7.4.0",
     "hls.js": "^1.6.15",
+    "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.577.0",
     "magnet-uri": "^6.2.0",
+    "nanoid": "^5.1.7",
     "next": "^16.2.1",
     "p2p-media-loader-core": "^2.2.2",
     "p2p-media-loader-hlsjs": "^2.2.2",
@@ -49,6 +52,8 @@
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-hot-toast": "^2.6.0",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
     "tailwind-merge": "^3.5.0",
     "webtorrent": "^2.8.5",
     "ws": "^8.20.0",
@@ -58,10 +63,15 @@
     "@playwright/test": "^1.49.1",
     "@tailwindcss/postcss": "^4.2.2",
     "@types/archiver": "^7.0.0",
+    "@types/bcrypt": "^6.0.0",
+    "@types/cookie": "^0.6.0",
     "@types/electron": "^1.4.38",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/nanoid": "^2.1.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/socket.io": "^3.0.1",
     "@types/webtorrent": "^0.109.10",
     "@vitejs/plugin-react": "^6.0.1",
     "@vitest/coverage-v8": "^4.1.2",
@@ -93,16 +103,26 @@
       "package.json"
     ],
     "win": {
-      "target": ["nsis", "portable"],
+      "target": [
+        "nsis",
+        "portable"
+      ],
       "icon": "assets/icon.ico"
     },
     "mac": {
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "icon": "assets/icon.icns",
       "category": "public.app-category.entertainment"
     },
     "linux": {
-      "target": ["AppImage", "deb", "rpm"],
+      "target": [
+        "AppImage",
+        "deb",
+        "rpm"
+      ],
       "icon": "assets/icon.png",
       "category": "Video"
     }
