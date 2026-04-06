@@ -4,6 +4,7 @@
  * DELETE /api/watch-party/rooms/[roomId] - Delete room (host only)
  *
  * Phase 11: Production Deployment - Multi-Device Watch Party
+ * Updated to use global WebSocket room manager
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -20,12 +21,20 @@ interface RoomDetails {
   hasPassword: boolean;
   viewerCount: number;
   createdAt: number;
-  hostUsername: string;
+  viewers: Array<{
+    id: string;
+    username: string;
+    isHost: boolean;
+  }>;
 }
 
-// Import rooms storage (shared with rooms route)
-// In production, this would be a database
-declare const rooms: Map<string, any>; // This will be shared via a proper module
+/**
+ * Get the global watch party room manager
+ */
+function getRoomManager() {
+  // @ts-ignore - Global is set by custom server
+  return global.__WATCH_PARTY_MANAGER__;
+}
 
 /**
  * GET - Get room details
@@ -37,22 +46,42 @@ export async function GET(
   try {
     const { roomId } = await params;
 
-    // TODO: Fetch from actual storage
-    // For now, return mock data
-    const mockRoom: RoomDetails = {
-      id: roomId,
-      name: 'Watch Party',
-      animeId: 21459,
-      episodeNumber: 1,
-      isPublic: true,
-      hasPassword: false,
-      viewerCount: 1,
-      createdAt: Date.now(),
-      hostUsername: 'Host',
+    // Get room manager
+    const roomManager = getRoomManager();
+    if (!roomManager) {
+      return NextResponse.json(
+        { error: 'Watch party service not available. Please use the custom server.' },
+        { status: 503 }
+      );
+    }
+
+    // Get room from WebSocket manager
+    const room = roomManager.getRoom(roomId);
+    if (!room) {
+      return NextResponse.json(
+        { error: 'Room not found' },
+        { status: 404 }
+      );
+    }
+
+    const roomDetails: RoomDetails = {
+      id: room.id,
+      name: room.name,
+      animeId: room.animeId,
+      episodeNumber: room.episodeNumber,
+      isPublic: room.isPublic,
+      hasPassword: !!room.password,
+      viewerCount: room.viewers.size,
+      createdAt: room.createdAt,
+      viewers: Array.from(room.viewers.values()).map((v: any) => ({
+        id: v.id,
+        username: v.username,
+        isHost: v.isHost,
+      })),
     };
 
     return NextResponse.json({
-      room: mockRoom,
+      room: roomDetails,
     });
   } catch (error) {
     console.error('[Watch Party] Error getting room:', error);
@@ -73,9 +102,60 @@ export async function DELETE(
   try {
     const { roomId } = await params;
 
-    // TODO: Verify user is host
-    // TODO: Delete from storage
-    // TODO: Notify all connected viewers
+    // Get user info from auth
+    const authHeader = request.headers.get('authorization');
+    const userId = authHeader?.replace('Bearer ', '');
+
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    // Get room manager
+    const roomManager = getRoomManager();
+    if (!roomManager) {
+      return NextResponse.json(
+        { error: 'Watch party service not available. Please use the custom server.' },
+        { status: 503 }
+      );
+    }
+
+    // Get room to verify host
+    const room = roomManager.getRoom(roomId);
+    if (!room) {
+      return NextResponse.json(
+        { error: 'Room not found' },
+        { status: 404 }
+      );
+    }
+
+    // Verify user is host
+    if (room.hostId !== userId) {
+      return NextResponse.json(
+        { error: 'Only the host can delete this room' },
+        { status: 403 }
+      );
+    }
+
+    // Delete room
+    const deleted = roomManager.deleteRoom(roomId);
+    if (!deleted) {
+      return NextResponse.json(
+        { error: 'Failed to delete room' },
+        { status: 500 }
+      );
+    }
+
+    // Notify all connected viewers via WebSocket
+    const io = roomManager.getIO();
+    if (io) {
+      io.to(roomId).emit('room_deleted', {
+        roomId,
+        message: 'This room has been closed by the host',
+      });
+    }
 
     return NextResponse.json({
       success: true,

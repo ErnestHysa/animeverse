@@ -4,6 +4,7 @@
  * GET /api/watch-party/rooms - List public rooms
  *
  * Phase 11: Production Deployment - Multi-Device Watch Party
+ * Updated to use global WebSocket room manager
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -30,20 +31,13 @@ interface RoomResponse {
   createdAt: number;
 }
 
-// In-memory room storage (TODO: Move to Redis/Database in production)
-const rooms = new Map<string, {
-  id: string;
-  name: string;
-  hostId: string;
-  hostUsername: string;
-  animeId: number;
-  episodeNumber: number;
-  isPublic: boolean;
-  password?: string;
-  createdAt: number;
-  lastActivity: number;
-  viewers: Set<string>;
-}>();
+/**
+ * Get the global watch party room manager
+ */
+function getRoomManager() {
+  // @ts-ignore - Global is set by custom server
+  return global.__WATCH_PARTY_MANAGER__;
+}
 
 /**
  * POST - Create new watch party room
@@ -63,28 +57,28 @@ export async function POST(request: NextRequest) {
 
     // Get user info (from auth header or session)
     const authHeader = request.headers.get('authorization');
-    const userId = authHeader?.replace('Bearer ', '') || `guest-${Date.now()}`;
-    const username = request.headers.get('x-username') || 'Anonymous';
+    const hostId = authHeader?.replace('Bearer ', '') || nanoid(10);
+    const hostUsername = request.headers.get('x-username') || 'Anonymous';
 
-    // Generate room ID
-    const roomId = nanoid(8).toUpperCase();
+    // Get room manager
+    const roomManager = getRoomManager();
+    if (!roomManager) {
+      return NextResponse.json(
+        { error: 'Watch party service not available. Please use the custom server.' },
+        { status: 503 }
+      );
+    }
 
-    // Create room
-    const room = {
-      id: roomId,
+    // Create room via WebSocket manager
+    const room = roomManager.createRoom({
       name: name.trim(),
-      hostId: userId,
-      hostUsername: username,
+      hostId,
+      hostUsername,
       animeId,
       episodeNumber,
       isPublic,
       password: isPublic ? undefined : password,
-      createdAt: Date.now(),
-      lastActivity: Date.now(),
-      viewers: new Set([userId]),
-    };
-
-    rooms.set(roomId, room);
+    });
 
     const response: RoomResponse = {
       id: room.id,
@@ -118,33 +112,26 @@ export async function GET(request: NextRequest) {
     const animeId = searchParams.get('animeId');
     const limit = parseInt(searchParams.get('limit') || '50', 10);
 
-    // Filter rooms
-    let publicRooms = Array.from(rooms.values())
-      .filter(room => room.isPublic);
+    // Get room manager
+    const roomManager = getRoomManager();
+    if (!roomManager) {
+      return NextResponse.json(
+        { error: 'Watch party service not available. Please use the custom server.' },
+        { status: 503 }
+      );
+    }
+
+    // Get public rooms from WebSocket manager
+    let publicRooms = roomManager.getPublicRooms(limit);
 
     // Filter by anime if specified
     if (animeId) {
-      publicRooms = publicRooms.filter(room => room.animeId === parseInt(animeId, 10));
+      publicRooms = publicRooms.filter((room: any) => room.animeId === parseInt(animeId, 10));
     }
 
-    // Sort by last activity and limit
-    publicRooms = publicRooms
-      .sort((a, b) => b.lastActivity - a.lastActivity)
-      .slice(0, limit);
-
-    const response: RoomResponse[] = publicRooms.map(room => ({
-      id: room.id,
-      name: room.name,
-      animeId: room.animeId,
-      episodeNumber: room.episodeNumber,
-      isPublic: room.isPublic,
-      viewerCount: room.viewers.size,
-      createdAt: room.createdAt,
-    }));
-
     return NextResponse.json({
-      rooms: response,
-      count: response.length,
+      rooms: publicRooms,
+      count: publicRooms.length,
     });
   } catch (error) {
     console.error('[Watch Party] Error listing rooms:', error);

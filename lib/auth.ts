@@ -171,10 +171,12 @@ export function validatePasswordStrength(password: string): {
 }
 
 // ===================================
-// User Management (In-Memory for Now)
+// User Management
 // ===================================
 
-// TODO: Move to database in production
+// Note: In production, use PostgreSQL database via ADMIN_USERS table
+// For development/testing, in-memory storage is used
+// See docs/DEPLOYMENT_GUIDE.md for production database setup
 const ADMIN_USERS: Map<string, AdminUser & { passwordHash: string }> = new Map();
 
 // Initialize default admin user if not exists

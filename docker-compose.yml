@@ -1,0 +1,144 @@
+# ========================================
+# Docker Compose for Anime Stream
+# ========================================
+# Usage:
+#   Development: docker-compose -f docker-compose.dev.yml up
+#   Production: docker-compose -f docker-compose.yml up -d
+
+version: '3.9'
+
+services:
+  # ========================================
+  # Main Application
+  # ========================================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    container_name: anime-stream-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=postgresql://anime_stream:${POSTGRES_PASSWORD}@postgres:5432/anime_stream
+      - REDIS_URL=redis://redis:6379
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      - NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL:-ws://localhost:3000}
+      - JWT_SECRET=${JWT_SECRET}
+      - DEFAULT_ADMIN_USERNAME=${DEFAULT_ADMIN_USERNAME:-admin}
+      - DEFAULT_ADMIN_PASSWORD=${DEFAULT_ADMIN_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - anime-stream-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    volumes:
+      - app-data:/app/.next/cache
+
+  # ========================================
+  # PostgreSQL Database
+  # ========================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: anime-stream-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=anime_stream
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=anime_stream
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - anime-stream-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U anime_stream -d anime_stream"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5432:5432"
+
+  # ========================================
+  # Redis Cache
+  # ========================================
+  redis:
+    image: redis:7-alpine
+    container_name: anime-stream-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis-data:/data
+    networks:
+      - anime-stream-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "6379:6379"
+
+  # ========================================
+  # pgAdmin (Optional - for database management)
+  # ========================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: anime-stream-pgadmin
+    restart: unless-stopped
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_EMAIL:-admin@animeverse.local}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_PASSWORD}
+      - PGADMIN_CONFIG_SERVER_MODE=False
+    ports:
+      - "5050:80"
+    networks:
+      - anime-stream-network
+    depends_on:
+      - postgres
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    profiles:
+      - tools
+
+  # ========================================
+  # Redis Commander (Optional - for Redis management)
+  # ========================================
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: anime-stream-redis-ui
+    restart: unless-stopped
+    environment:
+      - REDIS_HOSTS=local:redis:6379:0:${REDIS_PASSWORD}
+    ports:
+      - "8081:8081"
+    networks:
+      - anime-stream-network
+    depends_on:
+      - redis
+    profiles:
+      - tools
+
+networks:
+  anime-stream-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
+  pgadmin-data:
+    driver: local
+  app-data:
+    driver: local

@@ -101,9 +101,9 @@ export async function GET(request: NextRequest) {
  * PUT /api/magnets/comments/[id]
  * Update a comment
  */
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
     const { comment, userId } = body;
 
@@ -146,9 +146,9 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
  * DELETE /api/magnets/comments/[id]
  * Delete a comment
  */
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const searchParams = request.nextUrl.searchParams;
     const userId = searchParams.get("userId");
 

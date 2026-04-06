@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   // Check admin access
   if (!(await isAdminRequest(request))) {
@@ -62,8 +62,9 @@ export async function PUT(
   }
 
   try {
+    const { id } = await params;
     const alertsManager = getAlertsManager();
-    alertsManager.resolveAlert(params.id);
+    alertsManager.resolveAlert(id);
 
     return NextResponse.json({
       success: true,
