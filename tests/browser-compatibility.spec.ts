@@ -20,7 +20,7 @@ test.describe.configure({ mode: 'parallel' });
 
 for (const [browserName, displayName] of Object.entries(browsers)) {
   test.describe(`${displayName} Browser Compatibility`, () => {
-    test.use({ browserName });
+    test.use({ browserName: browserName as "chromium" | "firefox" | "webkit" });
 
     test('should support WebRTC', async ({ page }) => {
       await page.goto('http://localhost:3000');
@@ -203,7 +203,13 @@ for (const [browserName, displayName] of Object.entries(browsers)) {
 }
 
 test.describe('Mobile Browser Compatibility', () => {
-  test.use({ ...devices['Pixel 5'] });
+  test.use({
+    viewport: { width: 393, height: 851 },
+    userAgent: 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36',
+    deviceScaleFactor: 2.75,
+    isMobile: true,
+    hasTouch: true,
+  });
 
   test('should work on mobile Chrome', async ({ page }) => {
     await page.goto('http://localhost:3000');

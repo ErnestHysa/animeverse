@@ -10,6 +10,8 @@
  * - Timeout thresholds: WebTorrent (30s), HLS (15s)
  * - Smart fallback based on seed count and source availability
  * - Manual override support via settings
+ *
+ * Phase 9: Analytics tracking integrated
  */
 
 // ===================================
@@ -61,6 +63,21 @@ export interface HybridStreamResult {
 const DEFAULT_TIMEOUT_WEBTORRENT = 30000; // 30 seconds
 const DEFAULT_TIMEOUT_HLS = 15000; // 15 seconds
 const MIN_SEED_THRESHOLD = 3; // Minimum seeds for WebTorrent to be viable
+
+// ===================================
+// Analytics (Phase 9)
+// ===================================
+
+let analyticsEnabled = false;
+let fallbackStartTime = 0;
+
+export function enableAnalytics() {
+  analyticsEnabled = true;
+}
+
+export function disableAnalytics() {
+  analyticsEnabled = false;
+}
 
 // ===================================
 // Hybrid Stream Manager
@@ -120,6 +137,25 @@ class HybridStreamManagerImpl {
         { primary, secondary, language }
       );
 
+      // Track playback start (Phase 9)
+      if (analyticsEnabled) {
+        try {
+          const { trackPlaybackStart } = require("./analytics-integration");
+          trackPlaybackStart({
+            animeId,
+            animeTitle: animeTitle || `Anime ${animeId}`,
+            episode: episodeNumber,
+            method: primary,
+            quality: "auto",
+            sourceProvider: primary,
+          });
+        } catch (error) {
+          console.error("Failed to track playback start:", error);
+        }
+      }
+
+      fallbackStartTime = Date.now();
+
       // Try primary method first
       const primaryResult = await this.tryMethod(
         primary,
@@ -132,10 +168,29 @@ class HybridStreamManagerImpl {
         // Check if we should fallback due to low seed count
         if (primary === "webtorrent" && primaryResult.seeders !== undefined) {
           if (primaryResult.seeders < MIN_SEED_THRESHOLD) {
+            const timeToFallback = Date.now() - fallbackStartTime;
             logger.warn(
               `[HybridStream] WebTorrent has low seed count (${primaryResult.seeders}), falling back to HLS`
             );
             onFallback?.("webtorrent", "hls", `Low seed count (${primaryResult.seeders} < ${MIN_SEED_THRESHOLD})`);
+
+            // Track fallback event (Phase 9)
+            if (analyticsEnabled) {
+              try {
+                const { trackFallback } = require("./analytics-integration");
+                trackFallback({
+                  animeId,
+                  animeTitle: animeTitle || `Anime ${animeId}`,
+                  episode: episodeNumber,
+                  fromMethod: "webtorrent",
+                  toMethod: "hls",
+                  reason: `Low seed count (${primaryResult.seeders} < ${MIN_SEED_THRESHOLD})`,
+                  timeToFallback,
+                });
+              } catch (error) {
+                console.error("Failed to track fallback:", error);
+              }
+            }
 
             const fallbackResult = await this.tryMethod(
               "hls",
@@ -164,6 +219,7 @@ class HybridStreamManagerImpl {
 
       // Primary method failed, try secondary
       if (secondary) {
+        const timeToFallback = Date.now() - fallbackStartTime;
         logger.warn(
           `[HybridStream] Primary method (${primary}) failed: ${primaryResult.error?.message}`,
           "Falling back to secondary method"
@@ -173,6 +229,24 @@ class HybridStreamManagerImpl {
           secondary,
           primaryResult.error?.message || "Primary method failed"
         );
+
+        // Track fallback event (Phase 9)
+        if (analyticsEnabled) {
+          try {
+            const { trackFallback } = require("./analytics-integration");
+            trackFallback({
+              animeId,
+              animeTitle: animeTitle || `Anime ${animeId}`,
+              episode: episodeNumber,
+              fromMethod: primary,
+              toMethod: secondary,
+              reason: primaryResult.error?.message || "Primary method failed",
+              timeToFallback,
+            });
+          } catch (error) {
+            console.error("Failed to track fallback:", error);
+          }
+        }
 
         const secondaryResult = await this.tryMethod(
           secondary,

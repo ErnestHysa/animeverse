@@ -39,6 +39,7 @@ import { SubtitleSettings } from "@/components/settings/subtitle-settings";
 import { StreamingSettings } from "@/components/settings/streaming-settings";
 import { PerformanceSettings } from "@/components/settings/performance-settings";
 import { SeedTrackingSettings } from "@/components/settings/seed-tracking-settings";
+import { AnalyticsSettings } from "@/components/settings/analytics-settings";
 import {
   calculateStats,
   formatWatchTime,
@@ -754,6 +755,15 @@ export default function SettingsPage() {
                 Seed Statistics & Achievements
               </h2>
               <SeedTrackingSettings />
+            </GlassCard>
+
+            {/* Analytics & Diagnostics */}
+            <GlassCard>
+              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-primary" />
+                Analytics & Diagnostics
+              </h2>
+              <AnalyticsSettings />
             </GlassCard>
 
             {/* Appearance */}
