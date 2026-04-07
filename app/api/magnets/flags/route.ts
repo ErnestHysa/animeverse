@@ -103,17 +103,18 @@ export async function GET(request: NextRequest) {
 }
 
 /**
- * PUT /api/magnets/flags/[id]/review
- * Admin review of flag
+ * PATCH /api/magnets/flags/review
+ * Admin review of flag (uses query parameters instead of dynamic route)
  */
-export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function PATCH(request: NextRequest) {
   try {
-    const { id } = await params;
+    const searchParams = request.nextUrl.searchParams;
+    const id = searchParams.get("id");
     const body = await request.json();
     const { adminId, action, note } = body;
 
     // Validation
-    if (!adminId || !action) {
+    if (!id || !adminId || !action) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 

@@ -98,16 +98,17 @@ export async function GET(request: NextRequest) {
 }
 
 /**
- * PUT /api/magnets/comments/[id]
- * Update a comment
+ * PATCH /api/magnets/comments
+ * Update a comment (uses query parameters instead of dynamic route)
  */
-export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function PATCH(request: NextRequest) {
   try {
-    const { id } = await params;
+    const searchParams = request.nextUrl.searchParams;
+    const id = searchParams.get("id");
     const body = await request.json();
     const { comment, userId } = body;
 
-    if (!comment || !userId) {
+    if (!id || !comment || !userId) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
@@ -143,17 +144,17 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 }
 
 /**
- * DELETE /api/magnets/comments/[id]
- * Delete a comment
+ * DELETE /api/magnets/comments
+ * Delete a comment (uses query parameters instead of dynamic route)
  */
-export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: NextRequest) {
   try {
-    const { id } = await params;
     const searchParams = request.nextUrl.searchParams;
+    const id = searchParams.get("id");
     const userId = searchParams.get("userId");
 
-    if (!userId) {
-      return NextResponse.json({ error: "userId parameter is required" }, { status: 400 });
+    if (!id || !userId) {
+      return NextResponse.json({ error: "Missing required parameters" }, { status: 400 });
     }
 
     // Find and delete comment

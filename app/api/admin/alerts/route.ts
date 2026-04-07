@@ -49,20 +49,23 @@ export async function GET(request: NextRequest) {
 }
 
 /**
- * PUT /api/admin/alerts/[id]/resolve
- * Resolve an alert (admin only)
+ * PATCH /api/admin/alerts/resolve
+ * Resolve an alert (admin only, uses query parameters instead of dynamic route)
  */
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: NextRequest) {
   // Check admin access
   if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
-    const { id } = await params;
+    const searchParams = request.nextUrl.searchParams;
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json({ error: 'Missing alert ID' }, { status: 400 });
+    }
+
     const alertsManager = getAlertsManager();
     alertsManager.resolveAlert(id);
 
@@ -74,6 +77,37 @@ export async function PUT(
     console.error("Error resolving alert:", error);
     return NextResponse.json(
       { error: "Failed to resolve alert" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * POST /api/admin/alerts
+ * Create a new alert (admin only)
+ */
+export async function POST(request: NextRequest) {
+  // Check admin access
+  if (!(await isAdminRequest(request))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  try {
+    const body = await request.json();
+    const { type, severity, message, metadata } = body;
+
+    const alertsManager = getAlertsManager();
+    const alert = alertsManager.manualCreateAlert(type, severity, message, metadata);
+
+    return NextResponse.json({
+      success: true,
+      alert,
+      message: "Alert created",
+    }, { status: 201 });
+  } catch (error) {
+    console.error("Error creating alert:", error);
+    return NextResponse.json(
+      { error: "Failed to create alert" },
       { status: 500 }
     );
   }

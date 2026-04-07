@@ -186,6 +186,35 @@ class AlertsManager {
   }
 
   /**
+   * Manually create an alert (public method for admin use)
+   */
+  manualCreateAlert(
+    type: Alert["type"],
+    severity: Alert["severity"],
+    message: string,
+    metadata?: Record<string, unknown>
+  ): Alert {
+    const alert: Alert = {
+      id: `alert_manual_${Date.now()}_${type}`,
+      type,
+      severity,
+      message,
+      timestamp: Date.now(),
+      resolved: false,
+      metadata,
+    };
+
+    this.alerts.set(alert.id, alert);
+
+    // Call webhook or send notification
+    this.notifyAlert(alert).catch((err) => {
+      console.error("[AlertsManager] Error notifying alert:", err);
+    });
+
+    return alert;
+  }
+
+  /**
    * Resolve alert
    */
   resolveAlert(alertId: string): void {
