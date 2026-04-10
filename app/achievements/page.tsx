@@ -7,13 +7,13 @@
 
 export const dynamic = "force-dynamic";
 
-import { useState, useEffect } from "react";
-import { Trophy, Target, Award, TrendingUp, Lock } from "lucide-react";
+import { useState } from "react";
+import { Trophy, Target, Lock } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { GlassCard } from "@/components/ui/glass-card";
 import { useStore } from "@/store";
-import { ACHIEVEMENTS, RARITY_COLORS, RARITY_BADGES, getAchievementRequirement } from "@/lib/achievements";
+import { ACHIEVEMENTS, RARITY_COLORS, RARITY_BADGES } from "@/lib/achievements";
 
 export default function AchievementsPage() {
   const { achievements, unlockedAchievements, watchHistory, favorites } = useStore();

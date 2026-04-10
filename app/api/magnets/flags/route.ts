@@ -111,7 +111,7 @@ export async function PATCH(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get("id");
     const body = await request.json();
-    const { adminId, action, note } = body;
+    const { adminId, action } = body;
 
     // Validation
     if (!id || !adminId || !action) {

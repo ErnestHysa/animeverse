@@ -14,7 +14,13 @@ export const dynamic = "force-dynamic";
 
 // Simple in-memory event storage (in production, use a proper database)
 // For now, we'll store events in memory and write to a file periodically
-const analyticsEvents: any[] = [];
+interface AnalyticsEvent {
+  eventType: string;
+  timestamp: number;
+  [key: string]: unknown;
+}
+
+const analyticsEvents: AnalyticsEvent[] = [];
 
 /**
  * POST /api/analytics/events

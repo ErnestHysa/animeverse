@@ -117,6 +117,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Find comment
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     for (const [magnetHash, comments] of commentsStore.entries()) {
       const commentIndex = comments.findIndex((c) => c.id === id);
 
@@ -158,6 +159,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Find and delete comment
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     for (const [magnetHash, comments] of commentsStore.entries()) {
       const commentIndex = comments.findIndex((c) => c.id === id);
 

@@ -11,6 +11,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { readdir, readFile } from "fs/promises";
 import { join } from "path";
 
+interface AnalyticsEvent {
+  eventType: string;
+  timestamp: number;
+  method?: string;
+  animeId?: number;
+  episode?: number;
+  watchTime?: number;
+  animeTitle?: string;
+  bufferTime?: number;
+  seederCount?: number;
+  fallbackReason?: string;
+  quality?: string;
+  [key: string]: unknown;
+}
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -68,7 +83,7 @@ async function loadAnalyticsEvents(startTime: number) {
     const analyticsDir = join(process.cwd(), "data", "analytics");
     const files = await readdir(analyticsDir);
 
-    const events: any[] = [];
+    const events: AnalyticsEvent[] = [];
 
     for (const file of files) {
       if (file.endsWith(".json")) {
@@ -79,7 +94,7 @@ async function loadAnalyticsEvents(startTime: number) {
 
           // Filter events by time range
           const filteredEvents = fileEvents.filter(
-            (event: any) => event.timestamp >= startTime
+            (event: AnalyticsEvent) => event.timestamp >= startTime
           );
 
           events.push(...filteredEvents);
@@ -99,7 +114,7 @@ async function loadAnalyticsEvents(startTime: number) {
 /**
  * Calculate analytics summary
  */
-function calculateSummary(events: any[], period: string) {
+function calculateSummary(events: AnalyticsEvent[], period: string) {
   const playbackStartEvents = events.filter((e) => e.eventType === "playback_start");
   const playbackEndEvents = events.filter((e) => e.eventType === "playback_end");
   const fallbackEvents = events.filter((e) => e.eventType === "fallback");
@@ -114,7 +129,7 @@ function calculateSummary(events: any[], period: string) {
   };
 
   playbackStartEvents.forEach((event) => {
-    if (event.method in methodDistribution) {
+    if (event.method && event.method in methodDistribution) {
       methodDistribution[event.method as keyof typeof methodDistribution]++;
     }
   });
@@ -123,7 +138,7 @@ function calculateSummary(events: any[], period: string) {
   const totalStreams = playbackStartEvents.length;
 
   // Calculate average watch time
-  const totalWatchTime = playbackEndEvents.reduce((sum, event) => sum + (event.duration || 0), 0);
+  const totalWatchTime = playbackEndEvents.reduce((sum, event) => sum + (event.duration as number || 0), 0);
   const averageWatchTime = playbackEndEvents.length > 0
     ? totalWatchTime / playbackEndEvents.length
     : 0;
@@ -134,23 +149,25 @@ function calculateSummary(events: any[], period: string) {
     : 0;
 
   // Calculate average seeder count
-  const totalSeeders = torrentStatsEvents.reduce((sum, event) => sum + (event.seeders || 0), 0);
+  const totalSeeders = torrentStatsEvents.reduce((sum, event) => sum + (event.seeders as number || 0), 0);
   const averageSeederCount = torrentStatsEvents.length > 0
     ? totalSeeders / torrentStatsEvents.length
     : 0;
 
   // Calculate average buffer time
-  const totalBufferTime = bufferingEvents.reduce((sum, event) => sum + (event.bufferDuration || 0), 0);
+  const totalBufferTime = bufferingEvents.reduce((sum, event) => sum + (event.bufferDuration as number || 0), 0);
   const averageBufferTime = bufferingEvents.length > 0
-    ? totalBufferTime / bufferingEvents.length
+    ? Math.round(totalBufferTime / bufferingEvents.length)
     : 0;
 
   // Calculate top anime
   const animeStreamCounts = new Map<number, { title: string; count: number }>();
   playbackStartEvents.forEach((event) => {
-    const current = animeStreamCounts.get(event.animeId) || { title: event.animeTitle, count: 0 };
+    const animeId = event.animeId as number;
+    const animeTitle = event.animeTitle as string;
+    const current = animeStreamCounts.get(animeId) || { title: animeTitle, count: 0 };
     current.count++;
-    animeStreamCounts.set(event.animeId, current);
+    animeStreamCounts.set(animeId, current);
   });
 
   const topAnime = Array.from(animeStreamCounts.entries())

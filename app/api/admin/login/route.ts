@@ -6,7 +6,6 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { serialize } from 'cookie';
 import {
   authenticateUser,
   isUsernameLocked,
@@ -157,7 +156,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 /**
  * DELETE handler - Logout
  */
-export async function DELETE(request: NextRequest): Promise<NextResponse> {
+export async function DELETE(_request: NextRequest): Promise<NextResponse> {
   const response = NextResponse.json({ success: true });
 
   // Clear auth cookies

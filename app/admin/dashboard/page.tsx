@@ -24,7 +24,6 @@ import {
   Film,
   RefreshCw,
   Bell,
-  BellOff,
 } from "lucide-react";
 
 interface AnalyticsData {
@@ -80,12 +79,12 @@ export default function AdminDashboardPage() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<"hour" | "day" | "week" | "month">("day");
-  const [alertsEnabled, setAlertsEnabled] = useState(true);
 
   useEffect(() => {
     fetchDashboardData();
     const interval = setInterval(fetchDashboardData, 30000); // Refresh every 30s
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period]);
 
   const fetchDashboardData = async () => {
@@ -149,8 +148,6 @@ export default function AdminDashboardPage() {
   };
 
   const activeAlerts = alerts.filter((a) => !a.resolved);
-  const criticalAlerts = activeAlerts.filter((a) => a.severity === "critical");
-  const warningAlerts = activeAlerts.filter((a) => a.severity === "warning");
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white p-8">
@@ -173,7 +170,7 @@ export default function AdminDashboardPage() {
             </button>
             <select
               value={period}
-              onChange={(e) => setPeriod(e.target.value as any)}
+              onChange={(e) => setPeriod(e.target.value as "hour" | "day" | "week" | "month")}
               className="px-4 py-2 bg-gray-800 rounded-lg border border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="hour">Last Hour</option>

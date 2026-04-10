@@ -480,7 +480,7 @@ export function VideoSourceLoader({
   if (loading) {
     const isSlow = loadingSeconds >= 8;
     return (
-      <GlassCard className="aspect-video flex items-center justify-center animate-fadeIn">
+      <GlassCard className="aspect-video flex items-center justify-center animate-fadeIn" data-testid="loading-indicator">
         <div className="text-center">
           {/* Animated spinner with glow effect */}
           <div className="relative mb-6">
@@ -629,15 +629,15 @@ export function VideoSourceLoader({
       )}
 
       {/* Streaming method indicator */}
-      <div className="flex items-center justify-between text-xs text-muted-foreground px-2">
+      <div className="flex items-center justify-between text-xs text-muted-foreground px-2" data-testid="streaming-method-indicator">
         <div className="flex items-center gap-2">
-          <span className="flex items-center gap-1">
+          <span className="flex items-center gap-1" data-testid="streaming-method-text">
             {currentStreamingMethod === "webtorrent" ? (
               <>
                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
                 Streaming via P2P (WebTorrent)
                 {sources?.seeders !== undefined && (
-                  <span className="ml-1 text-green-400">({sources.seeders} seeders)</span>
+                  <span className="ml-1 text-green-400" data-testid="seed-count">({sources.seeders} seeders)</span>
                 )}
               </>
             ) : (
@@ -648,13 +648,14 @@ export function VideoSourceLoader({
             )}
           </span>
           {fallbackOccurred && fallbackReason && (
-            <span className="text-yellow-400">(Fallback: {fallbackReason})</span>
+            <span className="text-yellow-400" data-testid="fallback-indicator">(Fallback: {fallbackReason})</span>
           )}
         </div>
         <Button
           variant="ghost"
           size="sm"
           className="h-6 px-2 text-xs"
+          data-testid="retry-button"
           onClick={() => {
             setRetryCount(0);
             fetchSources(currentLanguage);

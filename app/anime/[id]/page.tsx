@@ -62,7 +62,6 @@ async function HeroSection({ anime }: { anime: Media }) {
   const title = getAnimeTitle(anime);
   const cover = getAnimeCover(anime);
   const banner = anime.bannerImage;
-  const nextAiring = getNextAiringTime(anime);
 
   return (
     <div className="relative">

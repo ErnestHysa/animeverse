@@ -2299,7 +2299,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
           ) : (
             <div className="flex flex-col items-center gap-3">
               <p className="text-sm font-medium">
-                {isBuffering ? 'Buffering...' : source.url.includes('.m3u8') ? 'Loading stream...' : 'Loading video...'}
+                {isBuffering ? 'Buffering...' : source?.url?.includes('.m3u8') ? 'Loading stream...' : 'Loading video...'}
               </p>
               {/* Animated dots */}
               <div className="flex gap-1">

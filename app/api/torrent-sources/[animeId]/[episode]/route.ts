@@ -12,9 +12,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import {
-  findTorrentSources,
   getTorrentSourcesWithFallback,
-  type MagnetLink,
 } from "@/lib/torrent-finder";
 
 export const runtime = "nodejs";

@@ -52,12 +52,13 @@ export default function AdminMagnetsPage() {
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
-  const [selectedMagnet, setSelectedMagnet] = useState<MagnetEntry | null>(null);
 
   // Filters
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [providerFilter, setProviderFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [qualityFilter, setQualityFilter] = useState<"all" | "1080p" | "720p" | "480p">("all");
+  const [sourceFilter, setSourceFilter] = useState<"all" | "nyaa" | "anidex">("all");
 
   // New magnet form
   const [newMagnet, setNewMagnet] = useState({
@@ -75,10 +76,12 @@ export default function AdminMagnetsPage() {
 
   useEffect(() => {
     fetchMagnets();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     filterMagnets();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [magnets, statusFilter, providerFilter, searchQuery]);
 
   const fetchMagnets = async () => {
