@@ -91,8 +91,8 @@ test.describe('Journey 1: New User Discovery', () => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await waitForPageLoad(page);
 
-    // Verify trending section exists
-    const trendingSection = page.getByText('Trending', { exact: false });
+    // Verify trending section heading exists (use h2 to avoid matching hidden nav link on mobile)
+    const trendingSection = page.locator('h2', { hasText: 'Trending' });
     await expect(trendingSection.first()).toBeVisible({ timeout: TIMEOUT });
 
     // Scroll down to see more content
@@ -101,8 +101,8 @@ test.describe('Journey 1: New User Discovery', () => {
 
     await screenshot(page, '02-homepage-scrolled');
 
-    // Verify popular section
-    const popularSection = page.getByText('Popular', { exact: false });
+    // Verify popular section (use h2 to avoid matching hidden nav link on mobile)
+    const popularSection = page.locator('h2', { hasText: 'Popular' });
     await expect(popularSection.first()).toBeVisible({ timeout: TIMEOUT });
   });
 

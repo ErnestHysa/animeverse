@@ -23,14 +23,41 @@ export const metadata = {
 };
 
 async function getUpcomingAnime() {
-  // Fetch anime that hasn't been released yet (NOT_YET_RELEASED)
-  const result = await anilist.search({
-    page: 1,
-    perPage: 24,
-    sort: "POPULARITY_DESC",
-    status: "NOT_YET_RELEASED",
-  });
-  return result.data?.Page.media ?? [];
+  const { getCurrentSeason, getCurrentYear } = await import("@/lib/anilist");
+
+  const currentSeason = getCurrentSeason();
+  const currentYear = getCurrentYear();
+
+  // Calculate next season
+  const seasons: Array<"WINTER" | "SPRING" | "SUMMER" | "FALL"> = ["WINTER", "SPRING", "SUMMER", "FALL"];
+  const currentSeasonIndex = seasons.indexOf(currentSeason as any);
+  const nextSeasonIndex = (currentSeasonIndex + 1) % 4;
+  const nextSeason = seasons[nextSeasonIndex];
+  const nextYear = nextSeasonIndex < currentSeasonIndex ? currentYear + 1 : currentYear;
+
+  // Fetch multiple sources for upcoming anime
+  const [notYetReleased, nextSeasonAnime] = await Promise.all([
+    // Anime that hasn't been released yet
+    anilist.search({
+      page: 1,
+      perPage: 12,
+      sort: "POPULARITY_DESC",
+      status: "NOT_YET_RELEASED",
+    }),
+    // Next season anime
+    anilist.getSeasonal(nextSeason, nextYear, 1, 12),
+  ]);
+
+  const notYetReleasedAnime = notYetReleased.data?.Page.media ?? [];
+  const nextSeasonAnimeList = nextSeasonAnime.data?.Page.media ?? [];
+
+  // Combine and deduplicate
+  const combined = [...notYetReleasedAnime, ...nextSeasonAnimeList];
+  const uniqueAnime = combined.filter((anime, index, self) =>
+    index === self.findIndex((a) => a.id === anime.id)
+  );
+
+  return uniqueAnime;
 }
 
 export default async function ComingSoonPage() {

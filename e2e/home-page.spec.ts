@@ -54,8 +54,8 @@ test.describe('Home Page', () => {
   test('should display trending section', async ({ page }) => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
 
-    // Wait for any section heading
-    const trendingSection = page.getByText('Trending', { exact: false });
+    // Wait for the trending section heading (h2), not the nav link which is hidden on mobile
+    const trendingSection = page.locator('h2', { hasText: 'Trending' });
     await expect(trendingSection.first()).toBeVisible({ timeout: DEFAULT_TIMEOUT });
 
     await page.screenshot({ timeout: 5000, animations: 'disabled', path: 'test-results/04-trending-section.png', fullPage: false }).catch(() => {});
@@ -64,7 +64,7 @@ test.describe('Home Page', () => {
   test('should display popular section', async ({ page }) => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
 
-    const popularSection = page.getByText('Popular', { exact: false });
+    const popularSection = page.locator('h2', { hasText: 'Popular' });
     await expect(popularSection.first()).toBeVisible({ timeout: DEFAULT_TIMEOUT });
   });
 

@@ -283,7 +283,8 @@ p {
   border-width: 0;
 }
 
-.focus:not-sr-only {
+.focus\:not-sr-only,
+.focus:not(.sr-only) {
   position: static;
   width: auto;
   height: auto;
