@@ -72,6 +72,15 @@ interface LoginResponse {
  */
 export async function POST(request: NextRequest): Promise<NextResponse<LoginResponse>> {
   try {
+    // Body size check
+    const contentLength = parseInt(request.headers.get('content-length') || '0');
+    if (contentLength > 1048576) {
+      return NextResponse.json(
+        { success: false, error: 'Request too large' },
+        { status: 413 }
+      );
+    }
+
     const body: LoginRequestBody = await request.json();
     const { username, password, remember = false } = body;
 
@@ -151,15 +160,6 @@ export async function POST(request: NextRequest): Promise<NextResponse<LoginResp
       path: '/',
     });
 
-    // Set refresh token cookie
-    response.cookies.set('refresh_token', result.tokens!.refresh, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60, // 7 days
-      path: '/',
-    });
-
     return response;
   } catch (error) {
     console.error('[Admin Login] Error:', error);
@@ -210,7 +210,6 @@ export async function DELETE(_request: NextRequest): Promise<NextResponse> {
 
   // Clear auth cookies
   response.cookies.delete('auth_token');
-  response.cookies.delete('refresh_token');
 
   return response;
 }

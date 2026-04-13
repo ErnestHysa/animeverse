@@ -5,6 +5,8 @@
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import { useMemo } from "react";
+
 import type { Media } from "@/types/anilist";
 import { STORAGE_KEYS, DEFAULT_PREFERENCES } from "@/lib/constants";
 import { ACHIEVEMENTS, getAchievementRequirement } from "@/lib/achievements";
@@ -396,13 +398,16 @@ export const useStore = create<StoreState>()(
 
       setMediaCache: (media: Media) =>
         set((state) => {
-          const newCache = { ...state.mediaCache, [media.id]: media };
+          const now = Date.now();
+          const newCache = { ...state.mediaCache, [media.id]: { ...media, _lastAccessed: now } } as any;
           const keys = Object.keys(newCache);
 
-          // Evict oldest entries if cache exceeds 500 items (simple LRU approximation)
+          // Evict least-recently-accessed entries if cache exceeds 500 items
           if (keys.length > 500) {
             const excess = keys.length - 500;
-            const keysToRemove = keys.slice(0, excess);
+            // Sort keys by lastAccessed timestamp ascending (oldest first)
+            const sortedKeys = keys.sort((a, b) => (newCache[a]._lastAccessed || 0) - (newCache[b]._lastAccessed || 0));
+            const keysToRemove = sortedKeys.slice(0, excess);
             for (const key of keysToRemove) {
               delete newCache[Number(key)];
             }
@@ -412,7 +417,15 @@ export const useStore = create<StoreState>()(
         }),
 
       getMediaCache: (id: number) => {
-        return get().mediaCache[id];
+        const cached = get().mediaCache[id];
+        if (cached) {
+          // Update lastAccessed timestamp on read
+          const now = Date.now();
+          set((state) => ({
+            mediaCache: { ...state.mediaCache, [id]: { ...state.mediaCache[id], _lastAccessed: now } },
+          }));
+        }
+        return cached;
       },
 
       clearMediaCache: () => set({ mediaCache: {} }),
@@ -1006,192 +1019,222 @@ export const useStore = create<StoreState>()(
  * Hook for favorites
  */
 export const useFavorites = () => {
-  const favorites = useStore((state) => state.favorites);
-  const addFavorite = useStore((state) => state.addFavorite);
-  const removeFavorite = useStore((state) => state.removeFavorite);
-  const toggleFavorite = useStore((state) => state.toggleFavorite);
-  const isFavorite = useStore((state) => state.isFavorite);
-  const clearFavorites = useStore((state) => state.clearFavorites);
+  const favorites = useStore(s => s.favorites);
+  const addFavorite = useStore(s => s.addFavorite);
+  const removeFavorite = useStore(s => s.removeFavorite);
+  const toggleFavorite = useStore(s => s.toggleFavorite);
+  const isFavorite = useStore(s => s.isFavorite);
+  const clearFavorites = useStore(s => s.clearFavorites);
 
-  return {
-    favorites,
-    addFavorite,
-    removeFavorite,
-    toggleFavorite,
-    isFavorite,
-    clearFavorites,
-    count: favorites.length,
-  };
+  return useMemo(
+    () => ({
+      favorites,
+      addFavorite,
+      removeFavorite,
+      toggleFavorite,
+      isFavorite,
+      clearFavorites,
+      count: favorites.length,
+    }),
+    [favorites, addFavorite, removeFavorite, toggleFavorite, isFavorite, clearFavorites]
+  );
 };
 
 /**
  * Hook for watchlist
  */
 export const useWatchlist = () => {
-  const watchlist = useStore((state) => state.watchlist);
-  const addWatchlist = useStore((state) => state.addWatchlist);
-  const removeWatchlist = useStore((state) => state.removeWatchlist);
-  const toggleWatchlist = useStore((state) => state.toggleWatchlist);
-  const isInWatchlist = useStore((state) => state.isInWatchlist);
-  const clearWatchlist = useStore((state) => state.clearWatchlist);
+  const watchlist = useStore(s => s.watchlist);
+  const addWatchlist = useStore(s => s.addWatchlist);
+  const removeWatchlist = useStore(s => s.removeWatchlist);
+  const toggleWatchlist = useStore(s => s.toggleWatchlist);
+  const isInWatchlist = useStore(s => s.isInWatchlist);
+  const clearWatchlist = useStore(s => s.clearWatchlist);
 
-  return {
-    watchlist,
-    addWatchlist,
-    removeWatchlist,
-    toggleWatchlist,
-    isInWatchlist,
-    clearWatchlist,
-    count: watchlist.length,
-  };
+  return useMemo(
+    () => ({
+      watchlist,
+      addWatchlist,
+      removeWatchlist,
+      toggleWatchlist,
+      isInWatchlist,
+      clearWatchlist,
+      count: watchlist.length,
+    }),
+    [watchlist, addWatchlist, removeWatchlist, toggleWatchlist, isInWatchlist, clearWatchlist]
+  );
 };
 
 /**
  * Hook for watch history
  */
 export const useWatchHistory = () => {
-  const watchHistory = useStore((state) => state.watchHistory);
-  const addToWatchHistory = useStore((state) => state.addToWatchHistory);
-  const getWatchHistoryItem = useStore((state) => state.getWatchHistoryItem);
-  const getContinueWatching = useStore((state) => state.getContinueWatching);
-  const clearWatchHistory = useStore((state) => state.clearWatchHistory);
-  const clearMediaHistory = useStore((state) => state.clearMediaHistory);
+  const watchHistory = useStore(s => s.watchHistory);
+  const addToWatchHistory = useStore(s => s.addToWatchHistory);
+  const getWatchHistoryItem = useStore(s => s.getWatchHistoryItem);
+  const getContinueWatching = useStore(s => s.getContinueWatching);
+  const clearWatchHistory = useStore(s => s.clearWatchHistory);
+  const clearMediaHistory = useStore(s => s.clearMediaHistory);
 
-  return {
-    watchHistory,
-    addToWatchHistory,
-    getWatchHistoryItem,
-    getContinueWatching,
-    clearWatchHistory,
-    clearMediaHistory,
-  };
+  return useMemo(
+    () => ({
+      watchHistory,
+      addToWatchHistory,
+      getWatchHistoryItem,
+      getContinueWatching,
+      clearWatchHistory,
+      clearMediaHistory,
+    }),
+    [watchHistory, addToWatchHistory, getWatchHistoryItem, getContinueWatching, clearWatchHistory, clearMediaHistory]
+  );
 };
 
 /**
  * Hook for user preferences
  */
 export const usePreferences = () => {
-  const preferences = useStore((state) => state.preferences);
-  const updatePreferences = useStore((state) => state.updatePreferences);
-  const resetPreferences = useStore((state) => state.resetPreferences);
+  const preferences = useStore(s => s.preferences);
+  const updatePreferences = useStore(s => s.updatePreferences);
+  const resetPreferences = useStore(s => s.resetPreferences);
 
-  return {
-    preferences,
-    updatePreferences,
-    resetPreferences,
-  };
+  return useMemo(
+    () => ({
+      preferences,
+      updatePreferences,
+      resetPreferences,
+    }),
+    [preferences, updatePreferences, resetPreferences]
+  );
 };
 
 /**
  * Hook for media cache
  */
 export const useMediaCache = () => {
-  const mediaCache = useStore((state) => state.mediaCache);
-  const setMediaCache = useStore((state) => state.setMediaCache);
-  const getMediaCache = useStore((state) => state.getMediaCache);
-  const clearMediaCache = useStore((state) => state.clearMediaCache);
+  const mediaCache = useStore(s => s.mediaCache);
+  const setMediaCache = useStore(s => s.setMediaCache);
+  const getMediaCache = useStore(s => s.getMediaCache);
+  const clearMediaCache = useStore(s => s.clearMediaCache);
 
-  return {
-    mediaCache,
-    setMediaCache,
-    getMediaCache,
-    clearMediaCache,
-  };
+  return useMemo(
+    () => ({
+      mediaCache,
+      setMediaCache,
+      getMediaCache,
+      clearMediaCache,
+    }),
+    [mediaCache, setMediaCache, getMediaCache, clearMediaCache]
+  );
 };
 
 /**
  * Hook for AniList authentication
  */
 export const useAniListAuth = () => {
-  const anilistUser = useStore((state) => state.anilistUser);
-  const anilistToken = useStore((state) => state.anilistToken);
-  const anilistMediaList = useStore((state) => state.anilistMediaList);
-  const isAuthenticated = useStore((state) => state.isAuthenticated);
-  const setAniListAuth = useStore((state) => state.setAniListAuth);
-  const clearAniListAuth = useStore((state) => state.clearAniListAuth);
-  const syncAniListData = useStore((state) => state.syncAniListData);
-  const migrateAniListData = useStore((state) => state.migrateAniListData);
+  const anilistUser = useStore(s => s.anilistUser);
+  const anilistToken = useStore(s => s.anilistToken);
+  const anilistMediaList = useStore(s => s.anilistMediaList);
+  const isAuthenticated = useStore(s => s.isAuthenticated);
+  const setAniListAuth = useStore(s => s.setAniListAuth);
+  const clearAniListAuth = useStore(s => s.clearAniListAuth);
+  const syncAniListData = useStore(s => s.syncAniListData);
+  const migrateAniListData = useStore(s => s.migrateAniListData);
 
-  return {
-    anilistUser,
-    anilistToken,
-    anilistMediaList,
-    isAuthenticated,
-    setAniListAuth,
-    clearAniListAuth,
-    syncAniListData,
-    migrateAniListData,
-  };
+  return useMemo(
+    () => ({
+      anilistUser,
+      anilistToken,
+      anilistMediaList,
+      isAuthenticated,
+      setAniListAuth,
+      clearAniListAuth,
+      syncAniListData,
+      migrateAniListData,
+    }),
+    [anilistUser, anilistToken, anilistMediaList, isAuthenticated, setAniListAuth, clearAniListAuth, syncAniListData, migrateAniListData]
+  );
 };
 
 /**
  * Hook for Achievements
  */
 export const useAchievements = () => {
-  const achievements = useStore((state) => state.achievements);
-  const unlockedAchievements = useStore((state) => state.unlockedAchievements);
-  const unlockAchievement = useStore((state) => state.unlockAchievement);
-  const updateAchievementProgress = useStore((state) => state.updateAchievementProgress);
-  const checkAndUnlockAchievements = useStore((state) => state.checkAndUnlockAchievements);
+  const achievements = useStore(s => s.achievements);
+  const unlockedAchievements = useStore(s => s.unlockedAchievements);
+  const unlockAchievement = useStore(s => s.unlockAchievement);
+  const updateAchievementProgress = useStore(s => s.updateAchievementProgress);
+  const checkAndUnlockAchievements = useStore(s => s.checkAndUnlockAchievements);
 
-  return {
-    achievements,
-    unlockedAchievements,
-    unlockAchievement,
-    updateAchievementProgress,
-    checkAndUnlockAchievements,
-  };
+  return useMemo(
+    () => ({
+      achievements,
+      unlockedAchievements,
+      unlockAchievement,
+      updateAchievementProgress,
+      checkAndUnlockAchievements,
+    }),
+    [achievements, unlockedAchievements, unlockAchievement, updateAchievementProgress, checkAndUnlockAchievements]
+  );
 };
 
 /**
  * Hook for MAL authentication
  */
 export const useMALAuth = () => {
-  const malUser = useStore((state) => state.malUser);
-  const malToken = useStore((state) => state.malToken);
-  const malRefreshToken = useStore((state) => state.malRefreshToken);
-  const malTokenExpiresAt = useStore((state) => state.malTokenExpiresAt);
-  const setMALAuth = useStore((state) => state.setMALAuth);
-  const clearMALAuth = useStore((state) => state.clearMALAuth);
+  const malUser = useStore(s => s.malUser);
+  const malToken = useStore(s => s.malToken);
+  const malRefreshToken = useStore(s => s.malRefreshToken);
+  const malTokenExpiresAt = useStore(s => s.malTokenExpiresAt);
+  const setMALAuth = useStore(s => s.setMALAuth);
+  const clearMALAuth = useStore(s => s.clearMALAuth);
 
-  return {
-    malUser,
-    malToken,
-    malRefreshToken,
-    malTokenExpiresAt,
-    setMALAuth,
-    clearMALAuth,
-    isMALAuthenticated: !!malToken,
-  };
+  return useMemo(
+    () => ({
+      malUser,
+      malToken,
+      malRefreshToken,
+      malTokenExpiresAt,
+      setMALAuth,
+      clearMALAuth,
+      isMALAuthenticated: !!malToken,
+    }),
+    [malUser, malToken, malRefreshToken, malTokenExpiresAt, setMALAuth, clearMALAuth]
+  );
 };
 
 /**
  * Hook for mini player state
  */
 export const useMiniPlayer = () => {
-  const miniPlayer = useStore((state) => state.miniPlayer);
-  const setMiniPlayer = useStore((state) => state.setMiniPlayer);
-  const clearMiniPlayer = useStore((state) => state.clearMiniPlayer);
+  const miniPlayer = useStore(s => s.miniPlayer);
+  const setMiniPlayer = useStore(s => s.setMiniPlayer);
+  const clearMiniPlayer = useStore(s => s.clearMiniPlayer);
 
-  return {
-    miniPlayerAnime: miniPlayer,
-    setMiniPlayer,
-    clearMiniPlayer,
-    isMiniPlayerActive: !!miniPlayer,
-  };
+  return useMemo(
+    () => ({
+      miniPlayerAnime: miniPlayer,
+      setMiniPlayer,
+      clearMiniPlayer,
+      isMiniPlayerActive: !!miniPlayer,
+    }),
+    [miniPlayer, setMiniPlayer, clearMiniPlayer]
+  );
 };
 
 /**
  * Hook for per-anime preferences
  */
 export const usePerAnimePrefs = () => {
-  const perAnimePrefs = useStore((state) => state.perAnimePrefs);
-  const setPerAnimePref = useStore((state) => state.setPerAnimePref);
-  const getPerAnimePref = useStore((state) => state.getPerAnimePref);
+  const perAnimePrefs = useStore(s => s.perAnimePrefs);
+  const setPerAnimePref = useStore(s => s.setPerAnimePref);
+  const getPerAnimePref = useStore(s => s.getPerAnimePref);
 
-  return {
-    perAnimePrefs,
-    setPerAnimePref,
-    getPerAnimePref,
-  };
+  return useMemo(
+    () => ({
+      perAnimePrefs,
+      setPerAnimePref,
+      getPerAnimePref,
+    }),
+    [perAnimePrefs, setPerAnimePref, getPerAnimePref]
+  );
 };

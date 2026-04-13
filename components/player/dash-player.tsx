@@ -17,6 +17,9 @@
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import toast from "react-hot-toast";
+import { createScopedLogger } from "@/lib/logger";
+
+const logger = createScopedLogger("dash-player");
 
 // ===================================
 // Types
@@ -119,7 +122,7 @@ export const DASHPlayer = React.forwardRef<DASHPlayerRef, DASHPlayerProps>(
 
         // Attach event listeners
         dashInstance.on((dashjs.MediaPlayer.events as any).STREAM_INITIALIZED, () => {
-          console.log("[DASHPlayer] Stream initialized");
+          logger.info("Stream initialized");
         });
 
         dashInstance.on((dashjs.MediaPlayer.events as any).QUALITY_CHANGE_RENDERED, (e: any) => {
@@ -137,11 +140,11 @@ export const DASHPlayer = React.forwardRef<DASHPlayerRef, DASHPlayerProps>(
 
         dashInstance.on((dashjs.MediaPlayer.events as any).BUFFER_LOADED, () => {
           setLoading(false);
-          console.log("[DASHPlayer] Buffer loaded");
+          logger.info("Buffer loaded");
         });
 
         dashInstance.on((dashjs.MediaPlayer.events as any).ERROR, (e: any) => {
-          console.error("[DASHPlayer] DASH error:", e);
+          logger.error("DASH error:", e);
           const errorMsg = `DASH error: ${e.error || "Unknown error"}`;
           setError(errorMsg);
           setLoading(false);
@@ -168,10 +171,10 @@ export const DASHPlayer = React.forwardRef<DASHPlayerRef, DASHPlayerProps>(
           }
         }
 
-        console.log("[DASHPlayer] Initialized successfully");
+        logger.info("Initialized successfully");
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
-        console.error("[DASHPlayer] Initialization failed:", error);
+        logger.error("Initialization failed:", error);
         setError(error.message);
         setLoading(false);
         onError?.(error);
@@ -195,7 +198,7 @@ export const DASHPlayer = React.forwardRef<DASHPlayerRef, DASHPlayerProps>(
           }))
           .sort((a: DASHQuality, b: DASHQuality) => b.bitrate - a.bitrate);
       } catch (err) {
-        console.error("[DASHPlayer] Failed to get qualities:", err);
+        logger.error("Failed to get qualities:", err);
         return [];
       }
     };
@@ -289,7 +292,7 @@ export const DASHPlayer = React.forwardRef<DASHPlayerRef, DASHPlayerProps>(
           dashInstanceRef.current = null;
         }
       },
-    }));
+    }), [currentQuality]);
 
     /**
      * Initialize on mount

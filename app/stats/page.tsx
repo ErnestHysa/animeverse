@@ -5,8 +5,6 @@
 
 "use client";
 
-export const dynamic = "force-dynamic";
-
 import { useMemo, useState } from "react";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
@@ -84,7 +82,10 @@ function GenreBar({ genre, count, maxCount, color }: GenreBarProps) {
 }
 
 export default function StatsPage() {
-  const { watchHistory, favorites, mediaCache, anilistMediaList } = useStore();
+  const watchHistory = useStore((s) => s.watchHistory);
+  const favorites = useStore((s) => s.favorites);
+  const mediaCache = useStore((s) => s.mediaCache);
+  const anilistMediaList = useStore((s) => s.anilistMediaList);
   const [currentTimestamp] = useState(() => Date.now());
 
   // Calculate comprehensive statistics

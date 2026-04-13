@@ -8,6 +8,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyToken, extractTokenFromHeader, getUserByUsername } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -102,16 +103,35 @@ export async function DELETE(
   try {
     const { roomId } = await params;
 
-    // Get user info from auth
+    // Get user info from auth — proper JWT verification
     const authHeader = request.headers.get('authorization');
-    const userId = authHeader?.replace('Bearer ', '');
+    const token = extractTokenFromHeader(authHeader);
 
-    if (!userId) {
+    if (!token) {
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
       );
     }
+
+    const payload = verifyToken(token);
+    if (!payload) {
+      return NextResponse.json(
+        { error: 'Invalid or expired token' },
+        { status: 401 }
+      );
+    }
+
+    // Verify user exists in store
+    const userRecord = getUserByUsername(payload.username);
+    if (!userRecord) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 401 }
+      );
+    }
+
+    const userId = payload.userId;
 
     // Get room manager
     const roomManager = getRoomManager();

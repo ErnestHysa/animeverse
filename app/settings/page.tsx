@@ -49,7 +49,7 @@ import {
   saveStats,
   type UserStats,
 } from "@/lib/stats";
-import { useStore } from "@/store";
+import { useStore, type AniListMediaEntry } from "@/store";
 import { Clock, Flame, TrendingUp, BarChart3, Award, Keyboard } from "lucide-react";
 import { DEFAULT_SHORTCUTS } from "@/lib/keyboard-shortcuts";
 import { safeGetItem, safeRemoveItem } from "@/lib/storage";

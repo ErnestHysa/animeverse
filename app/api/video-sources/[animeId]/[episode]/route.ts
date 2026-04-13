@@ -105,11 +105,32 @@ export async function GET(
   }
 }
 
-export async function OPTIONS() {
+function getAllowedVideoOrigin(request: NextRequest): string {
+  const origin = request.headers.get('origin');
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || '';
+  if (origin) {
+    try {
+      const originHost = new URL(origin).hostname;
+      if (
+        originHost === 'localhost' ||
+        originHost === '127.0.0.1' ||
+        originHost.endsWith('.animeverse.app') ||
+        (appUrl && new URL(appUrl).hostname === originHost)
+      ) {
+        return origin;
+      }
+    } catch {}
+  }
+  const host = request.headers.get('host') || '';
+  const protocol = request.headers.get('x-forwarded-proto') || 'https';
+  return `${protocol}://${host}`;
+}
+
+export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
     status: 200,
     headers: {
-      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Origin": getAllowedVideoOrigin(request),
       "Access-Control-Allow-Methods": "GET, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
     },

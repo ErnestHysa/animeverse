@@ -9,7 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { nanoid } from 'nanoid';
-import { verifyToken, extractTokenFromHeader } from '@/lib/auth';
+import { verifyToken, extractTokenFromHeader, getUserByUsername } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -45,6 +45,15 @@ function getRoomManager() {
  */
 export async function POST(request: NextRequest) {
   try {
+    // Body size check
+    const contentLength = parseInt(request.headers.get('content-length') || '0');
+    if (contentLength > 1048576) {
+      return NextResponse.json(
+        { error: 'Request too large' },
+        { status: 413 }
+      );
+    }
+
     const body: CreateRoomBody = await request.json();
     const { name, animeId, episodeNumber, isPublic = true, password } = body;
 
@@ -56,10 +65,43 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get user info (from auth header or session)
+    // Get user info (from auth header or session) — proper JWT verification
     const authHeader = request.headers.get('authorization');
-    const hostId = authHeader?.replace('Bearer ', '') || nanoid(10);
-    const hostUsername = request.headers.get('x-username') || 'Anonymous';
+    const token = extractTokenFromHeader(authHeader);
+    const payload = token ? verifyToken(token) : null;
+
+    let hostId: string;
+    let hostUsername: string;
+
+    if (payload) {
+      // Validate that the user exists in the admin store
+      const userRecord = getUserByUsername(payload.username);
+      if (!userRecord) {
+        return NextResponse.json(
+          { error: 'Invalid authentication: user not found' },
+          { status: 401 }
+        );
+      }
+      hostId = payload.userId;
+      hostUsername = payload.username;
+    } else {
+      // Fallback for anonymous users — generate a random ID
+      hostId = nanoid(10);
+      hostUsername = 'Anonymous';
+    }
+
+    // Validate x-username header (non-empty, max length 50)
+    const xUsername = request.headers.get('x-username');
+    if (xUsername) {
+      const trimmed = xUsername.trim();
+      if (trimmed.length === 0 || trimmed.length > 50) {
+        return NextResponse.json(
+          { error: 'Invalid username' },
+          { status: 400 }
+        );
+      }
+      hostUsername = trimmed;
+    }
 
     // Get room manager
     const roomManager = getRoomManager();

@@ -28,14 +28,12 @@ interface BatchOperationsProps {
 }
 
 export function BatchOperations({ className = "" }: BatchOperationsProps) {
-  const {
-    favorites,
-    toggleFavorite,
-    watchlist,
-    toggleWatchlist,
-    mediaCache,
-    setMediaCache,
-  } = useStore();
+  const favorites = useStore((s) => s.favorites);
+  const toggleFavorite = useStore((s) => s.toggleFavorite);
+  const watchlist = useStore((s) => s.watchlist);
+  const toggleWatchlist = useStore((s) => s.toggleWatchlist);
+  const mediaCache = useStore((s) => s.mediaCache);
+  const setMediaCache = useStore((s) => s.setMediaCache);
   const { lists, addAnimeToList } = useCustomLists();
   const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
   const [selectionMode, setSelectionMode] = useState<"favorites" | "watchlist" | null>(null);

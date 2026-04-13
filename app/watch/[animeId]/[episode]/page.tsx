@@ -28,6 +28,7 @@ import {
 import { EpisodeCommentsSection } from "@/components/watch/episode-comments-section";
 import { CacheAnime } from "@/components/anime/cache-anime";
 import { MiniPlayerActivator } from "@/components/player/mini-player-activator";
+import { ClientErrorBoundary } from "@/components/error/client-error-boundary";
 
 function LinkButton({ href, children }: { href: string; children: React.ReactNode }) {
   return (
@@ -107,15 +108,17 @@ async function VideoSection({ anime, episodeNum }: { anime: Media; episodeNum: n
         episode={episodeNum}
         coverImage={anime.coverImage?.large ?? undefined}
       />
-      <VideoSourceLoader
-        animeId={anime.id}
-        episodeNumber={episodeNum}
-        animeTitle={englishTitle}
-        malId={anime.idMal || null}
-        poster={anime.coverImage?.extraLarge || undefined}
-        nextEpisodeUrl={hasNext ? `/watch/${anime.id}/${episodeNum + 1}` : undefined}
-        prevEpisodeUrl={hasPrev ? `/watch/${anime.id}/${episodeNum - 1}` : undefined}
-      />
+      <ClientErrorBoundary>
+        <VideoSourceLoader
+          animeId={anime.id}
+          episodeNumber={episodeNum}
+          animeTitle={englishTitle}
+          malId={anime.idMal || null}
+          poster={anime.coverImage?.extraLarge || undefined}
+          nextEpisodeUrl={hasNext ? `/watch/${anime.id}/${episodeNum + 1}` : undefined}
+          prevEpisodeUrl={hasPrev ? `/watch/${anime.id}/${episodeNum - 1}` : undefined}
+        />
+      </ClientErrorBoundary>
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

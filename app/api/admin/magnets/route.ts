@@ -19,6 +19,9 @@ import { isAdminRequest } from "@/lib/auth";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Write queue to serialize database writes and prevent TOCTOU races
+let writeQueue: Promise<any> = Promise.resolve();
+
 // Database file path
 const MAGNETS_DB_PATH = path.join(process.cwd(), "data", "magnets.json");
 
@@ -152,6 +155,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Body size check
+    const contentLength = parseInt(request.headers.get('content-length') || '0');
+    if (contentLength > 1048576) {
+      return NextResponse.json({ error: "Request too large" }, { status: 413 });
+    }
+
     const body = await request.json();
     const {
       animeId,
@@ -224,7 +233,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     };
 
     db.magnets.push(newMagnet);
-    await writeDatabase(db);
+    writeQueue = writeQueue.then(async () => {
+      await writeDatabase(db);
+    });
+    await writeQueue;
 
     return NextResponse.json(
       {
@@ -251,6 +263,12 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
     // Auth check
     if (!(await isAdminRequest(request))) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Body size check
+    const contentLength = parseInt(request.headers.get('content-length') || '0');
+    if (contentLength > 1048576) {
+      return NextResponse.json({ error: "Request too large" }, { status: 413 });
     }
 
     const body = await request.json();
@@ -285,7 +303,10 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
     }
     db.magnets[magnetIndex].updatedAt = Date.now();
 
-    await writeDatabase(db);
+    writeQueue = writeQueue.then(async () => {
+      await writeDatabase(db);
+    });
+    await writeQueue;
 
     return NextResponse.json({
       success: true,
@@ -333,7 +354,10 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
 
     // Remove magnet
     db.magnets.splice(magnetIndex, 1);
-    await writeDatabase(db);
+    writeQueue = writeQueue.then(async () => {
+      await writeDatabase(db);
+    });
+    await writeQueue;
 
     return NextResponse.json({
       success: true,

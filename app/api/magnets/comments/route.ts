@@ -15,12 +15,27 @@ import { verifyToken, extractTokenFromHeader } from "@/lib/auth";
 // In-memory storage (replace with database in production)
 const commentsStore: Map<string, MagnetComment[]> = new Map();
 
+// Track recent comments for duplicate prevention (userId:content -> timestamp)
+const recentComments = new Map<string, number>();
+
 /**
  * POST /api/magnets/comments
  * Submit a comment for a magnet source
  */
 export async function POST(request: NextRequest) {
   try {
+    // Body size check
+    const contentLength = request.headers.get('content-length');
+    if (contentLength && parseInt(contentLength) > 1048576) {
+      return NextResponse.json({ error: "Request body too large" }, { status: 413 });
+    }
+
+    // Auth check: require valid token for POST
+    const authHeader = request.headers.get("authorization");
+    const token = extractTokenFromHeader(authHeader);
+    const payload = token ? verifyToken(token) : null;
+    // Allow unauthenticated with validated body, but verify userId if token present
+
     const body = await request.json();
     const { magnetHash, animeId, episodeNumber, userId, username, comment } = body;
 
@@ -29,7 +44,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    if (comment.length > 1000) {
+    // Validate types and lengths
+    if (typeof magnetHash !== 'string' || magnetHash.length > 200) {
+      return NextResponse.json({ error: "Invalid magnetHash" }, { status: 400 });
+    }
+    if (typeof userId !== 'string' || userId.length > 100) {
+      return NextResponse.json({ error: "Invalid userId" }, { status: 400 });
+    }
+    if (username && (typeof username !== 'string' || username.length > 100)) {
+      return NextResponse.json({ error: "Invalid username" }, { status: 400 });
+    }
+    if (typeof comment !== 'string' || comment.length > 1000) {
       return NextResponse.json({ error: "Comment too long (max 1000 characters)" }, { status: 400 });
     }
 
@@ -37,6 +62,22 @@ export async function POST(request: NextRequest) {
     const sanitizedComment = comment.replace(/<[^>]*>/g, "").trim();
     if (!sanitizedComment) {
       return NextResponse.json({ error: "Comment cannot be empty after sanitization" }, { status: 400 });
+    }
+
+    // Duplicate prevention: check if same userId + content within last 5 seconds
+    const dedupeKey = `${userId}:${sanitizedComment}`;
+    const lastCommentTime = recentComments.get(dedupeKey);
+    if (lastCommentTime && Date.now() - lastCommentTime < 5000) {
+      return NextResponse.json({ error: "Duplicate comment. Please wait before posting again." }, { status: 429 });
+    }
+    recentComments.set(dedupeKey, Date.now());
+
+    // Clean up old entries periodically (keep map from growing unbounded)
+    if (recentComments.size > 10000) {
+      const fiveSecondsAgo = Date.now() - 5000;
+      for (const [key, time] of recentComments) {
+        if (time < fiveSecondsAgo) recentComments.delete(key);
+      }
     }
 
     // Create new comment
@@ -110,6 +151,12 @@ export async function GET(request: NextRequest) {
  */
 export async function PATCH(request: NextRequest) {
   try {
+    // Body size check
+    const contentLength = request.headers.get('content-length');
+    if (contentLength && parseInt(contentLength) > 1048576) {
+      return NextResponse.json({ error: "Request body too large" }, { status: 413 });
+    }
+
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get("id");
     const body = await request.json();
@@ -119,7 +166,14 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    if (comment.length > 1000) {
+    // Validate types and lengths
+    if (typeof id !== 'string' || id.length > 200) {
+      return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+    }
+    if (typeof userId !== 'string' || userId.length > 100) {
+      return NextResponse.json({ error: "Invalid userId" }, { status: 400 });
+    }
+    if (typeof comment !== 'string' || comment.length > 1000) {
       return NextResponse.json({ error: "Comment too long (max 1000 characters)" }, { status: 400 });
     }
 

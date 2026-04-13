@@ -44,7 +44,6 @@ if (!JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is required. Set it in .env');
 }
 const JWT_EXPIRES_IN = '1h'; // Access token expires in 1 hour
-const REFRESH_TOKEN_EXPIRES_IN = '7d'; // Refresh token expires in 7 days
 const BCRYPT_ROUNDS = 12;
 
 // ===================================
@@ -63,21 +62,6 @@ export function generateAccessToken(user: AdminUser): string {
 
   return jwt.sign(payload, JWT_SECRET, {
     expiresIn: JWT_EXPIRES_IN,
-  });
-}
-
-/**
- * Generate JWT refresh token
- */
-export function generateRefreshToken(user: AdminUser): string {
-  const payload: AuthTokenPayload = {
-    userId: user.id,
-    username: user.username,
-    role: user.role,
-  };
-
-  return jwt.sign(payload, JWT_SECRET, {
-    expiresIn: REFRESH_TOKEN_EXPIRES_IN,
   });
 }
 
@@ -259,7 +243,7 @@ export async function createAdminUser(
  */
 export async function authenticateUser(
   credentials: LoginCredentials
-): Promise<{ success: boolean; error?: string; user?: AdminUser; tokens?: { access: string; refresh: string } }> {
+): Promise<{ success: boolean; error?: string; user?: AdminUser; tokens?: { access: string } }> {
   const { username, password } = credentials;
 
   // Get user
@@ -288,14 +272,12 @@ export async function authenticateUser(
   };
 
   const accessToken = generateAccessToken(user);
-  const refreshToken = generateRefreshToken(user);
 
   return {
     success: true,
     user,
     tokens: {
       access: accessToken,
-      refresh: refreshToken,
     },
   };
 }
@@ -327,6 +309,10 @@ export async function isAdminRequest(request: Request): Promise<boolean> {
 
   const payload = verifyToken(token);
   if (!payload) return false;
+
+  // Verify user exists in the admin store
+  const userRecord = getUserByUsername(payload.username);
+  if (!userRecord) return false;
 
   // Check if user has admin role
   return payload.role === 'admin' || payload.role === 'superadmin';
@@ -463,7 +449,6 @@ initializeDefaultAdmin().catch(console.error);
 
 export default {
   generateAccessToken,
-  generateRefreshToken,
   verifyToken,
   extractTokenFromHeader,
   getTokenFromCookie,

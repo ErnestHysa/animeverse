@@ -491,7 +491,7 @@ class SeedServer {
       client: {
         uploadSpeed: this.client?.uploadSpeed || 0,
         downloadSpeed: this.client?.downloadSpeed || 0,
-        ratio: this.client?.uploadSpeed / (this.client?.downloadSpeed || 1) || 0,
+        ratio: (this.client?.uploadSpeed || 0) / (this.client?.downloadSpeed || 1) || 0,
       },
     };
   }

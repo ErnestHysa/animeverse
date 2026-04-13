@@ -75,14 +75,25 @@ export default function AdminMagnetsPage() {
   const [importing, setImporting] = useState(false);
 
   useEffect(() => {
-    fetchMagnets();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const loadMagnets = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch("/api/admin/magnets");
+        const data = await response.json();
+        setMagnets(data.magnets || []);
+      } catch (error) {
+        console.error("Error fetching magnets:", error);
+        toast.error("Failed to load magnets");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadMagnets();
   }, []);
 
   useEffect(() => {
     filterMagnets();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [magnets, statusFilter, providerFilter, searchQuery]);
+  }, [magnets, statusFilter, providerFilter, searchQuery]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchMagnets = async () => {
     try {

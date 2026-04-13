@@ -7,6 +7,7 @@
 
 import { useEffect, useState, useCallback, memo } from "react";
 import { useStore, useWatchHistory } from "@/store";
+import type { WatchHistoryItem } from "@/store";
 import { anilist } from "@/lib/anilist";
 import { Clock } from "lucide-react";
 import Link from "next/link";
@@ -37,7 +38,7 @@ export function ContinueWatching() {
       }
 
       // Fetch anime details for each history item
-      const animeIds = history.map((h) => h.mediaId);
+      const animeIds = history.map((h: WatchHistoryItem) => h.mediaId);
       const result = await anilist.getByIds(animeIds);
       const mediaList = result.data?.Page.media ?? [];
       mediaList.forEach((anime: Media) => {
@@ -45,7 +46,7 @@ export function ContinueWatching() {
       });
 
       // Combine anime data with progress
-      const combined = history.map((item) => {
+      const combined = history.map((item: WatchHistoryItem) => {
         const anime = mediaList.find((m: Media) => m.id === item.mediaId);
         if (!anime) return null;
 

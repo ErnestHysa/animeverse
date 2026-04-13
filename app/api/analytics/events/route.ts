@@ -8,6 +8,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { isAdminRequest } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,6 +29,12 @@ const analyticsEvents: AnalyticsEvent[] = [];
  */
 export async function POST(request: NextRequest) {
   try {
+    // Body size check
+    const contentLength = parseInt(request.headers.get('content-length') || '0');
+    if (contentLength > 1048576) {
+      return NextResponse.json({ error: "Request too large" }, { status: 413 });
+    }
+
     const body = await request.json();
     const { events } = body;
 
@@ -35,9 +42,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid events array" }, { status: 400 });
     }
 
-    // Limit events array length
-    if (events.length > 100) {
-      return NextResponse.json({ error: "Too many events. Maximum 100 events per request." }, { status: 400 });
+    // Limit events array length (tightened from 100 to 20)
+    if (events.length > 20) {
+      return NextResponse.json({ error: "Too many events. Maximum 20 events per request." }, { status: 400 });
     }
 
     // Check approximate payload size

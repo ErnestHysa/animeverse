@@ -4,66 +4,18 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyToken, extractTokenFromHeader } from '@/lib/auth';
+import { isUrlAllowedSync, getAllowedOrigin } from '@/lib/ssrf-protection';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-/**
- * SSRF protection: check if a URL targets a private/reserved IP or localhost
- */
-function isUrlAllowed(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      return false;
-    }
-    const hostname = parsed.hostname.toLowerCase();
-    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') {
-      return false;
-    }
-    const ipv4Regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
-    const match = hostname.match(ipv4Regex);
-    if (match) {
-      const octets = [parseInt(match[1]), parseInt(match[2]), parseInt(match[3]), parseInt(match[4])];
-      if (octets[0] === 10) return false;
-      if (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) return false;
-      if (octets[0] === 192 && octets[1] === 168) return false;
-      if (octets[0] === 169 && octets[1] === 254) return false;
-      if (octets[0] === 127) return false;
-    }
-    if (hostname.startsWith('fc') || hostname.startsWith('fd') || hostname.startsWith('fe80')) {
-      return false;
-    }
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Get allowed origin for CORS headers
- */
-function getAllowedOrigin(request: NextRequest): string {
-  const origin = request.headers.get('origin');
-  const host = request.headers.get('host') || '';
-  if (origin) {
-    try {
-      const originHost = new URL(origin).hostname;
-      if (originHost === 'localhost' || originHost === '127.0.0.1' || originHost.endsWith('.animeverse.app') || originHost === host.split(':')[0]) {
-        return origin;
-      }
-    } catch {}
-  }
-  const protocol = request.headers.get('x-forwarded-proto') || 'https';
-  return `${protocol}://${host}`;
-}
 
 /**
  * Proxy fetch for HLS content
  */
 async function proxyFetch(url: string): Promise<ReadableStream> {
   // SSRF protection
-  if (!isUrlAllowed(url)) {
+  if (!isUrlAllowedSync(url)) {
     throw new Error('URL not allowed: private/internal addresses are blocked');
   }
 
@@ -195,11 +147,46 @@ async function parseHLSManifest(manifestUrl: string): Promise<HLSManifestData> {
   return { videoSegments, subtitleSegments };
 }
 
+const MAX_SEGMENTS_PER_DOWNLOAD = 100;
+
+/**
+ * Auth check: require valid JWT OR valid referer from app's own domain
+ */
+async function isProxyAuthenticated(request: NextRequest): Promise<boolean> {
+  const authHeader = request.headers.get('authorization');
+  const token = extractTokenFromHeader(authHeader);
+  if (token) {
+    const payload = verifyToken(token);
+    if (payload) return true;
+  }
+  const referer = request.headers.get('referer');
+  if (referer) {
+    try {
+      const refererHost = new URL(referer).hostname;
+      const host = request.headers.get('host')?.split(':')[0] || '';
+      if (
+        refererHost === 'localhost' ||
+        refererHost === '127.0.0.1' ||
+        refererHost.endsWith('.animeverse.app') ||
+        refererHost === host
+      ) {
+        return true;
+      }
+    } catch {}
+  }
+  return false;
+}
+
 /**
  * GET /api/download-hls?url=<manifest-url>&title=<anime-title>&episode=<number>
  * Downloads video with subtitles as a ZIP file
  */
 export async function GET(request: NextRequest) {
+  // Auth check: require valid JWT or app-domain referer
+  if (!(await isProxyAuthenticated(request))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const { searchParams } = new URL(request.url);
   const manifestUrl = searchParams.get('url');
   const animeTitle = searchParams.get('title') || 'video';
@@ -216,7 +203,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid URL protocol' }, { status: 400 });
     }
     // SSRF protection
-    if (!isUrlAllowed(manifestUrl)) {
+    if (!isUrlAllowedSync(manifestUrl)) {
       return NextResponse.json({ error: 'URL not allowed: private/internal addresses are blocked' }, { status: 403 });
     }
   } catch {
@@ -229,6 +216,11 @@ export async function GET(request: NextRequest) {
 
     if (videoSegments.length === 0) {
       return NextResponse.json({ error: 'No segments found in manifest' }, { status: 400 });
+    }
+
+    // Cap the number of segments to prevent abuse
+    if (videoSegments.length > MAX_SEGMENTS_PER_DOWNLOAD) {
+      videoSegments.splice(MAX_SEGMENTS_PER_DOWNLOAD);
     }
 
     // Dynamically import archiver
@@ -362,7 +354,7 @@ How to play with subtitles:
   } catch (error) {
     console.error('HLS download error:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to download video' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

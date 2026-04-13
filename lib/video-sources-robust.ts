@@ -51,6 +51,9 @@ function getCached(animeId: number, episodeNumber: number): EpisodeSources | nul
   const key = `${animeId}-${episodeNumber}`;
   const cached = sourceCache.get(key);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    // Move to end for LRU access order (Map preserves insertion order)
+    sourceCache.delete(key);
+    sourceCache.set(key, cached);
     return cached.data;
   }
   return null;
@@ -58,8 +61,10 @@ function getCached(animeId: number, episodeNumber: number): EpisodeSources | nul
 
 function setCached(animeId: number, episodeNumber: number, data: EpisodeSources | null): void {
   const key = `${animeId}-${episodeNumber}`;
+  // Delete first to move to end (update insertion order)
+  sourceCache.delete(key);
   sourceCache.set(key, { data, timestamp: Date.now() });
-  // Evict oldest entries if cache exceeds max size
+  // Evict least-recently-used entries if cache exceeds max size
   if (sourceCache.size > 200) {
     const keys = Array.from(sourceCache.keys());
     for (let i = 0; i < 50 && i < keys.length; i++) {
@@ -308,7 +313,6 @@ async function fetchFromConsumet(
       }));
 
     // Prefer non-encrypted sources
-    const encrypted = sources.filter(s => s.label.toLowerCase().includes('encrypted'));
     const normal = sources.filter(s => !s.label.toLowerCase().includes('encrypted'));
 
     return {
@@ -352,23 +356,21 @@ async function fetchFromDirectPatterns(
       'gogoanime.lu',
     ];
 
-    // Try to construct direct iframe URLs
-    for (const domain of domains) {
-      const iframeUrl = `https://${domain}/streaming.php?id=${slug}-${episodeNumber}`;
+    // Try all domains in parallel for faster resolution
+    const results = await Promise.allSettled(
+      domains.map(async (domain) => {
+        const iframeUrl = `https://${domain}/streaming.php?id=${slug}-${episodeNumber}`;
+        const response = await fetchWithTimeout(iframeUrl, {}, 5000);
 
-      // Try to fetch the iframe page
-      const response = await fetchWithTimeout(iframeUrl, {}, 5000);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status} from ${domain}`);
+        }
 
-      if (response.ok) {
-        // Check if we can extract a video source from the response
         const text = await response.text();
-
-        // Look for m3u8 URLs in the response
         const m3u8Regex = /https?:\/\/[^\s"'<>]+\.m3u8[^\s"'<>]*/g;
         const matches = text.match(m3u8Regex);
 
         if (matches && matches.length > 0) {
-          // Filter out segments and pings
           const validMatches = matches.filter(url =>
             !url.includes('segment') &&
             !url.includes('ping.gif') &&
@@ -377,16 +379,15 @@ async function fetchFromDirectPatterns(
 
           if (validMatches.length > 0) {
             const m3u8Url = validMatches.find(u => u.includes('master.m3u8')) || validMatches[0];
-
             return {
               animeId,
               episodeNumber,
               sources: [{
                 url: m3u8Url,
-                quality: 'auto',
+                quality: 'auto' as const,
                 label: `Direct Stream (${domain})`,
                 provider: 'Direct',
-                type: 'hls',
+                type: 'hls' as const,
               }],
               subtitles: [],
               provider: `Direct (${domain})`,
@@ -394,6 +395,15 @@ async function fetchFromDirectPatterns(
             };
           }
         }
+
+        throw new Error(`No m3u8 found on ${domain}`);
+      })
+    );
+
+    // Return the first successful result
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        return result.value;
       }
     }
 
@@ -690,13 +700,42 @@ export async function reportBrokenVideo(data: {
   issue: string;
 }): Promise<void> {
   if (typeof window !== "undefined") {
-    const reports = JSON.parse(localStorage.getItem("video-reports") || "[]");
-    reports.push({
-      animeId: data.animeId,
-      episodeNumber: data.episodeNumber,
-      reason: data.issue,
-      timestamp: Date.now(),
-    });
-    localStorage.setItem("video-reports", JSON.stringify(reports));
+    const MAX_REPORTS = 100;
+    const EXPIRY_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+    const reports: Array<{
+      animeId: number;
+      episodeNumber: number;
+      reason: string;
+      timestamp: number;
+      source: string;
+    }> = JSON.parse(localStorage.getItem("video-reports") || "[]");
+
+    const now = Date.now();
+
+    // Remove expired entries (older than 30 days)
+    const validReports = reports.filter(r => now - r.timestamp < EXPIRY_MS);
+
+    // Deduplicate by source + issue combination
+    const isDuplicate = validReports.some(
+      r => r.source === data.source && r.reason === data.issue && r.animeId === data.animeId && r.episodeNumber === data.episodeNumber
+    );
+
+    if (!isDuplicate) {
+      validReports.push({
+        animeId: data.animeId,
+        episodeNumber: data.episodeNumber,
+        reason: data.issue,
+        timestamp: now,
+        source: data.source,
+      });
+    }
+
+    // FIFO eviction if over max limit
+    const finalReports = validReports.length > MAX_REPORTS
+      ? validReports.slice(validReports.length - MAX_REPORTS)
+      : validReports;
+
+    localStorage.setItem("video-reports", JSON.stringify(finalReports));
   }
 }

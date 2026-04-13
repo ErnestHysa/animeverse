@@ -18,7 +18,12 @@ import { formatDistanceToNow } from "@/lib/utils";
 import Link from "next/link";
 
 export default function HistoryPage() {
-  const { watchHistory, mediaCache, clearWatchHistory, clearMediaHistory, anilistMediaList, isAuthenticated } = useStore();
+  const watchHistory = useStore((s) => s.watchHistory);
+  const mediaCache = useStore((s) => s.mediaCache);
+  const clearWatchHistory = useStore((s) => s.clearWatchHistory);
+  const clearMediaHistory = useStore((s) => s.clearMediaHistory);
+  const anilistMediaList = useStore((s) => s.anilistMediaList);
+  const isAuthenticated = useStore((s) => s.isAuthenticated);
 
   // Get unique anime from watch history (most recent first)
   const uniqueHistory = [...watchHistory]

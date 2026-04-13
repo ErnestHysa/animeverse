@@ -289,6 +289,10 @@ export function EnhancedVideoPlayer({
   const [introSkipped, setIntroSkipped] = useState(false);
   const [outroSkipped, setOutroSkipped] = useState(false);
   const [recapSkipped, setRecapSkipped] = useState(false);
+  // Fix 3: Use refs for skip state to avoid re-registering the autoskip listener
+  const introSkippedRef = useRef(false);
+  const outroSkippedRef = useRef(false);
+  const recapSkippedRef = useRef(false);
 
   // WebTorrent stats
   const [downloadSpeed, setDownloadSpeed] = useState(0);
@@ -302,6 +306,16 @@ export function EnhancedVideoPlayer({
   const [showMobileVolumeSlider, setShowMobileVolumeSlider] = useState(false);
   const lastTapRef = useRef<{ time: number; x: number; side: 'left' | 'right' } | null>(null);
   const tapAnimationTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+
+  // Ref-based "useLatest" pattern to avoid stale closures in useEffect
+  // without re-registering event listeners on every render
+  const handlersRef = useRef<Record<string, (...args: unknown[]) => void>>({});
+  const goToNextEpisodeRef = useRef<() => void>(() => {});
+  const startAutoplayCountdownRef = useRef<() => void>(() => {});
+
+  // Toast debounce ref for keyboard seek toasts (Fix 7: prevent toast stacking)
+  const seekToastIdRef = useRef<string | null>(null);
+  const seekDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
   // User preferences
   const { preferences, updatePreferences } = usePreferences();
@@ -459,6 +473,10 @@ export function EnhancedVideoPlayer({
     },
     [addToWatchHistory]
   );
+
+  // Ref to keep saveWatchProgress fresh without re-registering listeners
+  const saveWatchProgressRef = useRef<typeof saveWatchProgress>(saveWatchProgress);
+  saveWatchProgressRef.current = saveWatchProgress;
 
   // ===================================
   // Video Loading
@@ -729,7 +747,7 @@ export function EnhancedVideoPlayer({
             if (video.readyState >= 1 && hlsRef.current) {
               logger.log("[HLS] Manifest parsed event not fired, but video has data - attempting playback");
               if (preferences.autoplay || userInitiatedPlayRef.current) {
-                play().catch(() => {});
+                play().catch((err) => { if (err.name !== 'NotAllowedError') console.error('Play failed:', err); });
               }
             }
           }, 3000);
@@ -1220,29 +1238,49 @@ export function EnhancedVideoPlayer({
       const video = videoRef.current;
       if (!video) return;
 
+      // Read latest handlers from ref to avoid stale closures
+      const handlers = handlersRef.current;
+
       switch (e.key) {
         case " ":
         case "k":
           e.preventDefault();
-          togglePlay();
+          handlers.togglePlay();
           break;
         case "ArrowLeft":
           e.preventDefault();
-          seek(video.currentTime - 5);
-          toast("-5s", { icon: "⏪", duration: 500 });
+          handlers.seek(video.currentTime - 5);
+          // Debounced seek toast: rapid seeks only show the final toast
+          if (seekToastIdRef.current !== null) toast.dismiss(seekToastIdRef.current);
+          if (seekDebounceRef.current) clearTimeout(seekDebounceRef.current);
+          seekDebounceRef.current = setTimeout(() => {
+            seekToastIdRef.current = toast("-5s", { icon: "⏪", duration: 500 });
+          }, 300);
           break;
         case "ArrowRight":
           e.preventDefault();
-          seek(video.currentTime + 5);
-          toast("+5s", { icon: "⏩", duration: 500 });
+          handlers.seek(video.currentTime + 5);
+          if (seekToastIdRef.current !== null) toast.dismiss(seekToastIdRef.current);
+          if (seekDebounceRef.current) clearTimeout(seekDebounceRef.current);
+          seekDebounceRef.current = setTimeout(() => {
+            seekToastIdRef.current = toast("+5s", { icon: "⏩", duration: 500 });
+          }, 300);
           break;
         case "j":
-          seek(video.currentTime - 10);
-          toast("-10s", { icon: "⏪", duration: 500 });
+          handlers.seek(video.currentTime - 10);
+          if (seekToastIdRef.current !== null) toast.dismiss(seekToastIdRef.current);
+          if (seekDebounceRef.current) clearTimeout(seekDebounceRef.current);
+          seekDebounceRef.current = setTimeout(() => {
+            seekToastIdRef.current = toast("-10s", { icon: "⏪", duration: 500 });
+          }, 300);
           break;
         case "l":
-          seek(video.currentTime + 10);
-          toast("+10s", { icon: "⏩", duration: 500 });
+          handlers.seek(video.currentTime + 10);
+          if (seekToastIdRef.current !== null) toast.dismiss(seekToastIdRef.current);
+          if (seekDebounceRef.current) clearTimeout(seekDebounceRef.current);
+          seekDebounceRef.current = setTimeout(() => {
+            seekToastIdRef.current = toast("+10s", { icon: "⏩", duration: 500 });
+          }, 300);
           break;
         case "ArrowUp":
           e.preventDefault();
@@ -1253,17 +1291,17 @@ export function EnhancedVideoPlayer({
           setVolume((v) => Math.max(0, v - 0.1));
           break;
         case "m":
-          toggleMute();
+          handlers.toggleMute();
           toast(isMuted ? "Muted" : "Unmuted", { duration: 500 });
           break;
         case "f":
-          toggleFullscreen();
+          handlers.toggleFullscreen();
           break;
         case "t":
-          toggleTheaterMode();
+          handlers.toggleTheaterMode();
           break;
         case "p":
-          togglePip();
+          handlers.togglePip();
           break;
         case "c":
           // Toggle captions
@@ -1295,7 +1333,7 @@ export function EnhancedVideoPlayer({
         case "n":
           // Next episode
           if (nextEpisodeUrl && preferences.autoNext) {
-            goToNextEpisode();
+            handlers.goToNextEpisode();
           }
           break;
         case "?":
@@ -1319,7 +1357,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [preferences.autoplay, preferences.autoNext, nextEpisodeUrl, isMuted, duration]);
+  }, []); // Fix 1: empty deps — handlersRef always has latest references
 
   // ===================================
   // Touch Gestures (Double-tap to seek)
@@ -1411,7 +1449,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
 
       // Save watch progress - episode completed
       if (animeId && episodeNumber) {
-        saveWatchProgress(animeId, episodeNumber, video.duration, true);
+        saveWatchProgressRef.current(animeId, episodeNumber, video.duration, true);
       }
 
       // Handle next episode autoplay
@@ -1420,7 +1458,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
       }
 
       if (nextEpisodeUrl && preferences.autoNext) {
-        startAutoplayCountdown();
+        startAutoplayCountdownRef.current();
       }
     };
     const handlePlay = () => {
@@ -1660,7 +1698,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
         playFallbackRef2.current = null;
       }
     };
-  }, [playbackRate, animeId, episodeNumber, nextEpisodeUrl, preferences.autoNext, onEpisodeEnd]);
+  }, [playbackRate, animeId, episodeNumber, nextEpisodeUrl, preferences.autoNext, onEpisodeEnd]); // Fix 2: saveWatchProgressRef is a ref so no stale closure
 
   // Auto-skip intro/outro
   useEffect(() => {
@@ -1671,13 +1709,14 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
       const time = video.currentTime;
 
       // Show skip intro button during intro
-      if (time >= introStart && time <= introEnd && !introSkipped) {
+      if (time >= introStart && time <= introEnd && !introSkippedRef.current) {
         setShowSkipIntro(true);
 
         // Auto-skip intro if enabled
         if (preferences.autoSkipIntro && time > introStart + 2) {
           // Don't auto-skip in first 2 seconds of intro (give user time to cancel)
           video.currentTime = introEnd;
+          introSkippedRef.current = true;
           setIntroSkipped(true);
           setShowSkipIntro(false);
         }
@@ -1685,17 +1724,19 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
         setShowSkipIntro(false);
         // Reset intro skip when past intro
         if (time > introEnd + 5) {
+          introSkippedRef.current = false;
           setIntroSkipped(false);
         }
       }
 
       // Show skip outro button during outro
-      if (time >= outroStart && time <= outroEnd && !outroSkipped) {
+      if (time >= outroStart && time <= outroEnd && !outroSkippedRef.current) {
         setShowSkipOutro(true);
 
         // Auto-skip outro if enabled
         if (preferences.autoSkipOutro && time > outroStart + 2) {
           video.currentTime = outroEnd;
+          outroSkippedRef.current = true;
           setOutroSkipped(true);
           setShowSkipOutro(false);
         }
@@ -1703,16 +1744,18 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
         setShowSkipOutro(false);
         // Reset outro skip when past outro
         if (time > outroEnd + 5) {
+          outroSkippedRef.current = false;
           setOutroSkipped(false);
         }
       }
 
       // Show skip recap button during recap
-      if (recapStart !== null && recapEnd !== null && time >= recapStart && time <= recapEnd && !recapSkipped) {
+      if (recapStart !== null && recapEnd !== null && time >= recapStart && time <= recapEnd && !recapSkippedRef.current) {
         setShowSkipRecap(true);
       } else {
         setShowSkipRecap(false);
         if (recapEnd !== null && time > recapEnd + 5) {
+          recapSkippedRef.current = false;
           setRecapSkipped(false);
         }
       }
@@ -1720,7 +1763,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
 
     video.addEventListener("timeupdate", handleAutoSkip);
     return () => video.removeEventListener("timeupdate", handleAutoSkip);
-  }, [introStart, introEnd, outroStart, outroEnd, recapStart, recapEnd, preferences.autoSkipIntro, preferences.autoSkipOutro, introSkipped, outroSkipped, recapSkipped]);
+  }, [introStart, introEnd, outroStart, outroEnd, recapStart, recapEnd, preferences.autoSkipIntro, preferences.autoSkipOutro]); // Fix 3: removed introSkipped/outroSkipped/recapSkipped from deps — using refs instead
 
   // Apply subtitle styles
   useEffect(() => {
@@ -2162,6 +2205,20 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
     }
   };
 
+  // Keep refs up-to-date for stale-closure-free effects
+  goToNextEpisodeRef.current = goToNextEpisode;
+  startAutoplayCountdownRef.current = startAutoplayCountdown;
+  handlersRef.current = {
+    togglePlay,
+    toggleMute,
+    toggleFullscreen,
+    toggleTheaterMode,
+    togglePip,
+    seek,
+    goToNextEpisode,
+    startAutoplayCountdown,
+  } as Record<string, (...args: unknown[]) => void>;
+
   // Use effect for autoplay countdown
   useEffect(() => {
     if (!showAutoplayCountdown) return;
@@ -2253,7 +2310,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
       window.location.href = prevEpisodeUrl;
     } : null);
     navigator.mediaSession.setActionHandler('nexttrack', nextEpisodeUrl ? () => {
-      goToNextEpisode();
+      goToNextEpisodeRef.current();
     } : null);
 
     return () => {

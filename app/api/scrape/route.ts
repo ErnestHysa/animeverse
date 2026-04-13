@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { anilist } from "@/lib/anilist";
 import type { Media } from "@/types/anilist";
+import { isAdminRequest } from "@/lib/auth";
 
 // ===================================
 // Types
@@ -121,7 +122,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json<ScrapeResponse>(
       {
         success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: "Internal server error",
       },
       { status: 500 }
     );
@@ -130,8 +131,28 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // Body size check
+    const contentLength = parseInt(request.headers.get('content-length') || '0');
+    if (contentLength > 1048576) {
+      return NextResponse.json<ScrapeResponse>(
+        { success: false, error: 'Request too large' },
+        { status: 413 }
+      );
+    }
+
+    // Admin auth required for POST
+    if (!(await isAdminRequest(request))) {
+      return NextResponse.json<ScrapeResponse>(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
     const body: ScrapeRequest = await request.json();
     const { query, type = "search", maxResults = 10 } = body;
+
+    // Cap maxResults to 50
+    const cappedMaxResults = Math.min(maxResults, 50);
 
     if (!query) {
       return NextResponse.json<ScrapeResponse>(
@@ -141,7 +162,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Call scraper
-    const data = await callScraper(query, type, maxResults);
+    const data = await callScraper(query, type, cappedMaxResults);
 
     return NextResponse.json<ScrapeResponse>({
       success: true,
@@ -153,7 +174,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json<ScrapeResponse>(
       {
         success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: "Internal server error",
       },
       { status: 500 }
     );

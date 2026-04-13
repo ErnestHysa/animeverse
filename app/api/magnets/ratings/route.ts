@@ -19,6 +19,12 @@ const statsCache: Map<string, MagnetSourceStats> = new Map();
  */
 export async function POST(request: NextRequest) {
   try {
+    // Body size check
+    const contentLength = request.headers.get('content-length');
+    if (contentLength && parseInt(contentLength) > 1048576) {
+      return NextResponse.json({ error: "Request body too large" }, { status: 413 });
+    }
+
     const body = await request.json();
     const {
       magnetHash,
@@ -39,8 +45,52 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    if (rating < 1 || rating > 5) {
-      return NextResponse.json({ error: "Rating must be between 1 and 5" }, { status: 400 });
+    // Validate types and lengths
+    if (typeof magnetHash !== 'string' || magnetHash.length > 200) {
+      return NextResponse.json({ error: "Invalid magnetHash" }, { status: 400 });
+    }
+    if (typeof animeId !== 'string' && typeof animeId !== 'number') {
+      return NextResponse.json({ error: "Invalid animeId" }, { status: 400 });
+    }
+    if (typeof episodeNumber !== 'string' && typeof episodeNumber !== 'number') {
+      return NextResponse.json({ error: "Invalid episodeNumber" }, { status: 400 });
+    }
+    if (typeof userId !== 'string' || userId.length > 100) {
+      return NextResponse.json({ error: "Invalid userId" }, { status: 400 });
+    }
+    if (username && (typeof username !== 'string' || username.length > 100)) {
+      return NextResponse.json({ error: "Invalid username" }, { status: 400 });
+    }
+
+    if (typeof rating !== 'number' || rating < 1 || rating > 5 || !Number.isInteger(rating)) {
+      return NextResponse.json({ error: "Rating must be an integer between 1 and 5" }, { status: 400 });
+    }
+
+    // Validate quality fields are 1-5 numbers if provided
+    if (videoQuality !== undefined && videoQuality !== null) {
+      if (typeof videoQuality !== 'string' || videoQuality.length > 50) {
+        return NextResponse.json({ error: "Invalid videoQuality" }, { status: 400 });
+      }
+    }
+    if (audioQuality !== undefined && audioQuality !== null) {
+      if (typeof audioQuality !== 'string' || audioQuality.length > 50) {
+        return NextResponse.json({ error: "Invalid audioQuality" }, { status: 400 });
+      }
+    }
+    if (subtitleQuality !== undefined && subtitleQuality !== null) {
+      if (typeof subtitleQuality !== 'string' || subtitleQuality.length > 50) {
+        return NextResponse.json({ error: "Invalid subtitleQuality" }, { status: 400 });
+      }
+    }
+
+    // Validate playbackIssues is an array if provided
+    if (playbackIssues !== undefined && playbackIssues !== null) {
+      if (!Array.isArray(playbackIssues)) {
+        return NextResponse.json({ error: "playbackIssues must be an array" }, { status: 400 });
+      }
+      if (playbackIssues.length > 20) {
+        return NextResponse.json({ error: "Too many playbackIssues" }, { status: 400 });
+      }
     }
 
     // Check if user already rated this magnet
@@ -74,8 +124,8 @@ export async function POST(request: NextRequest) {
     const newRating: MagnetRating = {
       id: `rating-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       magnetHash,
-      animeId,
-      episodeNumber,
+      animeId: typeof animeId === 'number' ? animeId : Number(animeId),
+      episodeNumber: typeof episodeNumber === 'number' ? episodeNumber : Number(episodeNumber),
       userId,
       username: username || "Anonymous",
       rating,

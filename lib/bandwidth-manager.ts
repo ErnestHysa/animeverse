@@ -83,6 +83,7 @@ class BandwidthManagerImpl {
   private updateInterval: ReturnType<typeof setInterval> | null = null;
   private webTorrentClient: any = null;
   private bandwidthMonitorCallbacks: Set<(stats: BandwidthStats) => void> = new Set();
+  private networkChangeHandler: (() => void) | null = null;
 
   private constructor() {
     // Load config from localStorage
@@ -374,6 +375,8 @@ class BandwidthManagerImpl {
       this.applyThrottling();
     };
 
+    this.networkChangeHandler = handler;
+
     // Use addEventListener if available (modern browsers)
     if (conn.addEventListener) {
       conn.addEventListener("change", handler);
@@ -556,6 +559,16 @@ class BandwidthManagerImpl {
    */
   destroy(): void {
     this.stopMonitoring();
+    // Remove network change listener to prevent memory leak
+    if (this.networkChangeHandler) {
+      const conn = (navigator as any).connection;
+      if (conn?.removeEventListener) {
+        conn.removeEventListener("change", this.networkChangeHandler);
+      } else if (conn) {
+        conn.onchange = null;
+      }
+      this.networkChangeHandler = null;
+    }
     this.bandwidthMonitorCallbacks.clear();
     this.webTorrentClient = null;
   }

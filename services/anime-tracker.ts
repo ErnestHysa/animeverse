@@ -53,6 +53,8 @@ interface UserInfo {
   passkey: string;
   uploaded: number;
   downloaded: number;
+  prevUploaded: number;
+  prevDownloaded: number;
   ratio: number;
   canUpload: boolean;
   isVIP: boolean;
@@ -469,8 +471,12 @@ class AnimeTracker {
    * Update user statistics
    */
   private updateUserStats(user: UserInfo, uploaded: number, downloaded: number, event: string): void {
-    user.uploaded += uploaded;
-    user.downloaded += downloaded;
+    const deltaUploaded = uploaded - (user.prevUploaded || 0);
+    const deltaDownloaded = downloaded - (user.prevDownloaded || 0);
+    user.uploaded += deltaUploaded;
+    user.downloaded += deltaDownloaded;
+    user.prevUploaded = uploaded;
+    user.prevDownloaded = downloaded;
 
     if (user.downloaded > 0) {
       user.ratio = user.uploaded / user.downloaded;
@@ -487,11 +493,13 @@ class AnimeTracker {
       const timeout = 3600000; // 1 hour
 
       for (const [infoHash, torrentPeers] of peers.entries()) {
+        const toRemove: PeerInfo[] = [];
         torrentPeers.forEach((peer) => {
           if (now - peer.lastAnnounce.getTime() > timeout) {
-            torrentPeers.delete(peer);
+            toRemove.push(peer);
           }
         });
+        toRemove.forEach((peer) => torrentPeers.delete(peer));
       }
     }, 300000);
 
@@ -545,10 +553,11 @@ class AnimeTracker {
     } else if (typeof data === "number") {
       return `i${data}e`;
     } else if (Array.isArray(data)) {
-      return `l${data.map((item) => this.bencode(item)).join("")}e`;
+      return `l${data.filter((item) => item != null).map((item) => this.bencode(item)).join("")}e`;
     } else if (typeof data === "object") {
       let result = "d";
       for (const [key, value] of Object.entries(data)) {
+        if (value == null) continue;
         result += this.bencode(key);
         result += this.bencode(value);
       }
@@ -564,7 +573,14 @@ class AnimeTracker {
   private async parseRequestBody(req: http.IncomingMessage): Promise<any> {
     return new Promise((resolve, reject) => {
       let body = "";
+      let totalBytes = 0;
       req.on("data", (chunk) => {
+        totalBytes += chunk.length;
+        if (totalBytes > 1048576) {
+          req.destroy();
+          reject(new Error("Body too large"));
+          return;
+        }
         body += chunk.toString();
       });
       req.on("end", () => {

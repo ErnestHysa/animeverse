@@ -98,6 +98,40 @@ function parseSize(sizeStr: string): number {
   return value * (multipliers[unit] || 1);
 }
 
+/**
+ * Retry wrapper for network requests
+ * Retries once on network errors (ECONNRESET, ETIMEDOUT, ENOTFOUND) after a 2s delay
+ * Does not retry on 4xx HTTP errors
+ */
+async function withRetry<T>(fn: () => Promise<T>, retries: number = 1, delayMs: number = 2000): Promise<T> {
+  try {
+    return await fn();
+  } catch (error: any) {
+    const isNetworkError =
+      error?.code === 'ECONNRESET' ||
+      error?.code === 'ETIMEDOUT' ||
+      error?.code === 'ENOTFOUND' ||
+      error?.code === 'ECONNREFUSED' ||
+      error?.name === 'AbortError' ||
+      (error?.message && (
+        error.message.includes('ECONNRESET') ||
+        error.message.includes('ETIMEDOUT') ||
+        error.message.includes('ENOTFOUND') ||
+        error.message.includes('fetch failed')
+      ));
+
+    const is4xx = typeof error?.message === 'string' && /HTTP [45]\d\d/.test(error.message);
+
+    if (retries > 0 && isNetworkError && !is4xx) {
+      console.log(`[Retry] Network error, retrying in ${delayMs}ms...`, error?.message || error);
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+      return withRetry(fn, retries - 1, delayMs);
+    }
+
+    throw error;
+  }
+}
+
 // ===================================
 // Magnet Link Utilities
 // ===================================
@@ -149,8 +183,8 @@ export function isValidMagnetLink(magnet: string): boolean {
     return false;
   }
 
-  // Must contain xt=urn:btih: parameter
-  const xtMatch = magnet.match(/xt=urn:btih:([a-fA-F0-9]{40})/);
+  // Must contain xt=urn:btih: parameter (supports 40-char hex and 32-char Base32)
+  const xtMatch = magnet.match(/xt=urn:btih:([a-zA-Z2-7]{32}|[a-fA-F0-9]{40})/);
   if (!xtMatch) {
     return false;
   }
@@ -215,6 +249,7 @@ export async function scrapeNyaa(
   episode: number,
   maxResults: number = 10
 ): Promise<MagnetLink[]> {
+  return withRetry(async () => {
   try {
     // Build search query
     const searchQuery = `${animeTitle} episode ${episode}`.replace(/\s+/g, " ");
@@ -322,6 +357,7 @@ export async function scrapeNyaa(
     console.error(`[Nyaa.si] Error scraping:`, error);
     return [];
   }
+  });
 }
 
 /**
@@ -336,6 +372,7 @@ export async function scrapeNyaaLand(
   episode: number,
   maxResults: number = 10
 ): Promise<MagnetLink[]> {
+  return withRetry(async () => {
   try {
     // Nyaa.land is a mirror with the same structure
     const searchQuery = `${animeTitle} episode ${episode}`.replace(/\s+/g, " ");
@@ -434,6 +471,7 @@ export async function scrapeNyaaLand(
     console.error(`[Nyaa.land] Error scraping:`, error);
     return [];
   }
+  });
 }
 
 /**
@@ -448,6 +486,7 @@ export async function scrapeAniDex(
   episode: number,
   maxResults: number = 10
 ): Promise<MagnetLink[]> {
+  return withRetry(async () => {
   try {
     // AniDex has different HTML structure
     const searchQuery = `${animeTitle} episode ${episode}`.replace(/\s+/g, " ");
@@ -480,10 +519,9 @@ export async function scrapeAniDex(
     // AniDex uses different HTML structure
     // Look for magnet links in torrent rows
     const magnetRegex = /href="(magnet:\?[^"]+)"/g;
-    const magnetMatches: RegExpMatchArray[] = [];
     let match;
     while ((match = magnetRegex.exec(html)) !== null) {
-      magnetMatches.push(match);
+      // We iterate to advance the regex; matches are extracted per-entry below
     }
 
     // AniDex structure: Look for torrent entries
@@ -552,6 +590,7 @@ export async function scrapeAniDex(
     console.error(`[AniDex] Error scraping:`, error);
     return [];
   }
+  });
 }
 
 // ===================================
@@ -700,6 +739,9 @@ export const TORRENT_DATABASE_SCHEMA = {
 // Phase 2: Database Cache (File-Based)
 // ===================================
 
+// Module-level write lock to prevent TOCTOU race conditions
+let cacheWriteLock: Promise<any> = Promise.resolve();
+
 /**
  * Simple file-based cache for magnet links
  * Database path: .data/torrent-cache.json
@@ -825,21 +867,25 @@ export function cacheMagnets(
   episode: number,
   magnets: MagnetLink[]
 ): void {
-  const cache = loadCache();
-  const key = getCacheKey(animeId, episode);
+  cacheWriteLock = cacheWriteLock.then(async () => {
+    const cache = loadCache();
+    const key = getCacheKey(animeId, episode);
 
-  cache.entries[key] = {
-    animeId,
-    episode,
-    magnets,
-    timestamp: Date.now(),
-  };
+    cache.entries[key] = {
+      animeId,
+      episode,
+      magnets,
+      timestamp: Date.now(),
+    };
 
-  saveCache(cache);
-  console.log(`[Cache] STORED ${key} with ${magnets.length} magnets`);
+    saveCache(cache);
+    console.log(`[Cache] STORED ${key} with ${magnets.length} magnets`);
 
-  // Clean up old entries
-  cleanupOldCache(cache);
+    // Clean up old entries
+    cleanupOldCache(cache);
+  }).catch((err) => {
+    console.error('[Cache] Error in cacheMagnets:', err);
+  });
 }
 
 /**
@@ -993,12 +1039,13 @@ function removeDuplicateMagnets(magnets: MagnetLink[]): MagnetLink[] {
  * Add timeout to a promise
  */
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-  let timer: ReturnType<typeof setTimeout>;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   const timeoutPromise = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new Error(`Timeout after ${timeoutMs}ms`)), timeoutMs);
   });
-
-  promise.finally(() => clearTimeout(timer));
-
-  return Promise.race([promise, timeoutPromise]);
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
 }

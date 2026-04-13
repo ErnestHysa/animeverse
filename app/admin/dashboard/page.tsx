@@ -80,13 +80,6 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<"hour" | "day" | "week" | "month">("day");
 
-  useEffect(() => {
-    fetchDashboardData();
-    const interval = setInterval(fetchDashboardData, 30000); // Refresh every 30s
-    return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period]);
-
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
@@ -112,6 +105,12 @@ export default function AdminDashboardPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchDashboardData();
+    const interval = setInterval(fetchDashboardData, 30000); // Refresh every 30s
+    return () => clearInterval(interval);
+  }, [period]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const resolveAlert = async (alertId: string) => {
     try {

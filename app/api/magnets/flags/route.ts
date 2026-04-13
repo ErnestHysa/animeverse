@@ -20,6 +20,12 @@ const flagsStore: Map<string, MagnetFlag[]> = new Map();
  */
 export async function POST(request: NextRequest) {
   try {
+    // Body size check
+    const contentLength = request.headers.get('content-length');
+    if (contentLength && parseInt(contentLength) > 1048576) {
+      return NextResponse.json({ error: "Request body too large" }, { status: 413 });
+    }
+
     const body = await request.json();
     const { magnetHash, userId, username, reason, description } = body;
 
@@ -28,8 +34,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const validReasons = ["broken", "malware", "wrong-content", "poor-quality", "other"];
-    if (!validReasons.includes(reason)) {
+    // Validate types and lengths
+    if (typeof magnetHash !== 'string' || magnetHash.length > 200) {
+      return NextResponse.json({ error: "Invalid magnetHash" }, { status: 400 });
+    }
+    if (typeof userId !== 'string' || userId.length > 100) {
+      return NextResponse.json({ error: "Invalid userId" }, { status: 400 });
+    }
+    if (username && (typeof username !== 'string' || username.length > 100)) {
+      return NextResponse.json({ error: "Invalid username" }, { status: 400 });
+    }
+    if (typeof reason !== 'string' || reason.length > 50) {
+      return NextResponse.json({ error: "Invalid reason" }, { status: 400 });
+    }
+    if (description && (typeof description !== 'string' || description.length > 2000)) {
+      return NextResponse.json({ error: "Description too long" }, { status: 400 });
+    }
+
+    const validReasons = ["broken", "malware", "wrong-content", "poor-quality", "other"] as const;
+    if (!validReasons.includes(reason as typeof validReasons[number])) {
       return NextResponse.json({ error: "Invalid reason" }, { status: 400 });
     }
 
@@ -47,7 +70,7 @@ export async function POST(request: NextRequest) {
       magnetHash,
       userId,
       username: username || "Anonymous",
-      reason,
+      reason: reason as MagnetFlag["reason"],
       description: description || "",
       createdAt: new Date().toISOString(),
       reviewed: false,
@@ -112,6 +135,12 @@ export async function PATCH(request: NextRequest) {
     // Auth check - only admins can review flags
     if (!(await isAdminRequest(request))) {
       return NextResponse.json({ error: "Unauthorized - admin access required" }, { status: 401 });
+    }
+
+    // Body size check
+    const contentLength = request.headers.get('content-length');
+    if (contentLength && parseInt(contentLength) > 1048576) {
+      return NextResponse.json({ error: "Request body too large" }, { status: 413 });
     }
 
     const searchParams = request.nextUrl.searchParams;

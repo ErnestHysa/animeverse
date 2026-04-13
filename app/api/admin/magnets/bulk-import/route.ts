@@ -16,6 +16,9 @@ import { isAdminRequest } from "@/lib/auth";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Write queue to serialize database writes and prevent TOCTOU races
+let writeQueue: Promise<any> = Promise.resolve();
+
 const MAGNETS_DB_PATH = path.join(process.cwd(), "data", "magnets.json");
 
 interface MagnetEntry {
@@ -114,6 +117,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Auth check
     if (!(await isAdminRequest(request))) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Body size check
+    const contentLength = parseInt(request.headers.get('content-length') || '0');
+    if (contentLength > 1048576) {
+      return NextResponse.json({ error: "Request too large" }, { status: 413 });
     }
 
     const body = await request.json();
@@ -217,7 +226,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     // Save database
-    await writeDatabase(db);
+    writeQueue = writeQueue.then(async () => {
+      await writeDatabase(db);
+    });
+    await writeQueue;
 
     return NextResponse.json({
       success: true,

@@ -313,6 +313,7 @@ class WebTorrentManagerImpl {
 
     // Prefer higher seed count, then higher quality
     const qualityPriority: Record<string, number> = {
+      "2160p": 5,
       "1080p": 4,
       "720p": 3,
       "480p": 2,

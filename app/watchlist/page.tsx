@@ -20,7 +20,7 @@ import type { Media } from "@/types/anilist";
 
 export default function WatchlistPage() {
   const { watchlist } = useWatchlist();
-  const { mediaCache } = useStore();
+  const mediaCache = useStore((s) => s.mediaCache);
   const [anime, setAnime] = useState<Media[]>([]);
   const [loading, setLoading] = useState(true);
 

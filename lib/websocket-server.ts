@@ -7,7 +7,7 @@
 
 import { Server as HTTPServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
-import { NextRequest } from 'next/server';
+import crypto from 'crypto';
 
 // ===================================
 // Types
@@ -76,10 +76,11 @@ class WatchPartyRoomManager {
   private readonly MAX_MESSAGES_PER_ROOM = 200;
   private messagesPerRoom: Map<string, number> = new Map();
   private io: SocketIOServer | null = null;
+  private cleanupInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
     // Clean up inactive rooms every 5 minutes
-    setInterval(() => this.cleanupInactiveRooms(), 5 * 60 * 1000);
+    this.cleanupInterval = setInterval(() => this.cleanupInactiveRooms(), 5 * 60 * 1000);
   }
 
   /**
@@ -176,10 +177,32 @@ class WatchPartyRoomManager {
       return;
     }
 
-    // Check password if private
-    if (!room.isPublic && room.password !== password) {
-      socket.emit('error', { message: 'Invalid room password' });
-      return;
+    // Check password if private (constant-time comparison to prevent timing attacks)
+    if (!room.isPublic) {
+      const roomPassword = room.password || '';
+      const providedPassword = password || '';
+      try {
+        const a = Buffer.from(roomPassword, 'utf-8');
+        const b = Buffer.from(providedPassword, 'utf-8');
+        // timingSafeEqual requires same-length buffers
+        if (a.length !== b.length) {
+          // Use a fixed-length comparison: hash both and compare the hashes
+          const hashA = crypto.createHash('sha256').update(a).digest();
+          const hashB = crypto.createHash('sha256').update(b).digest();
+          if (!crypto.timingSafeEqual(hashA, hashB)) {
+            socket.emit('error', { message: 'Invalid room password' });
+            return;
+          }
+        } else {
+          if (!crypto.timingSafeEqual(a, b)) {
+            socket.emit('error', { message: 'Invalid room password' });
+            return;
+          }
+        }
+      } catch {
+        socket.emit('error', { message: 'Invalid room password' });
+        return;
+      }
     }
 
     // Check if user is already in room
@@ -324,7 +347,7 @@ class WatchPartyRoomManager {
     this.messagesPerRoom.set(roomId, msgCount + 1);
 
     const message: ChatMessage = {
-      id: `msg-${Date.now()}-${Math.random()}`,
+      id: `msg-${Date.now()}-${crypto.randomUUID()}`,
       roomId,
       userId: viewer.id,
       username: viewer.username,
@@ -572,6 +595,28 @@ class WatchPartyRoomManager {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
+  }
+
+  /**
+   * Gracefully shut down: clear interval, disconnect all sockets, clear rooms
+   */
+  destroy(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+
+    if (this.io) {
+      // Disconnect all connected sockets
+      this.io.disconnectSockets(true);
+      this.io.close();
+      this.io = null;
+    }
+
+    this.rooms.clear();
+    this.userToRoom.clear();
+    this.socketToUser.clear();
+    this.messagesPerRoom.clear();
   }
 
   /**

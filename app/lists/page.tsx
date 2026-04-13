@@ -23,7 +23,7 @@ const LIST_EMOJIS = ["📚", "🌟", "🔥", "💎", "🎯", "⚔️", "🌸", "
 
 export default function CustomListsPage() {
   const { lists, addList, updateList, deleteList, addAnimeToList, removeAnimeFromList } = useCustomLists();
-  const { mediaCache } = useStore();
+  const mediaCache = useStore((s) => s.mediaCache);
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingList, setEditingList] = useState<CustomList | null>(null);

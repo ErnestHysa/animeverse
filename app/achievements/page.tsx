@@ -16,7 +16,10 @@ import { useStore } from "@/store";
 import { ACHIEVEMENTS, RARITY_COLORS, RARITY_BADGES } from "@/lib/achievements";
 
 export default function AchievementsPage() {
-  const { achievements, unlockedAchievements, watchHistory, favorites } = useStore();
+  const achievements = useStore((s) => s.achievements);
+  const unlockedAchievements = useStore((s) => s.unlockedAchievements);
+  const watchHistory = useStore((s) => s.watchHistory);
+  const favorites = useStore((s) => s.favorites);
   const [selectedCategory, setSelectedCategory] = useState<"all" | "watching" | "social" | "collection" | "exploration">("all");
 
   // Calculate stats

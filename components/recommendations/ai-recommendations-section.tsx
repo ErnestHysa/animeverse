@@ -25,7 +25,7 @@ export function AIRecommendationsSection({ allAnime }: AIRecommendationsSectionP
     // Add allAnime first
     allAnime.forEach((a) => animeMap.set(a.id, a));
     // Add cached media (includes watched anime details)
-    Object.values(mediaCache).forEach((a) => {
+    Object.values(mediaCache as Record<number, Media>).forEach((a) => {
       if (a && !animeMap.has(a.id)) {
         animeMap.set(a.id, a);
       }
