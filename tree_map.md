@@ -1,6 +1,6 @@
 ================================================================================
   ANIMEVERSE — CODEBASE TREE MAP
-  Last updated: 2026-04-12
+  Last updated: 2026-04-13
   Total files: ~320 | Total lines: ~36,850 (source code)
 ================================================================================
 
@@ -802,15 +802,17 @@ animeverse/
     NEXT_PUBLIC_SITE_URL            — Same as APP_URL
     NEXT_PUBLIC_BASE_URL            — Same as APP_URL
 
+  Required:
+    JWT_SECRET                      — Secret for admin JWT tokens (NO default — app throws if missing)
+    DEFAULT_ADMIN_USERNAME           — Default admin username (NO default — app throws if missing)
+    DEFAULT_ADMIN_PASSWORD           — Default admin password (NO default — app throws if missing)
+
   Optional:
     ANILIST_GRAPHQL_URL             — Override AniList API URL
     NEXT_PUBLIC_MAL_CLIENT_ID       — MAL OAuth client ID
     MAL_CLIENT_SECRET               — MAL OAuth client secret
     NEXT_PUBLIC_ENABLE_LOGGING      — "true" to enable verbose logs
     NEXT_PUBLIC_LOG_LEVEL           — debug | info | warn | error
-    JWT_SECRET                      — Secret for admin JWT tokens
-    DEFAULT_ADMIN_USERNAME          — Default admin username
-    DEFAULT_ADMIN_PASSWORD          — Default admin password
 
 
 ================================================================================
@@ -1512,15 +1514,30 @@ animeverse/
       Electron wrapper exists in electron/ but is likely not the primary
       deployment target. The main entry point is the web app.
 
-  14. TYPESCRIPT ignoreBuildErrors IS TRUE
-      next.config.ts has `typescript: { ignoreBuildErrors: true }`. This
-      means `next build` will succeed even with type errors. The package
-      scripts run `tsc --noEmit` before build as a separate step.
+  14. TYPESCRIPT ignoreBuildErrors IS NOW FALSE
+      next.config.ts had `ignoreBuildErrors: true` but this was removed in the
+      April 2026 audit. Now `tsc --noEmit` is used for type checking. Framework-
+      level type errors in node_modules/next/ may appear but are not from app code.
 
   15. LOGGER MUST BE USED INSTEAD OF console.log
       Use lib/logger.ts (or createScopedLogger) for all logging. Raw
       console.log calls should not appear in production code. The logger
       respects NEXT_PUBLIC_ENABLE_LOGGING and NEXT_PUBLIC_LOG_LEVEL.
+
+  16. PROXY ROUTES HAVE SSR PROTECTION
+      /api/proxy-hls, /api/proxy-subtitle, /api/download-hls now block requests
+      to private IPs, localhost, and cloud metadata endpoints (SSRF protection).
+      If you need to proxy to a local service, add it to the allowlist in the
+      isUrlAllowed() function in each route.
+
+  17. ADMIN ROUTES REQUIRE isADMINRequest() AUTH
+      All admin API routes now call isAdminRequest() which checks for a valid
+      JWT token. Do not add new admin routes without this guard.
+
+  18. STORE SELECTORS PATTERN
+      The Zustand store uses selectors (useStore(s => s.field)) instead of bare
+      useStore() calls to prevent unnecessary re-renders. Follow this pattern
+      in any new components that use the store.
 
 
 ================================================================================
