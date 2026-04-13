@@ -12,7 +12,9 @@ import Link from "next/link";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { GlassCard } from "@/components/ui/glass-card";
-import { usePreferences, useWatchlist, useFavorites, useAniListAuth } from "@/store";
+import { Dialog } from "@/components/ui/dialog";
+import { ErrorBoundary } from "@/components/error/error-boundary";
+import { usePreferences, useWatchlist, useFavorites, useAniListAuth, type AniListUser } from "@/store";
 import { useTheme } from "@/components/providers/theme-provider";
 import {
   Settings,
@@ -50,13 +52,43 @@ import {
 import { useStore } from "@/store";
 import { Clock, Flame, TrendingUp, BarChart3, Award, Keyboard } from "lucide-react";
 import { DEFAULT_SHORTCUTS } from "@/lib/keyboard-shortcuts";
+import { safeGetItem, safeRemoveItem } from "@/lib/storage";
+
+// FIX 1: Extracted reusable toggle setting component
+function ToggleSetting({ label, description, checked, onChange }: { label: string; description?: string; checked: boolean; onChange: (val: boolean) => void }) {
+  return (
+    <div className="flex items-center justify-between py-3 border-b border-white/10">
+      <div>
+        <p className="font-medium">{label}</p>
+        {description && <p className="text-sm text-muted-foreground">{description}</p>}
+      </div>
+      <button
+        onClick={() => onChange(!checked)}
+        className={cn(
+          "w-12 h-6 rounded-full transition-colors relative",
+          checked ? "bg-primary" : "bg-white/10"
+        )}
+      >
+        <div
+          className={cn(
+            "absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform",
+            checked ? "translate-x-6" : ""
+          )}
+        />
+      </button>
+    </div>
+  );
+}
 
 export default function SettingsPage() {
   const { preferences, updatePreferences, resetPreferences } = usePreferences();
   const { watchlist, clearWatchlist: clearList } = useWatchlist();
   const { favorites, clearFavorites } = useFavorites();
   const { theme, setTheme, resolvedTheme } = useTheme();
-  const { mediaCache, watchHistory, clearWatchHistory } = useStore();
+  // FIX 2: Use specific selectors instead of bare useStore()
+  const mediaCache = useStore((s) => s.mediaCache);
+  const watchHistory = useStore((s) => s.watchHistory);
+  const clearWatchHistory = useStore((s) => s.clearWatchHistory);
   const {
     anilistUser,
     anilistToken,
@@ -81,6 +113,9 @@ export default function SettingsPage() {
   const [clientId] = useState(process.env.NEXT_PUBLIC_ANILIST_CLIENT_ID ?? "");
   const [isSyncing, setIsSyncing] = useState(false);
   const [anilistFilter, setAnilistFilter] = useState<'all' | 'watching' | 'completed' | 'planning' | 'paused' | 'dropped'>('all');
+
+  // FIX 4: State-based confirmation dialog instead of window.confirm
+  const [pendingConfirm, setPendingConfirm] = useState<null | (() => void)>(null);
 
   const [historyCount, setHistoryCount] = useState(() => {
     // Initialize with 0 on server, actual count on client
@@ -124,18 +159,16 @@ export default function SettingsPage() {
   };
 
   const handleResetAll = async () => {
-    if (confirm("Are you sure you want to reset all settings? This cannot be undone.")) {
+    setPendingConfirm(() => () => {
       resetPreferences();
       toast.success("Settings reset to default");
-    }
+    });
   };
 
   const handleClearHistory = () => {
     clearWatchHistory();
-    // Also clear the stats from localStorage
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("animeverse_stats");
-    }
+    // Also clear the stats from localStorage (FIX 3: safe storage access)
+    safeRemoveItem("animeverse_stats");
     // Reset stats display
     setUserStats({
       totalEpisodesWatched: 0,
@@ -161,9 +194,9 @@ export default function SettingsPage() {
   };
 
   const exportData = () => {
-    const statsData = typeof window !== "undefined"
-      ? JSON.parse(localStorage.getItem("animeverse_stats") || "null")
-      : null;
+    // FIX 3: Use safe storage utility instead of direct localStorage access
+    const statsResult = safeGetItem<object | null>("animeverse_stats");
+    const statsData = statsResult.success ? statsResult.data ?? null : null;
 
     const data = {
       preferences,
@@ -285,14 +318,28 @@ export default function SettingsPage() {
       let userFromHash = null;
 
       try {
-        const hashData = JSON.parse(decodeURIComponent(window.location.hash.slice(1)));
-        if (hashData.token && hashData.user) {
-          tokenFromHash = hashData.token;
-          userFromHash = hashData.user;
+        // FIX 7: Validate hash data and sanitize string values to prevent XSS
+        const rawHash = decodeURIComponent(window.location.hash.slice(1));
+        const hashData = JSON.parse(rawHash);
+        // Validate structure: must be a plain object with expected fields
+        if (hashData && typeof hashData === 'object' && !Array.isArray(hashData) && hashData.token && hashData.user) {
+          // Sanitize string values
+          const sanitize = (val: unknown): unknown => {
+            if (typeof val === 'string') return val.replace(/<[^>]*>/g, '');
+            if (typeof val === 'object' && val !== null) {
+              const clean: Record<string, unknown> = {};
+              for (const [k, v] of Object.entries(val)) { clean[k] = sanitize(v); }
+              return clean;
+            }
+            return val;
+          };
+          const cleanData = sanitize(hashData) as typeof hashData;
+          tokenFromHash = cleanData.token;
+          userFromHash = cleanData.user;
           // Store in Zustand
-          setAniListAuth(hashData.user, hashData.token);
-          toast.success(`Welcome back, ${hashData.user.name}!`);
-          fetchAniListData(hashData.token);
+          setAniListAuth(cleanData.user, cleanData.token);
+          toast.success(`Welcome back, ${cleanData.user.name}!`);
+          fetchAniListData(cleanData.token);
         }
       } catch (e) {
         // Hash parse failed, try Zustand state
@@ -311,13 +358,14 @@ export default function SettingsPage() {
             }
           } else {
             // Fallback: try to get from localStorage directly
+            // FIX 3: Use safe storage utility
             try {
-              const zustandData = localStorage.getItem("animeverse-stream-storage");
-              if (zustandData) {
-                const parsed = JSON.parse(zustandData);
+              const zustandResult = safeGetItem<{ state?: { anilistUser?: unknown; anilistToken?: string } }>("animeverse-stream-storage");
+              if (zustandResult.success && zustandResult.data) {
+                const parsed = zustandResult.data;
                 if (parsed.state?.anilistUser && parsed.state?.anilistToken) {
-                  setAniListAuth(parsed.state.anilistUser, parsed.state.anilistToken);
-                  toast.success(`Welcome back, ${parsed.state.anilistUser.name}!`);
+                  setAniListAuth(parsed.state.anilistUser as AniListUser, parsed.state.anilistToken);
+                  toast.success(`Welcome back, ${(parsed.state.anilistUser as { name: string }).name}!`);
                   fetchAniListData(parsed.state.anilistToken);
                 }
               }
@@ -354,10 +402,22 @@ export default function SettingsPage() {
     const malAuthStatus = params.get("mal_auth");
     if (malAuthStatus === "success") {
       try {
-        const hashData = JSON.parse(decodeURIComponent(window.location.hash.slice(1)));
-        if (hashData.token && hashData.user) {
-          setMALAuth(hashData.user, hashData.token, hashData.refresh_token ?? "", hashData.expires_at ?? 0);
-          toast.success(`MAL connected: ${hashData.user.name}!`);
+        // FIX 7: Validate and sanitize MAL hash data
+        const rawHash = decodeURIComponent(window.location.hash.slice(1));
+        const hashData = JSON.parse(rawHash);
+        if (hashData && typeof hashData === 'object' && !Array.isArray(hashData) && hashData.token && hashData.user) {
+          const sanitize = (val: unknown): unknown => {
+            if (typeof val === 'string') return val.replace(/<[^>]*>/g, '');
+            if (typeof val === 'object' && val !== null) {
+              const clean: Record<string, unknown> = {};
+              for (const [k, v] of Object.entries(val)) { clean[k] = sanitize(v); }
+              return clean;
+            }
+            return val;
+          };
+          const cleanData = sanitize(hashData) as typeof hashData;
+          setMALAuth(cleanData.user, cleanData.token, cleanData.refresh_token ?? "", cleanData.expires_at ?? 0);
+          toast.success(`MAL connected: ${cleanData.user.name}!`);
         }
       } catch {
         // ignore hash parse error
@@ -463,7 +523,7 @@ export default function SettingsPage() {
     toast.success("Disconnected from MyAnimeList");
   };
 
-  // Sync watch history to MAL
+  // FIX 6: Sync watch history to MAL with batched concurrency (5 at a time)
   const handleSyncToMAL = async () => {
     if (!malToken) return;
     setIsSyncingMAL(true);
@@ -472,20 +532,26 @@ export default function SettingsPage() {
       // Sync from AniList media list (which has MAL IDs)
       const entries = useStore.getState().anilistMediaList.filter((e) => e.media?.idMal);
       let synced = 0;
-      for (const entry of entries) {
-        if (!entry.media?.idMal) continue;
-        try {
-          await updateMALEntry(
-            malToken,
-            entry.media.idMal,
-            anilistStatusToMAL(entry.status),
-            entry.progress,
-            entry.score
-          );
-          synced++;
-        } catch {
-          // skip individual failures
-        }
+      // Process in chunks of 5 for parallel execution
+      const CHUNK_SIZE = 5;
+      for (let i = 0; i < entries.length; i += CHUNK_SIZE) {
+        const chunk = entries.slice(i, i + CHUNK_SIZE);
+        const results = await Promise.allSettled(
+          chunk.map((entry) => {
+            if (!entry.media?.idMal) return Promise.resolve();
+            return updateMALEntry(
+              malToken,
+              entry.media.idMal,
+              anilistStatusToMAL(entry.status),
+              entry.progress,
+              entry.score
+            );
+          })
+        );
+        // Count successful syncs from this chunk
+        results.forEach((r) => {
+          if (r.status === 'fulfilled') synced++;
+        });
       }
       toast.success(`Synced ${synced} entries to MAL`);
     } catch (err) {
@@ -498,6 +564,8 @@ export default function SettingsPage() {
   return (
     <>
       <Header />
+      {/* FIX 5: Error boundary wrapper */}
+      <ErrorBoundary>
       <main className="min-h-screen">
         <div className="container mx-auto px-4 pt-24 pb-12">
           {/* Header */}
@@ -542,148 +610,52 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Autoplay */}
-                <div className="flex items-center justify-between py-3 border-b border-white/10">
-                  <div>
-                    <p className="font-medium">Autoplay</p>
-                    <p className="text-sm text-muted-foreground">
-                      Automatically play videos when loaded
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => handleSavePreference("autoplay", !preferences.autoplay)}
-                    className={cn(
-                      "w-12 h-6 rounded-full transition-colors relative",
-                      preferences.autoplay ? "bg-primary" : "bg-white/10"
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        "absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform",
-                        preferences.autoplay ? "translate-x-6" : ""
-                      )}
-                    />
-                  </button>
-                </div>
+                <ToggleSetting
+                  label="Autoplay"
+                  description="Automatically play videos when loaded"
+                  checked={preferences.autoplay}
+                  onChange={(val) => handleSavePreference("autoplay", val)}
+                />
 
                 {/* Auto Next Episode */}
-                <div className="flex items-center justify-between py-3 border-b border-white/10">
-                  <div>
-                    <p className="font-medium">Auto-play Next Episode</p>
-                    <p className="text-sm text-muted-foreground">
-                      Automatically play the next episode when current ends
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => handleSavePreference("autoNext", !preferences.autoNext)}
-                    className={cn(
-                      "w-12 h-6 rounded-full transition-colors relative",
-                      preferences.autoNext ? "bg-primary" : "bg-white/10"
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        "absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform",
-                        preferences.autoNext ? "translate-x-6" : ""
-                      )}
-                    />
-                  </button>
-                </div>
+                <ToggleSetting
+                  label="Auto-play Next Episode"
+                  description="Automatically play the next episode when current ends"
+                  checked={preferences.autoNext}
+                  onChange={(val) => handleSavePreference("autoNext", val)}
+                />
 
                 {/* Auto Skip Intro */}
-                <div className="flex items-center justify-between py-3 border-b border-white/10">
-                  <div>
-                    <p className="font-medium">Auto Skip Intro</p>
-                    <p className="text-sm text-muted-foreground">
-                      Automatically skip opening themes (when available)
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => handleSavePreference("autoSkipIntro", !preferences.autoSkipIntro)}
-                    className={cn(
-                      "w-12 h-6 rounded-full transition-colors relative",
-                      preferences.autoSkipIntro ? "bg-primary" : "bg-white/10"
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        "absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform",
-                        preferences.autoSkipIntro ? "translate-x-6" : ""
-                      )}
-                    />
-                  </button>
-                </div>
+                <ToggleSetting
+                  label="Auto Skip Intro"
+                  description="Automatically skip opening themes (when available)"
+                  checked={preferences.autoSkipIntro}
+                  onChange={(val) => handleSavePreference("autoSkipIntro", val)}
+                />
 
                 {/* Auto Skip Outro */}
-                <div className="flex items-center justify-between py-3 border-b border-white/10">
-                  <div>
-                    <p className="font-medium">Auto Skip Outro</p>
-                    <p className="text-sm text-muted-foreground">
-                      Automatically skip ending themes (when available)
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => handleSavePreference("autoSkipOutro", !preferences.autoSkipOutro)}
-                    className={cn(
-                      "w-12 h-6 rounded-full transition-colors relative",
-                      preferences.autoSkipOutro ? "bg-primary" : "bg-white/10"
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        "absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform",
-                        preferences.autoSkipOutro ? "translate-x-6" : ""
-                      )}
-                    />
-                  </button>
-                </div>
+                <ToggleSetting
+                  label="Auto Skip Outro"
+                  description="Automatically skip ending themes (when available)"
+                  checked={preferences.autoSkipOutro}
+                  onChange={(val) => handleSavePreference("autoSkipOutro", val)}
+                />
 
                 {/* Hide Adult Content */}
-                <div className="flex items-center justify-between py-3 border-b border-white/10">
-                  <div>
-                    <p className="font-medium">Hide Adult Content</p>
-                    <p className="text-sm text-muted-foreground">
-                      Filter out mature and NSFW anime from browsing
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => handleSavePreference("hideAdultContent", !preferences.hideAdultContent)}
-                    className={cn(
-                      "w-12 h-6 rounded-full transition-colors relative",
-                      preferences.hideAdultContent ? "bg-primary" : "bg-white/10"
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        "absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform",
-                        preferences.hideAdultContent ? "translate-x-6" : ""
-                      )}
-                    />
-                  </button>
-                </div>
+                <ToggleSetting
+                  label="Hide Adult Content"
+                  description="Filter out mature and NSFW anime from browsing"
+                  checked={preferences.hideAdultContent}
+                  onChange={(val) => handleSavePreference("hideAdultContent", val)}
+                />
 
                 {/* Show Filler Episodes */}
-                <div className="flex items-center justify-between py-3 border-b border-white/10">
-                  <div>
-                    <p className="font-medium">Show Filler Episodes</p>
-                    <p className="text-sm text-muted-foreground">
-                      Display filler episodes in episode lists
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => handleSavePreference("showFillerEpisodes", !preferences.showFillerEpisodes)}
-                    className={cn(
-                      "w-12 h-6 rounded-full transition-colors relative",
-                      preferences.showFillerEpisodes ? "bg-primary" : "bg-white/10"
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        "absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform",
-                        preferences.showFillerEpisodes ? "translate-x-6" : ""
-                      )}
-                    />
-                  </button>
-                </div>
+                <ToggleSetting
+                  label="Show Filler Episodes"
+                  description="Display filler episodes in episode lists"
+                  checked={preferences.showFillerEpisodes}
+                  onChange={(val) => handleSavePreference("showFillerEpisodes", val)}
+                />
 
                 {/* Streaming Method */}
                 <div className="py-3">
@@ -1405,7 +1377,36 @@ export default function SettingsPage() {
           </div>
         </div>
       </main>
+      </ErrorBoundary>
       <Footer />
+      {/* FIX 4: Confirmation dialog replacing window.confirm */}
+      <Dialog
+        isOpen={pendingConfirm !== null}
+        onClose={() => setPendingConfirm(null)}
+        title="Confirm Action"
+        size="sm"
+      >
+        <p className="text-muted-foreground mb-6">Are you sure you want to reset all settings? This cannot be undone.</p>
+        <div className="flex gap-3 justify-end">
+          <button
+            onClick={() => setPendingConfirm(null)}
+            className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => {
+              if (pendingConfirm) {
+                pendingConfirm();
+                setPendingConfirm(null);
+              }
+            }}
+            className="px-4 py-2 bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-lg transition-colors"
+          >
+            Confirm
+          </button>
+        </div>
+      </Dialog>
     </>
   );
 }

@@ -72,6 +72,9 @@ class WatchPartyRoomManager {
   private socketToUser: Map<string, string> = new Map(); // socketId -> userId
   private readonly ROOM_TIMEOUT = 24 * 60 * 60 * 1000; // 24 hours
   private readonly VIEWER_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+  private readonly MAX_ROOMS = 100;
+  private readonly MAX_MESSAGES_PER_ROOM = 200;
+  private messagesPerRoom: Map<string, number> = new Map();
   private io: SocketIOServer | null = null;
 
   constructor() {
@@ -312,12 +315,20 @@ class WatchPartyRoomManager {
     room.lastActivity = Date.now();
     viewer.lastSeen = Date.now();
 
+    // Enforce max messages per room
+    const msgCount = this.messagesPerRoom.get(roomId) || 0;
+    if (msgCount >= this.MAX_MESSAGES_PER_ROOM) {
+      socket.emit('error', { message: 'Room message limit reached' });
+      return;
+    }
+    this.messagesPerRoom.set(roomId, msgCount + 1);
+
     const message: ChatMessage = {
       id: `msg-${Date.now()}-${Math.random()}`,
       roomId,
       userId: viewer.id,
       username: viewer.username,
-      message: data.message,
+      message: data.message.replace(/<[^>]*>/g, ''),
       timestamp: Date.now(),
       type: 'text',
     };
@@ -436,7 +447,13 @@ class WatchPartyRoomManager {
     episodeNumber: number;
     isPublic: boolean;
     password?: string;
-  }): WatchPartyRoom {
+  }): WatchPartyRoom | null {
+    // Enforce max rooms limit
+    if (this.rooms.size >= this.MAX_ROOMS) {
+      console.warn('[WatchParty] Max rooms limit reached, cannot create new room');
+      return null;
+    }
+
     const roomId = this.generateRoomId();
 
     const room: WatchPartyRoom = {
@@ -514,6 +531,7 @@ class WatchPartyRoomManager {
       // Remove empty rooms or old rooms
       if (room.viewers.size === 0 || now - room.lastActivity > this.ROOM_TIMEOUT) {
         this.rooms.delete(roomId);
+        this.messagesPerRoom.delete(roomId);
         console.log(`[WatchParty] Room removed: ${roomId}`);
       }
     }
@@ -537,10 +555,14 @@ class WatchPartyRoomManager {
   }
 
   /**
-   * Generate random room ID
+   * Generate random room ID with uniqueness check
    */
   private generateRoomId(): string {
-    return Math.random().toString(36).substring(2, 8).toUpperCase();
+    let id: string;
+    do {
+      id = Math.random().toString(36).substring(2, 8).toUpperCase();
+    } while (this.rooms.has(id));
+    return id;
   }
 
   /**

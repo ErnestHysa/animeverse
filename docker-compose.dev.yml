@@ -3,8 +3,6 @@
 # ========================================
 # Usage: docker-compose -f docker-compose.dev.yml up
 
-version: '3.9'
-
 services:
   # ========================================
   # Development Application
@@ -21,13 +19,13 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=3000
-      - DATABASE_URL=postgresql://anime_stream:dev_password@postgres:5432/anime_stream_dev
+      - DATABASE_URL=postgresql://animeverse:animeverse@postgres:5432/animeverse_dev
       - REDIS_URL=redis://redis:6379
       - NEXT_PUBLIC_APP_URL=http://localhost:3000
       - NEXT_PUBLIC_WS_URL=ws://localhost:3000
       - JWT_SECRET=dev-jwt-secret-change-in-production
       - DEFAULT_ADMIN_USERNAME=admin
-      - DEFAULT_ADMIN_PASSWORD=admin123
+      - DEFAULT_ADMIN_PASSWORD=admin
     volumes:
       - .:/app
       - /app/node_modules
@@ -47,9 +45,9 @@ services:
     container_name: anime-stream-dev-db
     restart: unless-stopped
     environment:
-      - POSTGRES_USER=anime_stream
-      - POSTGRES_PASSWORD=dev_password
-      - POSTGRES_DB=anime_stream_dev
+      - POSTGRES_USER=animeverse
+      - POSTGRES_PASSWORD=animeverse
+      - POSTGRES_DB=animeverse_dev
     ports:
       - "5433:5432"
     volumes:

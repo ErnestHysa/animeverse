@@ -565,50 +565,68 @@ class BandwidthManagerImpl {
 // Export singleton instance
 // ===================================
 
-export const bandwidthManager = BandwidthManagerImpl.getInstance();
+let bandwidthManager: BandwidthManagerImpl;
+
+if (typeof window !== 'undefined') {
+  bandwidthManager = BandwidthManagerImpl.getInstance();
+
+  if (typeof module !== 'undefined' && (module as any).hot) {
+    const bwInterval = (bandwidthManager as any).updateInterval;
+    if (bwInterval) {
+      (module as any).hot.dispose(() => clearInterval(bwInterval));
+    }
+  }
+}
+
+function getBandwidthManager(): BandwidthManagerImpl {
+  if (!bandwidthManager) {
+    bandwidthManager = BandwidthManagerImpl.getInstance();
+  }
+  return bandwidthManager;
+}
 
 // ===================================
 // Export convenience functions
 // ===================================
 
 export function getBandwidthConfig(): BandwidthConfig {
-  return bandwidthManager.getConfig();
+  return getBandwidthManager().getConfig();
 }
 
 export function updateBandwidthConfig(config: Partial<BandwidthConfig>): void {
-  bandwidthManager.updateConfig(config);
+  getBandwidthManager().updateConfig(config);
 }
 
 export function setUploadLimit(limit: number): void {
-  bandwidthManager.setUploadLimit(limit);
+  getBandwidthManager().setUploadLimit(limit);
 }
 
 export function setDownloadLimit(limit: number): void {
-  bandwidthManager.setDownloadLimit(limit);
+  getBandwidthManager().setDownloadLimit(limit);
 }
 
 export function setAdaptiveBandwidth(enabled: boolean): void {
-  bandwidthManager.setAdaptiveEnabled(enabled);
+  getBandwidthManager().setAdaptiveEnabled(enabled);
 }
 
 export function getBandwidthStats(): BandwidthStats {
-  return bandwidthManager.getStats();
+  return getBandwidthManager().getStats();
 }
 
 export function onBandwidthStatsUpdate(
   callback: (stats: BandwidthStats) => void
 ): () => void {
-  return bandwidthManager.onStatsUpdate(callback);
+  return getBandwidthManager().onStatsUpdate(callback);
 }
 
 export function formatBandwidth(bytes: number): string {
-  return bandwidthManager.formatBytes(bytes);
+  return getBandwidthManager().formatBytes(bytes);
 }
 
 export function formatBandwidthSpeed(bytesPerSecond: number): string {
-  return bandwidthManager.formatSpeed(bytesPerSecond);
+  return getBandwidthManager().formatSpeed(bytesPerSecond);
 }
 
 export function setWebTorrentBandwidthClient(client: any): void {
-  bandwidthManager.setWebTorrentClient(client);
+  getBandwidthManager().setWebTorrentClient(client);
 }

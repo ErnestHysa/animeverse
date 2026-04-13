@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readFile, writeFile } from "fs/promises";
 import { existsSync } from "fs";
 import path from "path";
+import { isAdminRequest } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -110,6 +111,11 @@ function parseCSV(csvContent: string): Array<{
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
+    // Auth check
+    if (!(await isAdminRequest(request))) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await request.json();
     const { format, data, submittedBy } = body;
 
@@ -143,6 +149,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     } else {
       return NextResponse.json(
         { error: "Invalid format. Use 'csv' or 'json'" },
+        { status: 400 }
+      );
+    }
+
+    // Limit array size to prevent abuse
+    if (entries.length > 1000) {
+      return NextResponse.json(
+        { error: "Too many entries. Maximum 1000 magnets per bulk import." },
         { status: 400 }
       );
     }

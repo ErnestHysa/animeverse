@@ -6,6 +6,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   Play,
   Pause,
@@ -113,6 +114,15 @@ type SeekableVideoElement = HTMLVideoElement & {
 };
 
 // ===================================
+// Default props (defined outside component to avoid re-creation)
+// ===================================
+
+const DEFAULT_LANGUAGES = [
+  { id: "sub", label: "Subtitles", type: "sub" as const },
+  { id: "dub", label: "Dubbed", type: "dub" as const },
+];
+
+// ===================================
 // Main Component
 // ===================================
 
@@ -129,10 +139,7 @@ export function EnhancedVideoPlayer({
   nextEpisodeUrl,
   prevEpisodeUrl,
   allServers = [],
-  allLanguages = [
-    { id: "sub", label: "Subtitles", type: "sub" },
-    { id: "dub", label: "Dubbed", type: "dub" },
-  ],
+  allLanguages = DEFAULT_LANGUAGES,
   onServerChange,
   onLanguageChange,
   subtitles = [], // NEW: Subtitle tracks from API
@@ -146,6 +153,18 @@ export function EnhancedVideoPlayer({
   const bufferingSafetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   // Debounce timeout for waiting event to prevent false positive buffering overlay
   const waitingDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  // Ref for 15s buffering fallback timeout (to clear on unmount)
+  const bufferingFallbackRef = useRef<NodeJS.Timeout | null>(null);
+  // Ref for HLS seek recovery timeout (to clear on unmount)
+  const seekRecoveryRef = useRef<NodeJS.Timeout | null>(null);
+  // Ref for play() fallback timeout (to clear on unmount)
+  const playFallbackRef = useRef<NodeJS.Timeout | null>(null);
+  // Ref for checkReady() polling timeout (to clear on unmount)
+  const checkReadyTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Ref for subtitle loading setTimeout (to clear on unmount)
+  const subtitleTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Ref for seek timeout in play() function (to clear on unmount)
+  const playFallbackRef2 = useRef<NodeJS.Timeout | null>(null);
 
   // State
   const [isPlaying, setIsPlaying] = useState(false);
@@ -286,6 +305,9 @@ export function EnhancedVideoPlayer({
 
   // User preferences
   const { preferences, updatePreferences } = usePreferences();
+
+  // Next.js router for client-side navigation
+  const router = useRouter();
 
   // Store for watch history
   const { addToWatchHistory } = useStore();
@@ -695,7 +717,7 @@ export function EnhancedVideoPlayer({
           // userInitiatedPlayRef is a ref so we always read the current value (no stale closure)
           if (preferences.autoplay || userInitiatedPlayRef.current) {
             logger.log("[HLS] Starting playback (autoplay:", preferences.autoplay, "userInitiated:", userInitiatedPlayRef.current, ")");
-            play().catch(() => {});
+            play().catch((err) => { if (process.env.NODE_ENV === 'development') console.warn('Autoplay blocked:', err); });
           }
         });
 
@@ -900,15 +922,19 @@ export function EnhancedVideoPlayer({
       }
     } else {
       // WebTorrent handling (magnet/torrent links)
+      let cancelled = false;
       import("@/lib/webtorrent").then(({ webTorrentManager }) => {
+        if (cancelled) return;
         webTorrentManager.loadDirectVideo(source.url, video, {
           onReady: () => {
+            if (cancelled) return;
             clearTimeout(loadingTimeout);
             clearTimeout(safetyTimeout);
             setIsLoading(false);
             if (preferences.autoplay) play();
           },
           onError: (err: Error) => {
+            if (cancelled) return;
             clearTimeout(loadingTimeout);
             clearTimeout(safetyTimeout);
             setIsLoading(false);
@@ -916,8 +942,9 @@ export function EnhancedVideoPlayer({
           },
         });
       });
+      return () => { cancelled = true; clearTimeout(loadingTimeout); clearTimeout(safetyTimeout); };
     }
-  }, [source.url, preferences.autoplay]);
+  }, [source.url, source.type, source.referer, preferences.autoplay]);
 
   // ===================================
   // Update sources when source.qualities changes
@@ -988,6 +1015,8 @@ export function EnhancedVideoPlayer({
     const video = videoRef.current;
     if (!video) return;
 
+    let subtitleLoadCancelled = false;
+
     // Disable all existing text tracks first
     for (let i = 0; i < video.textTracks.length; i++) {
       video.textTracks[i].mode = "disabled";
@@ -995,6 +1024,7 @@ export function EnhancedVideoPlayer({
 
     // Add new subtitle tracks if available
     if (subtitles && subtitles.length > 0) {
+      if (subtitleLoadCancelled) return;
       setSubtitleTracks(subtitles);
 
       // Load subtitles sequentially to avoid race conditions
@@ -1004,6 +1034,7 @@ export function EnhancedVideoPlayer({
         let englishTrack: TextTrack | null = null;
 
         for (let index = 0; index < subtitles.length; index++) {
+          if (subtitleLoadCancelled) break;
           const sub = subtitles[index];
 
           try {
@@ -1117,7 +1148,8 @@ export function EnhancedVideoPlayer({
 
         // After all subtitles are loaded, enable the appropriate track
         // Use setTimeout to ensure cues are fully processed
-        setTimeout(() => {
+        subtitleTimerRef.current = setTimeout(() => {
+          if (subtitleLoadCancelled) return;
           const trackToEnable = englishTrack || firstTrack;
           if (trackToEnable && subtitlesEnabled) {
             // Disable all tracks first
@@ -1130,7 +1162,9 @@ export function EnhancedVideoPlayer({
             const enabledIndex = subtitles.findIndex(s =>
               s.lang === trackToEnable.language || s.label === trackToEnable.label
             );
+            if (subtitleLoadCancelled) return;
             setCurrentSubtitle(enabledIndex >= 0 ? enabledIndex : 0);
+            if (subtitleLoadCancelled) return;
             toast.success(`Subtitles loaded: ${trackToEnable.label}`, { duration: 2000 });
           }
         }, 100);
@@ -1138,8 +1172,15 @@ export function EnhancedVideoPlayer({
 
       loadSubtitles();
     } else {
-      setSubtitleTracks([]);
+      if (!subtitleLoadCancelled) {
+        setSubtitleTracks([]);
+      }
     }
+
+    return () => {
+      subtitleLoadCancelled = true;
+      if (subtitleTimerRef.current) clearTimeout(subtitleTimerRef.current);
+    };
   }, [subtitles, subtitlesEnabled]);
 
   // ===================================
@@ -1229,7 +1270,7 @@ export function EnhancedVideoPlayer({
           if (video.textTracks.length > 0) {
             const newState = video.textTracks[0].mode === "showing" ? "hidden" : "showing";
             video.textTracks[0].mode = newState;
-            toast(newState ? "Subtitles ON" : "Subtitles OFF", { duration: 500 });
+            toast(newState === "showing" ? "Subtitles ON" : "Subtitles OFF", { duration: 500 });
           } else {
             toast("No subtitles available", { icon: "⚠️", duration: 2000 });
           }
@@ -1442,7 +1483,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
           }, 5000); // First recovery attempt at 5s
 
           // Set final safety timeout
-          setTimeout(() => {
+          bufferingFallbackRef.current = setTimeout(() => {
             if (bufferingSafetyTimeoutRef.current) {
               logger.warn("Buffering safety timeout - forcing buffering state clear");
               setIsBuffering(false);
@@ -1501,8 +1542,10 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
         try {
           // Stop current loading and restart from seek position
           hls.stopLoad();
+          // Clear any previous seek recovery timeout
+          if (seekRecoveryRef.current) clearTimeout(seekRecoveryRef.current);
           // Small delay to let the stop take effect
-          setTimeout(() => {
+          seekRecoveryRef.current = setTimeout(() => {
             if (hlsRef.current) {
               hlsRef.current.startLoad(video.currentTime);
             }
@@ -1595,6 +1638,26 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
       if (waitingDebounceRef.current) {
         clearTimeout(waitingDebounceRef.current);
         waitingDebounceRef.current = null;
+      }
+      // Clean up buffering fallback timeout
+      if (bufferingFallbackRef.current) {
+        clearTimeout(bufferingFallbackRef.current);
+        bufferingFallbackRef.current = null;
+      }
+      // Clean up seek recovery timeout
+      if (seekRecoveryRef.current) {
+        clearTimeout(seekRecoveryRef.current);
+        seekRecoveryRef.current = null;
+      }
+      // Clean up subtitle loading timeout
+      if (subtitleTimerRef.current) {
+        clearTimeout(subtitleTimerRef.current);
+        subtitleTimerRef.current = null;
+      }
+      // Clean up play fallback timeout
+      if (playFallbackRef2.current) {
+        clearTimeout(playFallbackRef2.current);
+        playFallbackRef2.current = null;
       }
     };
   }, [playbackRate, animeId, episodeNumber, nextEpisodeUrl, preferences.autoNext, onEpisodeEnd]);
@@ -1702,6 +1765,11 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
     localStorage.setItem("subtitle-color", subtitleColor);
     localStorage.setItem("subtitle-background", subtitleBackground);
     localStorage.setItem("subtitle-position", subtitlePosition);
+
+    return () => {
+      const el = document.getElementById("subtitle-custom-style");
+      el?.remove();
+    };
   }, [subtitleSize, subtitleColor, subtitleBackground, subtitlePosition]);
 
   // Skip functions
@@ -1840,7 +1908,8 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
       hls.once(Hls.Events.MANIFEST_PARSED, onManifestParsed);
 
       // Also try to play after a short delay as fallback
-      setTimeout(() => {
+      if (playFallbackRef2.current) clearTimeout(playFallbackRef2.current);
+      playFallbackRef2.current = setTimeout(() => {
         if (video.paused && video.readyState >= 2) {
           logger.log("[play] Fallback: Video has data, attempting play...");
           video.play().catch(() => {});
@@ -2089,7 +2158,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
 
   const goToNextEpisode = () => {
     if (nextEpisodeUrl) {
-      window.location.href = nextEpisodeUrl;
+      router.push(nextEpisodeUrl);
     }
   };
 
@@ -2186,6 +2255,19 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
     navigator.mediaSession.setActionHandler('nexttrack', nextEpisodeUrl ? () => {
       goToNextEpisode();
     } : null);
+
+    return () => {
+      try {
+        navigator.mediaSession.setActionHandler('play', null);
+        navigator.mediaSession.setActionHandler('pause', null);
+        navigator.mediaSession.setActionHandler('seekbackward', null);
+        navigator.mediaSession.setActionHandler('seekforward', null);
+        navigator.mediaSession.setActionHandler('previoustrack', null);
+        navigator.mediaSession.setActionHandler('nexttrack', null);
+      } catch {
+        // Some browsers throw when setting handler to null
+      }
+    };
   }, [animeTitle, episodeNumber, poster, nextEpisodeUrl, prevEpisodeUrl]);
 
   // Update Media Session position state when time changes

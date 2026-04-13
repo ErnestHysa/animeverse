@@ -59,6 +59,13 @@ function getCached(animeId: number, episodeNumber: number): EpisodeSources | nul
 function setCached(animeId: number, episodeNumber: number, data: EpisodeSources | null): void {
   const key = `${animeId}-${episodeNumber}`;
   sourceCache.set(key, { data, timestamp: Date.now() });
+  // Evict oldest entries if cache exceeds max size
+  if (sourceCache.size > 200) {
+    const keys = Array.from(sourceCache.keys());
+    for (let i = 0; i < 50 && i < keys.length; i++) {
+      sourceCache.delete(keys[i]);
+    }
+  }
 }
 
 // ============================================
@@ -119,7 +126,7 @@ async function fetchWithTimeout(
   url: string,
   options: RequestInit = {},
   timeout = CONFIG.requestTimeout
-): Promise<Response | null> {
+): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
 
@@ -138,11 +145,10 @@ async function fetchWithTimeout(
   } catch (error) {
     clearTimeout(timeoutId);
     if (error instanceof Error && error.name === 'AbortError') {
-      log('warn', `Request timeout: ${url}`);
+      throw new Error(`Request timeout: ${url}`);
     } else {
-      log('error', `Request failed: ${url}`, error);
+      throw error;
     }
-    return null;
   }
 }
 
@@ -190,7 +196,7 @@ async function fetchFromAnify(
     const searchUrl = `https://api.anify.tv/search-anime/${encodeURIComponent(title)}`;
     const searchResponse = await fetchWithTimeout(searchUrl, {}, 8000);
 
-    if (!searchResponse || !searchResponse.ok) {
+    if (!searchResponse.ok) {
       return null;
     }
 
@@ -207,7 +213,7 @@ async function fetchFromAnify(
     const sourcesUrl = `https://api.anify.tv/sources?anilistId=${anilistId}&episodeNumber=${episodeNumber}&subType=sub`;
     const sourcesResponse = await fetchWithTimeout(sourcesUrl, {}, 10000);
 
-    if (!sourcesResponse || !sourcesResponse.ok) {
+    if (!sourcesResponse.ok) {
       return null;
     }
 
@@ -262,7 +268,7 @@ async function fetchFromConsumet(
     const searchUrl = `https://api.consumet.org/anime/gogoanime/${encodeURIComponent(searchQuery)}`;
     const searchResponse = await fetchWithTimeout(searchUrl, {}, 8000);
 
-    if (!searchResponse || !searchResponse.ok) {
+    if (!searchResponse.ok) {
       return null;
     }
 
@@ -280,7 +286,7 @@ async function fetchFromConsumet(
     const sourcesUrl = `https://api.consumet.org/anime/gogoanime/watch/${episodeId}`;
     const sourcesResponse = await fetchWithTimeout(sourcesUrl, {}, 10000);
 
-    if (!sourcesResponse || !sourcesResponse.ok) {
+    if (!sourcesResponse.ok) {
       return null;
     }
 
@@ -353,7 +359,7 @@ async function fetchFromDirectPatterns(
       // Try to fetch the iframe page
       const response = await fetchWithTimeout(iframeUrl, {}, 5000);
 
-      if (response && response.ok) {
+      if (response.ok) {
         // Check if we can extract a video source from the response
         const text = await response.text();
 
@@ -432,7 +438,7 @@ async function fetchFromIframeProviders(
       // Check if embed is accessible (HEAD request)
       const response = await fetchWithTimeout(embedUrl, { method: 'HEAD' }, 5000);
 
-      if (response && response.ok) {
+      if (response.ok) {
         // Return iframe embed as a source
         return {
           animeId,
@@ -493,7 +499,7 @@ async function fetchFromAnilistMapping(
       8000
     );
 
-    if (!response || !response.ok) {
+    if (!response.ok) {
       return null;
     }
 
@@ -636,9 +642,9 @@ export async function searchAnime(query: string): Promise<Array<{
   try {
     const anilistUrl = 'https://graphql.anilist.co';
     const searchQuery = `
-      query {
+      query ($search: String) {
         Page(page: 1, perPage: 10) {
-          media(search: "${query.replace(/"/g, '\\"')}", type: ANIME, sort: POPULARITY_DESC) {
+          media(search: $search, type: ANIME, sort: POPULARITY_DESC) {
             id
             title { romaji english }
             coverImage { large }
@@ -653,12 +659,12 @@ export async function searchAnime(query: string): Promise<Array<{
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: searchQuery }),
+        body: JSON.stringify({ query: searchQuery, variables: { search: query } }),
       },
       10000
     );
 
-    if (!response || !response.ok) {
+    if (!response.ok) {
       return [];
     }
 

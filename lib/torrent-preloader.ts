@@ -319,14 +319,18 @@ class TorrentPreloaderImpl {
             ? (task.targetBytes - downloaded) / downloadSpeed
             : 0;
 
-          callback({
-            taskId,
-            progress: task.progress,
-            downloadedBytes: task.downloadedBytes,
-            targetBytes: task.targetBytes,
-            downloadSpeed,
-            eta,
-          });
+          try {
+            callback({
+              taskId,
+              progress: task.progress,
+              downloadedBytes: task.downloadedBytes,
+              targetBytes: task.targetBytes,
+              downloadSpeed,
+              eta,
+            });
+          } catch (callbackError) {
+            console.error("[TorrentPreloader] Progress callback error:", callbackError);
+          }
         }
 
         // Check if target bytes reached
@@ -643,7 +647,18 @@ class TorrentPreloaderImpl {
 // Export singleton instance
 // ===================================
 
-export const torrentPreloader = TorrentPreloaderImpl.getInstance();
+let torrentPreloader: TorrentPreloaderImpl;
+
+if (typeof window !== 'undefined') {
+  torrentPreloader = TorrentPreloaderImpl.getInstance();
+}
+
+function getTorrentPreloader(): TorrentPreloaderImpl {
+  if (!torrentPreloader) {
+    torrentPreloader = TorrentPreloaderImpl.getInstance();
+  }
+  return torrentPreloader;
+}
 
 // ===================================
 // Export convenience functions
@@ -656,25 +671,25 @@ export async function preloadNextEpisode(
   infoHash: string,
   onProgress?: (progress: PreloadProgress) => void
 ): Promise<string> {
-  return torrentPreloader.preloadNextEpisode(animeId, episodeNumber, magnet, infoHash, onProgress);
+  return getTorrentPreloader().preloadNextEpisode(animeId, episodeNumber, magnet, infoHash, onProgress);
 }
 
 export function cancelPreload(taskId: string): void {
-  torrentPreloader.cancelPreload(taskId);
+  getTorrentPreloader().cancelPreload(taskId);
 }
 
 export function getPreloadedTorrent(animeId: number, episodeNumber: number): any | null {
-  return torrentPreloader.getPreloadedTorrent(animeId, episodeNumber);
+  return getTorrentPreloader().getPreloadedTorrent(animeId, episodeNumber);
 }
 
 export function isPreloaded(animeId: number, episodeNumber: number): boolean {
-  return torrentPreloader.isPreloaded(animeId, episodeNumber);
+  return getTorrentPreloader().isPreloaded(animeId, episodeNumber);
 }
 
 export function getPreloaderConfig(): PreloadConfig {
-  return torrentPreloader.getConfig();
+  return getTorrentPreloader().getConfig();
 }
 
 export function updatePreloaderConfig(config: Partial<PreloadConfig>): void {
-  torrentPreloader.updateConfig(config);
+  getTorrentPreloader().updateConfig(config);
 }

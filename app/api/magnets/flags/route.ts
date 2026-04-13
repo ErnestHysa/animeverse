@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import type { MagnetFlag } from "@/types/magnet-ratings";
+import { isAdminRequest } from "@/lib/auth";
 
 // In-memory storage (replace with database in production)
 const flagsStore: Map<string, MagnetFlag[]> = new Map();
@@ -108,6 +109,11 @@ export async function GET(request: NextRequest) {
  */
 export async function PATCH(request: NextRequest) {
   try {
+    // Auth check - only admins can review flags
+    if (!(await isAdminRequest(request))) {
+      return NextResponse.json({ error: "Unauthorized - admin access required" }, { status: 401 });
+    }
+
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get("id");
     const body = await request.json();

@@ -35,6 +35,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid events array" }, { status: 400 });
     }
 
+    // Limit events array length
+    if (events.length > 100) {
+      return NextResponse.json({ error: "Too many events. Maximum 100 events per request." }, { status: 400 });
+    }
+
+    // Check approximate payload size
+    const payloadSize = JSON.stringify(events).length;
+    if (payloadSize > 1024 * 1024) { // 1MB limit
+      return NextResponse.json({ error: "Payload too large. Maximum 1MB per request." }, { status: 400 });
+    }
+
     // Add events to storage
     analyticsEvents.push(...events);
 

@@ -1,0 +1,16 @@
+.git
+.next
+node_modules
+out
+dist
+coverage
+analysis
+docs
+e2e/screenshots
+tests
+*.md
+!README.md
+.env*
+.data
+.claude
+scripts/generate-demo-video.py

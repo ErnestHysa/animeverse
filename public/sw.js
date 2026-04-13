@@ -4,9 +4,11 @@
  * Only active in production - disabled in development
  */
 
-const CACHE_NAME = "animeverse-v1";
-const STATIC_CACHE = "animeverse-static-v1";
-const DYNAMIC_CACHE = "animeverse-dynamic-v1";
+// Bump this version on each release to bust old caches
+const CACHE_VERSION = "1";
+
+const STATIC_CACHE = "animeverse-static-v" + CACHE_VERSION;
+const DYNAMIC_CACHE = "animeverse-dynamic-v" + CACHE_VERSION;
 
 // Assets to cache immediately
 const STATIC_ASSETS = [
@@ -25,7 +27,6 @@ const SKIP_PATTERNS = [
   "%5D", // URL encoded ]
   "turbopack",
   "bb6de_", // Next.js dev build prefix
-  "DEVPROJECTS",
   "hmr-client",
   "react-dom",
   "react-server",
@@ -135,8 +136,9 @@ self.addEventListener("fetch", (event) => {
       }).catch(() => {
         // Network failed - return a basic offline response for HTML pages
         if (request.headers.get("accept")?.includes("text/html")) {
+          const offlinePage = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Offline - AnimeVerse</title><style>body{background:#0a0a1a;color:#e2e8f0;font-family:system-ui;display:flex;align-items:center;justify-content:center;min-height:100vh;}.container{text-align:center;padding:2rem;}h1{font-size:1.5rem;margin-bottom:0.5rem;}p{color:#94a3b8;}</style></head><body><div class="container"><h1>You're Offline</h1><p>Check your internet connection and try again.</p></div></body></html>`;
           return new Response(
-            "<h1>Offline - Please check your connection</h1>",
+            offlinePage,
             { headers: { "Content-Type": "text/html" } }
           );
         }

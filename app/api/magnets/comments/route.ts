@@ -10,6 +10,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import type { MagnetComment } from "@/types/magnet-ratings";
+import { verifyToken, extractTokenFromHeader } from "@/lib/auth";
 
 // In-memory storage (replace with database in production)
 const commentsStore: Map<string, MagnetComment[]> = new Map();
@@ -32,6 +33,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Comment too long (max 1000 characters)" }, { status: 400 });
     }
 
+    // Sanitize comment text - strip HTML tags
+    const sanitizedComment = comment.replace(/<[^>]*>/g, "").trim();
+    if (!sanitizedComment) {
+      return NextResponse.json({ error: "Comment cannot be empty after sanitization" }, { status: 400 });
+    }
+
     // Create new comment
     const newComment: MagnetComment = {
       id: `comment-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -40,7 +47,7 @@ export async function POST(request: NextRequest) {
       episodeNumber,
       userId,
       username: username || "Anonymous",
-      comment,
+      comment: sanitizedComment,
       isFlagged: false,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -116,6 +123,12 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Comment too long (max 1000 characters)" }, { status: 400 });
     }
 
+    // Sanitize comment text - strip HTML tags
+    const sanitizedComment = comment.replace(/<[^>]*>/g, "").trim();
+    if (!sanitizedComment) {
+      return NextResponse.json({ error: "Comment cannot be empty after sanitization" }, { status: 400 });
+    }
+
     // Find comment
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     for (const [magnetHash, comments] of commentsStore.entries()) {
@@ -130,7 +143,7 @@ export async function PATCH(request: NextRequest) {
         }
 
         // Update comment
-        existingComment.comment = comment;
+        existingComment.comment = sanitizedComment;
         existingComment.updatedAt = new Date().toISOString();
 
         return NextResponse.json({ comment: existingComment, message: "Comment updated" });
@@ -152,11 +165,24 @@ export async function DELETE(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get("id");
-    const userId = searchParams.get("userId");
 
-    if (!id || !userId) {
-      return NextResponse.json({ error: "Missing required parameters" }, { status: 400 });
+    if (!id) {
+      return NextResponse.json({ error: "Missing required parameter: id" }, { status: 400 });
     }
+
+    // Verify auth token to get userId
+    const authHeader = request.headers.get("authorization");
+    const token = extractTokenFromHeader(authHeader);
+    if (!token) {
+      return NextResponse.json({ error: "Authorization required" }, { status: 401 });
+    }
+
+    const payload = verifyToken(token);
+    if (!payload) {
+      return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
+    }
+
+    const userId = payload.userId;
 
     // Find and delete comment
     // eslint-disable-next-line @typescript-eslint/no-unused-vars

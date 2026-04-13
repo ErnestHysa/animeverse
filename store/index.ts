@@ -12,6 +12,9 @@ import { ACHIEVEMENTS, getAchievementRequirement } from "@/lib/achievements";
 // Re-export achievements list for use in components
 export const ACHIEVEMENTS_LIST = ACHIEVEMENTS;
 
+// Memoization cache for getContinueWatching
+let _continueWatchingCache: { watchHistoryRef: WatchHistoryItem[]; limit: number; result: WatchHistoryItem[] } | null = null;
+
 // ===================================
 // Types
 // ===================================
@@ -100,6 +103,12 @@ export interface DHTConfig {
   preferTrackers: boolean; // use trackers before DHT
 }
 
+export interface MALUser {
+  id: number;
+  name: string;
+  picture: string;
+}
+
 export interface UserPreferences {
   defaultQuality: "360p" | "480p" | "720p" | "1080p" | "auto";
   autoplay: boolean;
@@ -172,8 +181,8 @@ export interface StoreState {
   malToken: string | null;
   malRefreshToken: string | null;
   malTokenExpiresAt: number | null;
-  malUser: { id: number; name: string; picture: string } | null;
-  setMALAuth: (user: { id: number; name: string; picture: string }, token: string, refreshToken: string, expiresAt: number) => void;
+  malUser: MALUser | null;
+  setMALAuth: (user: MALUser, token: string, refreshToken: string, expiresAt: number) => void;
   clearMALAuth: () => void;
 
   // Achievements
@@ -332,6 +341,16 @@ export const useStore = create<StoreState>()(
 
       getContinueWatching: (limit = 10) => {
         const history = get().watchHistory;
+
+        // Return cached result if watchHistory hasn't changed and limit matches
+        if (
+          _continueWatchingCache &&
+          _continueWatchingCache.watchHistoryRef === history &&
+          _continueWatchingCache.limit === limit
+        ) {
+          return _continueWatchingCache.result;
+        }
+
         // Group by media and get most recent episode
         const mediaMap = new Map<number, WatchHistoryItem>();
 
@@ -342,10 +361,15 @@ export const useStore = create<StoreState>()(
           }
         }
 
-        return Array.from(mediaMap.values())
+        const result = Array.from(mediaMap.values())
           .sort((a, b) => b.timestamp - a.timestamp)
           .filter((item) => !item.completed)
           .slice(0, limit);
+
+        // Cache the result (reference check invalidates on any watchHistory change)
+        _continueWatchingCache = { watchHistoryRef: history, limit, result };
+
+        return result;
       },
 
       clearWatchHistory: () => set({ watchHistory: [] }),
@@ -371,9 +395,21 @@ export const useStore = create<StoreState>()(
       // ===================================
 
       setMediaCache: (media: Media) =>
-        set((state) => ({
-          mediaCache: { ...state.mediaCache, [media.id]: media },
-        })),
+        set((state) => {
+          const newCache = { ...state.mediaCache, [media.id]: media };
+          const keys = Object.keys(newCache);
+
+          // Evict oldest entries if cache exceeds 500 items (simple LRU approximation)
+          if (keys.length > 500) {
+            const excess = keys.length - 500;
+            const keysToRemove = keys.slice(0, excess);
+            for (const key of keysToRemove) {
+              delete newCache[Number(key)];
+            }
+          }
+
+          return { mediaCache: newCache };
+        }),
 
       getMediaCache: (id: number) => {
         return get().mediaCache[id];
@@ -423,10 +459,7 @@ export const useStore = create<StoreState>()(
         set((state) => {
           // Process AniList media list - preserve full status data
           const entries: AniListMediaEntry[] = [];
-          const favoriteIds: number[] = [];
           const watchlistIds: number[] = [];
-          const watchingIds: number[] = [];
-          const completedIds: number[] = [];
 
           // Process AniList media list
           for (const item of mediaList as Array<{
@@ -466,33 +499,21 @@ export const useStore = create<StoreState>()(
 
             entries.push(entry);
 
-            // Also update legacy lists for backwards compatibility
+            // Only sync PLANNING status to watchlist (plan-to-watch)
+            // Do NOT conflate AniList status with local favorites
             switch (item.status) {
-              case "COMPLETED":
-                completedIds.push(mediaId);
-                favoriteIds.push(mediaId);
-                break;
-              case "CURRENT":
-                watchingIds.push(mediaId);
-                favoriteIds.push(mediaId);
-                break;
               case "PLANNING":
                 watchlistIds.push(mediaId);
                 break;
-              case "PAUSED":
-                watchlistIds.push(mediaId);
-                break;
-              case "REPEATING":
-                favoriteIds.push(mediaId);
-                break;
+              // COMPLETED, CURRENT, REPEATING, PAUSED, DROPPED: only stored in anilistMediaList
+              // Users manage favorites/watchlist locally via explicit actions
             }
           }
 
           return {
             // Store full AniList media list with proper status
             anilistMediaList: entries,
-            // Update legacy lists
-            favorites: [...new Set([...state.favorites, ...favoriteIds])],
+            // Only sync watchlist for PLANNING entries
             watchlist: [...new Set([...state.watchlist, ...watchlistIds])],
           };
         }),
@@ -593,9 +614,12 @@ export const useStore = create<StoreState>()(
               // Create entries for watched episodes
               // For completed anime, create entry for all episodes
               // For in-progress, create entry for current progress
-              const episodesToCreate = entry.status === "COMPLETED" || entry.status === "REPEATING"
-                ? totalEpisodes
-                : episodesWatched;
+              const episodesToCreate = Math.min(
+                entry.status === "COMPLETED" || entry.status === "REPEATING"
+                  ? totalEpisodes
+                  : episodesWatched,
+                50 // Cap at 50 entries per anime to prevent unbounded history
+              );
 
               for (let ep = 1; ep <= episodesToCreate; ep++) {
                 const historyKey = `${mediaId}-${ep}`;
@@ -706,22 +730,7 @@ export const useStore = create<StoreState>()(
         set((state) => {
           if (state.unlockedAchievements.includes(achievementId)) return state;
 
-          // Save to localStorage
-          if (typeof window !== "undefined") {
-            try {
-              const allAchievements = {
-                ...state.achievements,
-                [achievementId]: (state.achievements[achievementId] || 0) + 1,
-              };
-              localStorage.setItem("animeverse_achievements", JSON.stringify({
-                achievements: allAchievements,
-                unlocked: [...state.unlockedAchievements, achievementId],
-              }));
-            } catch (error) {
-              console.error("Failed to save achievement:", error);
-            }
-          }
-
+          // Persistence is handled by Zustand persist middleware
           return {
             achievements: {
               ...state.achievements,
@@ -734,20 +743,26 @@ export const useStore = create<StoreState>()(
       updateAchievementProgress: (achievementId: string, progress: number) =>
         set((state) => {
           const currentProgress = state.achievements[achievementId] || 0;
+          const newAchievements = {
+            ...state.achievements,
+            [achievementId]: progress,
+          };
 
-          // Check if achievement should be unlocked
+          // If progress crossed the threshold, unlock in the same set() call
           if (currentProgress < progress && progress >= getAchievementRequirement(achievementId)) {
-            // Trigger unlock
-            const action = get().unlockAchievement;
-            action(achievementId);
-            return state;
+            if (!state.unlockedAchievements.includes(achievementId)) {
+              return {
+                achievements: {
+                  ...newAchievements,
+                  [achievementId]: (state.achievements[achievementId] || 0) + 1,
+                },
+                unlockedAchievements: [...state.unlockedAchievements, achievementId],
+              };
+            }
           }
 
           return {
-            achievements: {
-              ...state.achievements,
-              [achievementId]: progress,
-            },
+            achievements: newAchievements,
           };
         }),
 
@@ -829,17 +844,7 @@ export const useStore = create<StoreState>()(
             }
           }
 
-          // Save to localStorage
-          if (typeof window !== "undefined") {
-            try {
-              localStorage.setItem("animeverse_achievements", JSON.stringify({
-                achievements: newAchievements,
-                unlocked: newUnlocked,
-              }));
-            } catch (error) {
-              console.error("Failed to save achievements:", error);
-            }
-          }
+          // Persistence is handled by Zustand persist middleware
 
           return {
             achievements: newAchievements,
@@ -866,8 +871,29 @@ export const useStore = create<StoreState>()(
             if (typeof window === "undefined") return;
             localStorage.setItem(name, JSON.stringify(value));
           } catch (error) {
-            console.warn(`Failed to set ${name} in localStorage:`, error);
-            // Silently fail - app will work without persistence
+            if (error instanceof DOMException && error.name === "QuotaExceededError") {
+              // Evict old mediaCache entries to free space, then retry
+              try {
+                const parsed = typeof value === "string" ? JSON.parse(value) : value;
+                if (parsed?.state?.mediaCache) {
+                  const cacheKeys = Object.keys(parsed.state.mediaCache);
+                  if (cacheKeys.length > 100) {
+                    // Keep only the newest 100 entries
+                    const keepKeys = cacheKeys.slice(cacheKeys.length - 100);
+                    const reducedCache: Record<string, unknown> = {};
+                    for (const key of keepKeys) {
+                      reducedCache[key] = parsed.state.mediaCache[key];
+                    }
+                    parsed.state.mediaCache = reducedCache;
+                    localStorage.setItem(name, JSON.stringify(parsed));
+                  }
+                }
+              } catch (retryError) {
+                console.warn(`Failed to save ${name} even after eviction:`, retryError);
+              }
+            } else {
+              console.warn(`Failed to set ${name} in localStorage:`, error);
+            }
           }
         },
         removeItem: (name) => {
@@ -1114,5 +1140,58 @@ export const useAchievements = () => {
     unlockAchievement,
     updateAchievementProgress,
     checkAndUnlockAchievements,
+  };
+};
+
+/**
+ * Hook for MAL authentication
+ */
+export const useMALAuth = () => {
+  const malUser = useStore((state) => state.malUser);
+  const malToken = useStore((state) => state.malToken);
+  const malRefreshToken = useStore((state) => state.malRefreshToken);
+  const malTokenExpiresAt = useStore((state) => state.malTokenExpiresAt);
+  const setMALAuth = useStore((state) => state.setMALAuth);
+  const clearMALAuth = useStore((state) => state.clearMALAuth);
+
+  return {
+    malUser,
+    malToken,
+    malRefreshToken,
+    malTokenExpiresAt,
+    setMALAuth,
+    clearMALAuth,
+    isMALAuthenticated: !!malToken,
+  };
+};
+
+/**
+ * Hook for mini player state
+ */
+export const useMiniPlayer = () => {
+  const miniPlayer = useStore((state) => state.miniPlayer);
+  const setMiniPlayer = useStore((state) => state.setMiniPlayer);
+  const clearMiniPlayer = useStore((state) => state.clearMiniPlayer);
+
+  return {
+    miniPlayerAnime: miniPlayer,
+    setMiniPlayer,
+    clearMiniPlayer,
+    isMiniPlayerActive: !!miniPlayer,
+  };
+};
+
+/**
+ * Hook for per-anime preferences
+ */
+export const usePerAnimePrefs = () => {
+  const perAnimePrefs = useStore((state) => state.perAnimePrefs);
+  const setPerAnimePref = useStore((state) => state.setPerAnimePref);
+  const getPerAnimePref = useStore((state) => state.getPerAnimePref);
+
+  return {
+    perAnimePrefs,
+    setPerAnimePref,
+    getPerAnimePref,
   };
 };

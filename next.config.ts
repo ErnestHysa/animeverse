@@ -21,7 +21,7 @@ const nextConfig = {
 
   typescript: {
     // We run `next typegen` + `tsc --noEmit` before builds in package scripts/CI.
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
 
   images: {
@@ -57,9 +57,34 @@ const nextConfig = {
     ],
   },
 
-  // PWA manifest
+  poweredByHeader: false,
+
+  // PWA manifest + security headers
   async headers() {
+    const securityHeaders = [
+      {
+        key: "X-Content-Type-Options",
+        value: "nosniff",
+      },
+      {
+        key: "X-Frame-Options",
+        value: "DENY",
+      },
+      {
+        key: "Referrer-Policy",
+        value: "strict-origin-when-cross-origin",
+      },
+      {
+        key: "Permissions-Policy",
+        value: "camera=(), microphone=(), geolocation=()",
+      },
+    ];
+
     return [
+      {
+        source: "/(.*)",
+        headers: securityHeaders,
+      },
       {
         source: "/manifest.json",
         headers: [

@@ -22,7 +22,6 @@ FROM base AS deps
 
 # Copy package files
 COPY package*.json ./
-COPY prisma ./prisma/
 
 # Install dependencies
 RUN npm ci --only=production && \
@@ -40,9 +39,6 @@ COPY . .
 # Set build environment
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
-
-# Generate Prisma client
-RUN npx prisma generate
 
 # Build Next.js application
 RUN npm run build
@@ -65,17 +61,13 @@ RUN addgroup --system --gid 1001 nodejs && \
 # Set working directory
 WORKDIR /app
 
-# Copy necessary files from builder
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/prisma ./prisma/
+# Copy standalone output from builder (includes server.js and minimal node_modules)
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/server-custom.js ./
-COPY --from=builder /app/node_modules ./node_modules
 
-# Copy Prisma schema and generate client
-RUN npx prisma generate
+# Copy public and data directories
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/data ./data
 
 # Create directories with proper permissions
 RUN mkdir -p /app/.next/cache && \
@@ -92,4 +84,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
 # Start the application
-CMD ["node", "server-custom.js"]
+CMD ["node", "server.js"]

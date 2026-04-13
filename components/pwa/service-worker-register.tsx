@@ -48,7 +48,7 @@ export function ServiceWorkerRegister() {
         });
       })
       .catch((error) => {
-        // Silently fail - service worker is not critical for app functionality
+        console.error("SW registration failed:", error);
       });
 
     // Listen for controlling service worker

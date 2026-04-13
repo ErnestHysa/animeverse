@@ -9,6 +9,12 @@
 import parseTorrent from "parse-torrent";
 
 // ===================================
+// Constants
+// ===================================
+
+const SCRAPER_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+
+// ===================================
 // Types
 // ===================================
 
@@ -217,12 +223,19 @@ export async function scrapeNyaa(
     console.log(`[Nyaa.si] Searching: ${searchQuery}`);
 
     // Fetch the page
-    const response = await fetch(searchUrl, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      },
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    let response: Response;
+    try {
+      response = await fetch(searchUrl, {
+        headers: {
+          "User-Agent": SCRAPER_USER_AGENT,
+        },
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -252,7 +265,7 @@ export async function scrapeNyaa(
       }
     }
 
-    if (!rows) {
+    if (rows.length === 0) {
       console.log(`[Nyaa.si] No results found for: ${searchQuery}`);
       return [];
     }
@@ -330,12 +343,19 @@ export async function scrapeNyaaLand(
 
     console.log(`[Nyaa.land] Searching: ${searchQuery}`);
 
-    const response = await fetch(searchUrl, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      },
-    });
+    const nyaaLandController = new AbortController();
+    const nyaaLandTimeoutId = setTimeout(() => nyaaLandController.abort(), 15000);
+    let response: Response;
+    try {
+      response = await fetch(searchUrl, {
+        headers: {
+          "User-Agent": SCRAPER_USER_AGENT,
+        },
+        signal: nyaaLandController.signal,
+      });
+    } finally {
+      clearTimeout(nyaaLandTimeoutId);
+    }
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -363,7 +383,7 @@ export async function scrapeNyaaLand(
       }
     }
 
-    if (!rows) {
+    if (rows.length === 0) {
       console.log(`[Nyaa.land] No results found for: ${searchQuery}`);
       return [];
     }
@@ -435,12 +455,19 @@ export async function scrapeAniDex(
 
     console.log(`[AniDex] Searching: ${searchQuery}`);
 
-    const response = await fetch(searchUrl, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      },
-    });
+    const anidexController = new AbortController();
+    const anidexTimeoutId = setTimeout(() => anidexController.abort(), 15000);
+    let response: Response;
+    try {
+      response = await fetch(searchUrl, {
+        headers: {
+          "User-Agent": SCRAPER_USER_AGENT,
+        },
+        signal: anidexController.signal,
+      });
+    } finally {
+      clearTimeout(anidexTimeoutId);
+    }
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -478,7 +505,7 @@ export async function scrapeAniDex(
       }
     }
 
-    if (!entries) {
+    if (entries.length === 0) {
       console.log(`[AniDex] No results found for: ${searchQuery}`);
       return [];
     }
@@ -966,9 +993,12 @@ function removeDuplicateMagnets(magnets: MagnetLink[]): MagnetLink[] {
  * Add timeout to a promise
  */
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
   const timeoutPromise = new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error(`Timeout after ${timeoutMs}ms`)), timeoutMs);
+    timer = setTimeout(() => reject(new Error(`Timeout after ${timeoutMs}ms`)), timeoutMs);
   });
+
+  promise.finally(() => clearTimeout(timer));
 
   return Promise.race([promise, timeoutPromise]);
 }

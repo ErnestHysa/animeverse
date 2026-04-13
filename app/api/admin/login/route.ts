@@ -17,6 +17,36 @@ import {
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+// IP-based rate limiting
+const ipLoginAttempts = new Map<string, { count: number; resetTime: number }>();
+const MAX_LOGIN_ATTEMPTS = 10;
+const LOCKOUT_DURATION = 60 * 1000; // 1 minute
+
+function isIpLocked(ip: string): boolean {
+  const attempts = ipLoginAttempts.get(ip);
+  if (!attempts) return false;
+  if (Date.now() > attempts.resetTime) {
+    ipLoginAttempts.delete(ip);
+    return false;
+  }
+  return attempts.count >= MAX_LOGIN_ATTEMPTS;
+}
+
+function recordFailedIpLogin(ip: string): void {
+  const attempts = ipLoginAttempts.get(ip);
+  if (!attempts) {
+    ipLoginAttempts.set(ip, { count: 1, resetTime: Date.now() + LOCKOUT_DURATION });
+  } else if (Date.now() < attempts.resetTime) {
+    attempts.count++;
+  } else {
+    ipLoginAttempts.set(ip, { count: 1, resetTime: Date.now() + LOCKOUT_DURATION });
+  }
+}
+
+function clearIpAttempts(ip: string): void {
+  ipLoginAttempts.delete(ip);
+}
+
 interface LoginRequestBody {
   username: string;
   password: string;
@@ -53,7 +83,24 @@ export async function POST(request: NextRequest): Promise<NextResponse<LoginResp
       );
     }
 
-    // Check for rate limiting
+    // Get client IP for rate limiting
+    const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+      || request.headers.get('x-real-ip')
+      || 'unknown';
+
+    // Check IP-based rate limiting
+    if (isIpLocked(clientIp)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Too many failed login attempts from your IP. Please try again later.',
+          remainingAttempts: 0,
+        },
+        { status: 429 }
+      );
+    }
+
+    // Check username-based rate limiting
     if (isUsernameLocked(username)) {
       return NextResponse.json(
         {
@@ -69,8 +116,9 @@ export async function POST(request: NextRequest): Promise<NextResponse<LoginResp
     const result = await authenticateUser({ username, password });
 
     if (!result.success) {
-      // Record failed attempt
+      // Record failed attempt for both username and IP
       recordFailedLogin(username);
+      recordFailedIpLogin(clientIp);
       const remaining = getRemainingAttempts(username);
 
       return NextResponse.json(
@@ -85,6 +133,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<LoginResp
 
     // Clear failed attempts on successful login
     clearLoginAttempts(username);
+    clearIpAttempts(clientIp);
 
     // Create response with user data
     const response = NextResponse.json({

@@ -39,7 +39,10 @@ export interface LoginCredentials {
 // Configuration
 // ===================================
 
-const JWT_SECRET = process.env.JWT_SECRET || 'CHANGE_THIS_IN Production';
+const JWT_SECRET = process.env.JWT_SECRET!;
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is required. Set it in .env');
+}
 const JWT_EXPIRES_IN = '1h'; // Access token expires in 1 hour
 const REFRESH_TOKEN_EXPIRES_IN = '7d'; // Refresh token expires in 7 days
 const BCRYPT_ROUNDS = 12;
@@ -180,8 +183,11 @@ export function validatePasswordStrength(password: string): {
 const ADMIN_USERS: Map<string, AdminUser & { passwordHash: string }> = new Map();
 
 // Initialize default admin user if not exists
-const DEFAULT_ADMIN_USERNAME = process.env.DEFAULT_ADMIN_USERNAME || 'admin';
-const DEFAULT_ADMIN_PASSWORD = process.env.DEFAULT_ADMIN_PASSWORD || 'admin123';
+const DEFAULT_ADMIN_USERNAME = process.env.DEFAULT_ADMIN_USERNAME!;
+const DEFAULT_ADMIN_PASSWORD = process.env.DEFAULT_ADMIN_PASSWORD!;
+if (!DEFAULT_ADMIN_USERNAME || !DEFAULT_ADMIN_PASSWORD) {
+  throw new Error('DEFAULT_ADMIN_USERNAME and DEFAULT_ADMIN_PASSWORD environment variables are required. Set them in .env');
+}
 
 /**
  * Initialize default admin user

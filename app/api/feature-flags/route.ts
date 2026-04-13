@@ -8,6 +8,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { featureFlagManager } from '@/lib/feature-flags';
+import { verifyToken, extractTokenFromHeader } from '@/lib/auth';
+
+// Beta tester user IDs (configure as needed)
+const BETA_TESTER_USER_IDS: string[] = [
+  // Add beta tester user IDs here
+];
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,12 +27,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get user context from session (replace with your auth logic)
+    // Get user context from verified JWT token
+    const authHeader = request.headers.get('authorization');
+    const token = extractTokenFromHeader(authHeader);
+    const payload = token ? verifyToken(token) : null;
+
     const userContext = {
-      userId: request.headers.get('x-user-id') ? parseInt(request.headers.get('x-user-id')!) : undefined,
-      email: request.headers.get('x-user-email') || undefined,
-      isAdmin: request.headers.get('x-user-role') === 'admin',
-      isBetaTester: request.headers.get('x-user-beta') === 'true',
+      userId: payload?.userId ? parseInt(payload.userId.replace(/\D/g, '')) || undefined : undefined,
+      email: undefined as string | undefined,
+      isAdmin: payload?.role === 'admin' || payload?.role === 'superadmin',
+      isBetaTester: payload ? BETA_TESTER_USER_IDS.includes(payload.userId) : false,
     };
 
     const isEnabled = featureFlagManager.isFeatureEnabled(

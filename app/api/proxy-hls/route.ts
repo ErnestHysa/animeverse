@@ -12,6 +12,73 @@ import logger from "@/lib/logger";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/**
+ * SSRF protection: check if a URL targets a private/reserved IP or localhost
+ */
+function isUrlAllowed(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+
+    // Only allow http/https
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return false;
+    }
+
+    const hostname = parsed.hostname.toLowerCase();
+
+    // Block localhost
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1") {
+      return false;
+    }
+
+    // Block private IPv4 ranges
+    const ipv4Regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+    const match = hostname.match(ipv4Regex);
+    if (match) {
+      const octets = [parseInt(match[1]), parseInt(match[2]), parseInt(match[3]), parseInt(match[4])];
+      // 10.0.0.0/8
+      if (octets[0] === 10) return false;
+      // 172.16.0.0/12
+      if (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) return false;
+      // 192.168.0.0/16
+      if (octets[0] === 192 && octets[1] === 168) return false;
+      // 169.254.0.0/16 (link-local)
+      if (octets[0] === 169 && octets[1] === 254) return false;
+      // 127.0.0.0/8 (loopback)
+      if (octets[0] === 127) return false;
+    }
+
+    // Block IPv6 private ranges (simplified check)
+    if (hostname.startsWith("fc") || hostname.startsWith("fd") || hostname.startsWith("fe80")) {
+      return false;
+    }
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Get allowed origin for CORS headers
+ */
+function getAllowedOrigin(request: NextRequest): string {
+  const origin = request.headers.get("origin");
+  const host = request.headers.get("host") || "";
+  // Allow same-origin or known production URLs
+  if (origin) {
+    try {
+      const originHost = new URL(origin).hostname;
+      if (originHost === "localhost" || originHost === "127.0.0.1" || originHost.endsWith(".animeverse.app") || originHost === host.split(":")[0]) {
+        return origin;
+      }
+    } catch {}
+  }
+  // Fallback to request host
+  const protocol = request.headers.get("x-forwarded-proto") || "https";
+  return `${protocol}://${host}`;
+}
+
 const MAX_MANIFEST_SIZE = 10 * 1024 * 1024; // 10MB for manifests
 const MAX_SEGMENT_SIZE = 50 * 1024 * 1024; // 50MB for individual segments
 const MAX_VIDEO_SIZE = 2 * 1024 * 1024 * 1024; // 2GB for full video files
@@ -37,6 +104,14 @@ export async function GET(request: NextRequest) {
     }
 
     const targetUrl = decodeURIComponent(encodedUrl);
+
+    // SSRF protection: block private IPs and localhost
+    if (!isUrlAllowed(targetUrl)) {
+      return NextResponse.json(
+        { error: "URL not allowed: private/internal addresses are blocked" },
+        { status: 403 }
+      );
+    }
 
     // Validate URL and determine referer
     let refererOrigin = "";
@@ -248,7 +323,7 @@ export async function GET(request: NextRequest) {
         status: 200,
         headers: {
           "Content-Type": contentType,
-          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Origin": getAllowedOrigin(request),
           "Access-Control-Allow-Methods": "GET, OPTIONS",
           "Access-Control-Allow-Headers": "Range, Content-Type",
           "Cache-Control": "public, max-age=300", // 5 minutes for manifests
@@ -260,7 +335,7 @@ export async function GET(request: NextRequest) {
     const contentLengthHeader = response.headers.get("content-length");
     const headers: Record<string, string> = {
       "Content-Type": contentType,
-      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Origin": getAllowedOrigin(request),
       "Access-Control-Allow-Methods": "GET, OPTIONS",
       "Access-Control-Allow-Headers": "Range, Content-Type",
       "Cache-Control": type === "video" ? "public, max-age=3600" : "public, max-age=86400", // 1 hour for videos, 24 hours for segments
@@ -313,11 +388,11 @@ export async function GET(request: NextRequest) {
 /**
  * OPTIONS handler for CORS preflight
  */
-export async function OPTIONS() {
+export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
     status: 200,
     headers: {
-      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Origin": getAllowedOrigin(request),
       "Access-Control-Allow-Methods": "GET, OPTIONS",
       "Access-Control-Allow-Headers": "Range, Content-Type",
     },

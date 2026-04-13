@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readFile, writeFile } from "fs/promises";
 import { existsSync } from "fs";
 import path from "path";
+import { isAdminRequest } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -108,6 +109,11 @@ async function validateMagnetViaDHT(magnet: string): Promise<{
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
+    // Auth check
+    if (!(await isAdminRequest(request))) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 
@@ -151,6 +157,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
+    // Auth check
+    if (!(await isAdminRequest(request))) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await request.json();
     const { id, magnet: magnetLink } = body;
 

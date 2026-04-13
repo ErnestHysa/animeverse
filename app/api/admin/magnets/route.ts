@@ -11,9 +11,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { readFile, writeFile } from "fs/promises";
+import { readFile, writeFile, mkdir } from "fs/promises";
 import { existsSync } from "fs";
 import path from "path";
+import { isAdminRequest } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -52,7 +53,7 @@ async function initDatabase(): Promise<void> {
   if (!existsSync(MAGNETS_DB_PATH)) {
     const dataDir = path.dirname(MAGNETS_DB_PATH);
     if (!existsSync(dataDir)) {
-      await writeFile(dataDir, "");
+      await mkdir(dataDir, { recursive: true });
     }
 
     const initialDb: MagnetsDatabase = {
@@ -92,6 +93,11 @@ async function writeDatabase(data: MagnetsDatabase): Promise<void> {
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
+    // Auth check
+    if (!(await isAdminRequest(request))) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const animeId = searchParams.get("animeId");
     const episode = searchParams.get("episode");
@@ -141,6 +147,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
+    // Auth check
+    if (!(await isAdminRequest(request))) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await request.json();
     const {
       animeId,
@@ -237,6 +248,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
  */
 export async function PUT(request: NextRequest): Promise<NextResponse> {
   try {
+    // Auth check
+    if (!(await isAdminRequest(request))) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await request.json();
     const { id, status, notes, quality } = body;
 
@@ -290,6 +306,11 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
  */
 export async function DELETE(request: NextRequest): Promise<NextResponse> {
   try {
+    // Auth check
+    if (!(await isAdminRequest(request))) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 

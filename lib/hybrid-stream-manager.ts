@@ -68,15 +68,12 @@ const MIN_SEED_THRESHOLD = 3; // Minimum seeds for WebTorrent to be viable
 // Analytics (Phase 9)
 // ===================================
 
-let analyticsEnabled = false;
-let fallbackStartTime = 0;
-
 export function enableAnalytics() {
-  analyticsEnabled = true;
+  HybridStreamManagerImpl.getInstance().setAnalyticsEnabled(true);
 }
 
 export function disableAnalytics() {
-  analyticsEnabled = false;
+  HybridStreamManagerImpl.getInstance().setAnalyticsEnabled(false);
 }
 
 // ===================================
@@ -86,6 +83,8 @@ export function disableAnalytics() {
 class HybridStreamManagerImpl {
   private activeAttempts: Map<string, AbortController> = new Map();
   private static instance: HybridStreamManagerImpl;
+  private analyticsEnabled = false;
+  private fallbackStartTime = 0;
 
   private constructor() {
     // Singleton pattern
@@ -96,6 +95,10 @@ class HybridStreamManagerImpl {
       HybridStreamManagerImpl.instance = new HybridStreamManagerImpl();
     }
     return HybridStreamManagerImpl.instance;
+  }
+
+  setAnalyticsEnabled(enabled: boolean): void {
+    this.analyticsEnabled = enabled;
   }
 
   // ===================================
@@ -138,9 +141,9 @@ class HybridStreamManagerImpl {
       );
 
       // Track playback start (Phase 9)
-      if (analyticsEnabled) {
+      if (this.analyticsEnabled) {
         try {
-          const { trackPlaybackStart } = require("./analytics-integration");
+          const { trackPlaybackStart } = await import("./analytics-integration");
           trackPlaybackStart({
             animeId,
             animeTitle: animeTitle || `Anime ${animeId}`,
@@ -154,7 +157,7 @@ class HybridStreamManagerImpl {
         }
       }
 
-      fallbackStartTime = Date.now();
+      this.fallbackStartTime = Date.now();
 
       // Try primary method first
       const primaryResult = await this.tryMethod(
@@ -168,16 +171,16 @@ class HybridStreamManagerImpl {
         // Check if we should fallback due to low seed count
         if (primary === "webtorrent" && primaryResult.seeders !== undefined) {
           if (primaryResult.seeders < MIN_SEED_THRESHOLD) {
-            const timeToFallback = Date.now() - fallbackStartTime;
+            const timeToFallback = Date.now() - this.fallbackStartTime;
             logger.warn(
               `[HybridStream] WebTorrent has low seed count (${primaryResult.seeders}), falling back to HLS`
             );
             onFallback?.("webtorrent", "hls", `Low seed count (${primaryResult.seeders} < ${MIN_SEED_THRESHOLD})`);
 
             // Track fallback event (Phase 9)
-            if (analyticsEnabled) {
+            if (this.analyticsEnabled) {
               try {
-                const { trackFallback } = require("./analytics-integration");
+                const { trackFallback } = await import("./analytics-integration");
                 trackFallback({
                   animeId,
                   animeTitle: animeTitle || `Anime ${animeId}`,
@@ -219,7 +222,7 @@ class HybridStreamManagerImpl {
 
       // Primary method failed, try secondary
       if (secondary) {
-        const timeToFallback = Date.now() - fallbackStartTime;
+        const timeToFallback = Date.now() - this.fallbackStartTime;
         logger.warn(
           `[HybridStream] Primary method (${primary}) failed: ${primaryResult.error?.message}`,
           "Falling back to secondary method"
@@ -231,9 +234,9 @@ class HybridStreamManagerImpl {
         );
 
         // Track fallback event (Phase 9)
-        if (analyticsEnabled) {
+        if (this.analyticsEnabled) {
           try {
-            const { trackFallback } = require("./analytics-integration");
+            const { trackFallback } = await import("./analytics-integration");
             trackFallback({
               animeId,
               animeTitle: animeTitle || `Anime ${animeId}`,
@@ -302,6 +305,15 @@ class HybridStreamManagerImpl {
     }
     this.activeAttempts.clear();
     logger.info("[HybridStream] Cancelled all attempts");
+  }
+
+  /**
+   * Destroy the singleton: clear all state and abort active attempts
+   */
+  destroy(): void {
+    this.cancelAllAttempts();
+    this.analyticsEnabled = false;
+    this.fallbackStartTime = 0;
   }
 
   // ===================================

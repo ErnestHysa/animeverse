@@ -14,7 +14,7 @@
  * - Offline support for cached content
  */
 
-import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage } from "electron";
+import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, Notification } from "electron";
 import path from "path";
 import fs from "fs";
 import { createServer } from "http";
@@ -140,7 +140,7 @@ function createWindow(): void {
 
   // Load the app (in development, load from dev server)
   if (process.env.NODE_ENV === "development") {
-    mainWindow.loadURL("http://localhost:3001");
+    mainWindow.loadURL("http://localhost:3000");
     mainWindow.webContents.openDevTools();
   } else {
     mainWindow.loadFile(path.join(__dirname, "../out/index.html"));
@@ -402,14 +402,8 @@ function quitApp(): void {
 }
 
 function showNotification(title: string, body: string): void {
-  if (Notification.permission === "granted") {
-    new Notification(title, { body });
-  } else if (Notification.permission !== "denied") {
-    Notification.requestPermission().then((permission) => {
-      if (permission === "granted") {
-        new Notification(title, { body });
-      }
-    });
+  if (Notification.isSupported()) {
+    new Notification({ title, body }).show();
   }
 }
 
