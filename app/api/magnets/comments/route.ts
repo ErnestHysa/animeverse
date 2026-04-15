@@ -157,12 +157,26 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Request body too large" }, { status: 413 });
     }
 
+    // Fix C7: Extract userId from JWT token instead of request body
+    const authHeader = request.headers.get("authorization");
+    const token = extractTokenFromHeader(authHeader);
+    if (!token) {
+      return NextResponse.json({ error: "Authorization required" }, { status: 401 });
+    }
+
+    const payload = verifyToken(token);
+    if (!payload) {
+      return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
+    }
+
+    const userId = payload.username;
+
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get("id");
     const body = await request.json();
-    const { comment, userId } = body;
+    const { comment } = body;
 
-    if (!id || !comment || !userId) {
+    if (!id || !comment) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 

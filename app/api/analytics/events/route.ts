@@ -22,6 +22,7 @@ interface AnalyticsEvent {
 }
 
 const analyticsEvents: AnalyticsEvent[] = [];
+const MAX_ANALYTICS_EVENTS = 10000; // Fix H3: Cap events array size
 
 /**
  * POST /api/analytics/events
@@ -29,6 +30,26 @@ const analyticsEvents: AnalyticsEvent[] = [];
  */
 export async function POST(request: NextRequest) {
   try {
+    // Fix H3: Basic origin check — only accept events from the app itself
+    const origin = request.headers.get('origin');
+    const host = request.headers.get('host') || '';
+    if (origin) {
+      try {
+        const originHost = new URL(origin).hostname;
+        const hostWithoutPort = host.split(':')[0];
+        const isAllowedOrigin =
+          originHost === 'localhost' ||
+          originHost === '127.0.0.1' ||
+          originHost.endsWith('.animeverse.app') ||
+          originHost === hostWithoutPort;
+        if (!isAllowedOrigin) {
+          return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
+        }
+      } catch {
+        return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
+      }
+    }
+
     // Body size check
     const contentLength = parseInt(request.headers.get('content-length') || '0');
     if (contentLength > 1048576) {
@@ -55,6 +76,11 @@ export async function POST(request: NextRequest) {
 
     // Add events to storage
     analyticsEvents.push(...events);
+
+    // Fix H3: Cap the events array at MAX_ANALYTICS_EVENTS, remove oldest if exceeded
+    if (analyticsEvents.length > MAX_ANALYTICS_EVENTS) {
+      analyticsEvents.splice(0, analyticsEvents.length - MAX_ANALYTICS_EVENTS);
+    }
 
     // Persist to file periodically (every 100 events)
     if (analyticsEvents.length >= 100) {

@@ -123,7 +123,17 @@ class StatsTracker {
     this.stats.totalDownloaded = Object.values(this.stats.torrentStats)
       .reduce((sum, t) => sum + (t.downloaded || 0), 0);
 
-    this.save();
+    this.debouncedSave();
+  }
+
+  // Debounced save: coalesce rapid updates into a single write (H10)
+  private saveTimeout: ReturnType<typeof setTimeout> | null = null;
+  debouncedSave() {
+    if (this.saveTimeout) clearTimeout(this.saveTimeout);
+    this.saveTimeout = setTimeout(() => {
+      this.save();
+      this.saveTimeout = null;
+    }, 30000); // 30s debounce
   }
 
   removeTorrent(infoHash) {
@@ -153,6 +163,7 @@ class SeedServer {
     this.torrentList = this.loadTorrentList();
     this.cleanupInterval = null;
     this.statsInterval = null;
+    this.logStatsInterval = null;
   }
 
   /**
@@ -207,6 +218,9 @@ class SeedServer {
     }
     if (this.statsInterval) {
       clearInterval(this.statsInterval);
+    }
+    if (this.logStatsInterval) {
+      clearInterval(this.logStatsInterval);
     }
 
     // Destroy all torrents
@@ -394,8 +408,8 @@ class SeedServer {
       this.stats.save();
     }, 60 * 1000);
 
-    // Log stats every 5 minutes
-    setInterval(() => {
+    // Log stats every 5 minutes (H6: store interval reference for cleanup)
+    this.logStatsInterval = setInterval(() => {
       this.logStats();
     }, 5 * 60 * 1000);
   }

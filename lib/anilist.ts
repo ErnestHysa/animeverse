@@ -69,11 +69,17 @@ class AniListClient {
     variables: Record<string, unknown> = {}
   ): Promise<APIResult<T>> {
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+
       const response = await fetch(this.url, {
         ...this.options,
         body: JSON.stringify({ query, variables }),
         next: { revalidate: 300 },
+        signal: controller.signal,
       });
+
+      clearTimeout(timeout);
 
       const data = await response.json();
 

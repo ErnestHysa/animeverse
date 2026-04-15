@@ -183,9 +183,17 @@ export function scheduleNotification(
     return { cancel: () => {} };
   }
 
-  const timeoutId = setTimeout(() => {
-    showNotification(options);
-  }, delay);
+  // Cap delay at MAX_SAFE_DELAY to avoid setTimeout overflow (2^31-1 ms ≈ 24.8 days)
+  const MAX_SAFE_DELAY = 2147483647;
+
+  function scheduleWithMaxDelay(remaining: number): NodeJS.Timeout {
+    if (remaining <= MAX_SAFE_DELAY) {
+      return setTimeout(() => showNotification(options), remaining);
+    }
+    return setTimeout(() => scheduleWithMaxDelay(remaining - MAX_SAFE_DELAY), MAX_SAFE_DELAY);
+  }
+
+  const timeoutId = scheduleWithMaxDelay(delay);
 
   return {
     cancel: () => clearTimeout(timeoutId),

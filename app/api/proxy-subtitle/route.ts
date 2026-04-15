@@ -4,8 +4,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { verifyToken, extractTokenFromHeader } from "@/lib/auth";
-import { isUrlAllowedSync, getAllowedOrigin } from "@/lib/ssrf-protection";
+import { isProxyAuthenticated } from "@/lib/auth";
+import { isUrlAllowed, getAllowedOrigin } from "@/lib/ssrf-protection";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,40 +14,12 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB max for subtitle files
 const TIMEOUT_MS = 10000; // 10 second timeout
 
 /**
- * Auth check: require valid JWT OR valid referer from app's own domain
- */
-async function isProxyAuthenticated(request: NextRequest): Promise<boolean> {
-  const authHeader = request.headers.get("authorization");
-  const token = extractTokenFromHeader(authHeader);
-  if (token) {
-    const payload = verifyToken(token);
-    if (payload) return true;
-  }
-  const referer = request.headers.get("referer");
-  if (referer) {
-    try {
-      const refererHost = new URL(referer).hostname;
-      const host = request.headers.get("host")?.split(":")[0] || "";
-      if (
-        refererHost === "localhost" ||
-        refererHost === "127.0.0.1" ||
-        refererHost.endsWith(".animeverse.app") ||
-        refererHost === host
-      ) {
-        return true;
-      }
-    } catch {}
-  }
-  return false;
-}
-
-/**
  * GET /api/proxy-subtitle?url=<encoded_url>
  * Proxies subtitle file requests to bypass CORS and hotlink protection
  */
 export async function GET(request: NextRequest) {
   try {
-    // Auth check: require valid JWT or app-domain referer
+    // Auth check: require valid JWT (no referer bypass)
     if (!(await isProxyAuthenticated(request))) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -63,8 +35,8 @@ export async function GET(request: NextRequest) {
 
     const subtitleUrl = decodeURIComponent(encodedUrl);
 
-    // SSRF protection: block private IPs and localhost
-    if (!isUrlAllowedSync(subtitleUrl)) {
+    // SSRF protection: block private IPs and localhost (with DNS resolution)
+    if (!(await isUrlAllowed(subtitleUrl))) {
       return NextResponse.json(
         { error: "URL not allowed: private/internal addresses are blocked" },
         { status: 403 }

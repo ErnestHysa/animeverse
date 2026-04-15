@@ -93,6 +93,12 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    // Fix M8: Body size check
+    const contentLength = parseInt(request.headers.get('content-length') || '0');
+    if (contentLength > 1048576) {
+      return NextResponse.json({ error: 'Request too large' }, { status: 413 });
+    }
+
     const body = await request.json();
     const { type, severity, message, metadata } = body;
 

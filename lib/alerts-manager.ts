@@ -20,6 +20,9 @@ class AlertsManager {
   private rules: AlertRule[] = [];
   private checkInterval = 60000; // Check every minute
   private checkTimer: NodeJS.Timeout | null = null;
+  private isChecking = false; // Prevent concurrent checkRules calls
+  private static readonly MAX_ALERTS = 500;
+  private static readonly RESOLVED_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
   constructor() {
     this.setupDefaultRules();
@@ -143,15 +146,52 @@ class AlertsManager {
    * Check all alert rules
    */
   private async checkRules(): Promise<void> {
-    for (const rule of this.rules) {
-      try {
-        const triggered = await rule.check();
+    // Prevent concurrent checkRules calls (H2)
+    if (this.isChecking) return;
+    this.isChecking = true;
 
-        if (triggered) {
-          await this.createAlert(rule);
+    try {
+      for (const rule of this.rules) {
+        try {
+          const triggered = await rule.check();
+
+          if (triggered) {
+            await this.createAlert(rule);
+          }
+        } catch (error) {
+          console.error(`Error checking rule ${rule.type}:`, error);
         }
-      } catch (error) {
-        console.error(`Error checking rule ${rule.type}:`, error);
+      }
+    } finally {
+      this.isChecking = false;
+    }
+
+    // Cleanup old resolved alerts (H9)
+    this.cleanupAlerts();
+  }
+
+  /**
+   * Cleanup old resolved alerts and enforce max cap
+   */
+  private cleanupAlerts(): void {
+    const now = Date.now();
+
+    // Remove resolved alerts older than 24 hours
+    for (const [id, alert] of this.alerts.entries()) {
+      if (alert.resolved && alert.resolvedAt && (now - alert.resolvedAt > AlertsManager.RESOLVED_TTL)) {
+        this.alerts.delete(id);
+      }
+    }
+
+    // Enforce max cap: remove oldest resolved alerts if over limit
+    if (this.alerts.size > AlertsManager.MAX_ALERTS) {
+      const resolvedAlerts = Array.from(this.alerts.entries())
+        .filter(([, a]) => a.resolved)
+        .sort(([, a], [, b]) => (a.resolvedAt || a.timestamp) - (b.resolvedAt || b.timestamp));
+
+      const toRemove = this.alerts.size - AlertsManager.MAX_ALERTS;
+      for (let i = 0; i < Math.min(toRemove, resolvedAlerts.length); i++) {
+        this.alerts.delete(resolvedAlerts[i][0]);
       }
     }
   }

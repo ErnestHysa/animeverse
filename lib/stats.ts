@@ -125,24 +125,26 @@ function calculateStreaks(watchHistory: WatchHistoryItem[]): {
     return { currentStreak: 0, longestStreak: 0 };
   }
 
-  // Group by date
+  // Group by date using UTC to avoid timezone-dependent grouping
   const watchDates = new Set<number>();
   for (const item of watchHistory) {
-    const date = new Date(item.timestamp).toDateString();
-    watchDates.add(new Date(date).getTime());
+    const d = new Date(item.timestamp);
+    const utcDate = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+    watchDates.add(utcDate.getTime());
   }
 
   const sortedDates = Array.from(watchDates).sort((a, b) => a - b);
-  const today = new Date().toDateString();
-  const todayTime = new Date(today).getTime();
+  const now = new Date();
+  const todayTime = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).getTime();
 
   // Calculate current streak
   let currentStreak = 0;
   let checkDate = todayTime;
 
   for (let i = 0; i < sortedDates.length; i++) {
-    const dateToCheck = new Date(checkDate).toDateString();
-    if (sortedDates.includes(new Date(dateToCheck).getTime())) {
+    const checkDateObj = new Date(checkDate);
+    const utcCheckDate = new Date(Date.UTC(checkDateObj.getUTCFullYear(), checkDateObj.getUTCMonth(), checkDateObj.getUTCDate()));
+    if (sortedDates.includes(utcCheckDate.getTime())) {
       currentStreak++;
       checkDate -= 24 * 60 * 60 * 1000; // Go back one day
     } else {

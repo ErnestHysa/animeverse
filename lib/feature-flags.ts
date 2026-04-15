@@ -246,7 +246,7 @@ class FeatureFlagManager {
    * Get all feature flags (admin only)
    */
   getAllFlags(): Record<string, FeatureFlagConfig> {
-    return { ...FEATURE_FLAGS };
+    return JSON.parse(JSON.stringify({ ...FEATURE_FLAGS }));
   }
 
   /**

@@ -18,6 +18,7 @@ export interface EpisodeComment {
   createdAt: number;
   updatedAt: number;
   likes: number;
+  likedBy: string[]; // Track which users liked this comment
   isSpoiler: boolean;
 }
 
@@ -64,13 +65,16 @@ export const useEpisodeComments = create<CommentsState>()(
           const user = getCurrentUser();
           const newComment: EpisodeComment = {
             ...comment,
-            id: `comment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            id: typeof crypto !== 'undefined' && crypto.randomUUID
+              ? `comment_${crypto.randomUUID()}`
+              : `comment_${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             userId: user.id,
             userName: user.name,
             userAvatar: user.avatar,
             createdAt: Date.now(),
             updatedAt: Date.now(),
             likes: 0,
+            likedBy: [],
           };
           return { comments: [...state.comments, newComment] };
         }),
@@ -88,11 +92,30 @@ export const useEpisodeComments = create<CommentsState>()(
         })),
 
       toggleLike: (id) =>
-        set((state) => ({
-          comments: state.comments.map((c) =>
-            c.id === id ? { ...c, likes: c.likes + 1 } : c
-          ),
-        })),
+        set((state) => {
+          const user = getCurrentUser();
+          return {
+            comments: state.comments.map((c) => {
+              if (c.id !== id) return c;
+              const likedBy = c.likedBy || [];
+              if (likedBy.includes(user.id)) {
+                // Unlike: remove user and decrement
+                return {
+                  ...c,
+                  likes: Math.max(0, c.likes - 1),
+                  likedBy: likedBy.filter((uid) => uid !== user.id),
+                };
+              } else {
+                // Like: add user and increment
+                return {
+                  ...c,
+                  likes: c.likes + 1,
+                  likedBy: [...likedBy, user.id],
+                };
+              }
+            }),
+          };
+        }),
 
       getCommentsForEpisode: (animeId, episodeNumber) => {
         const state = get();

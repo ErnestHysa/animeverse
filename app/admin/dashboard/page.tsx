@@ -25,6 +25,9 @@ import {
   RefreshCw,
   Bell,
 } from "lucide-react";
+import { createScopedLogger } from "@/lib/logger";
+
+const logger = createScopedLogger('admin-dashboard');
 
 interface AnalyticsData {
   totalStreams: number;
@@ -74,6 +77,12 @@ interface Alert {
 }
 
 export default function AdminDashboardPage() {
+  // Client-side auth guard
+  useEffect(() => {
+    const token = localStorage.getItem('admin_token');
+    if (!token) { window.location.href = '/admin/login'; return; }
+  }, []);
+
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [seedServerStatus, setSeedServerStatus] = useState<SeedServerStatus | null>(null);
   const [alerts, setAlerts] = useState<Alert[]>([]);
@@ -99,7 +108,7 @@ export default function AdminDashboardPage() {
       setSeedServerStatus(serverData);
       setAlerts(alertsData.alerts || []);
     } catch (error) {
-      console.error("Error fetching dashboard data:", error);
+      logger.error("Error fetching dashboard data:", error);
       toast.error("Failed to load dashboard data");
     } finally {
       setLoading(false);
@@ -123,7 +132,7 @@ export default function AdminDashboardPage() {
         setAlerts(alerts.filter((a) => a.id !== alertId));
       }
     } catch (error) {
-      console.error("Error resolving alert:", error);
+      logger.error("Error resolving alert:", error);
       toast.error("Failed to resolve alert");
     }
   };

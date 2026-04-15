@@ -418,8 +418,8 @@ class AnimeTracker {
       return;
     }
 
-    // Similar to HTTP announce but with WebSocket
-    // Implementation omitted for brevity
+    // WebSocket announce not yet implemented
+    ws.send(JSON.stringify({ 'failure-reason': 'WebSocket announce not implemented' }));
   }
 
   /**
@@ -433,8 +433,8 @@ class AnimeTracker {
       return;
     }
 
-    // Subscribe to updates for this torrent
-    // Implementation omitted for brevity
+    // WebSocket subscription not yet implemented
+    ws.send(JSON.stringify({ error: 'WebSocket subscribe not implemented' }));
   }
 
   /**

@@ -31,6 +31,7 @@ export default function CustomListsPage() {
   const [newListDesc, setNewListDesc] = useState("");
   const [newListEmoji, setNewListEmoji] = useState("📚");
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{ msg: string; onConfirm: () => void } | null>(null);
 
   const handleCreateList = () => {
     if (!newListName.trim()) {
@@ -54,10 +55,13 @@ export default function CustomListsPage() {
   };
 
   const handleDeleteList = (id: string, name: string) => {
-    if (confirm(`Delete "${name}"?`)) {
-      deleteList(id);
-      toast.success("List deleted");
-    }
+    setConfirmDialog({
+      msg: `Delete "${name}"?`,
+      onConfirm: () => {
+        deleteList(id);
+        toast.success("List deleted");
+      },
+    });
   };
 
   const handleAddToList = (listId: string, animeId: number) => {
@@ -291,6 +295,30 @@ export default function CustomListsPage() {
         </div>
       </main>
       <Footer />
+      {confirmDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-gray-800 rounded-lg p-6 max-w-sm mx-4">
+            <p className="text-white mb-4">{confirmDialog.msg}</p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setConfirmDialog(null)}
+                className="px-4 py-2 text-gray-400 hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  confirmDialog.onConfirm();
+                  setConfirmDialog(null);
+                }}
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

@@ -418,11 +418,13 @@ class WatchPartyRoomManager {
   }
 }
 
-// Global room manager instance
-const watchPartyRoomManager = new WatchPartyRoomManager();
+// Module-level room manager instance
+const watchPartyManager = new WatchPartyRoomManager();
 
-// Export for API routes
-global.__WATCH_PARTY_MANAGER__ = watchPartyRoomManager;
+// Expose globally for API route access (standard Node.js pattern for cross-module sharing)
+if (typeof globalThis !== 'undefined') {
+  globalThis.__WATCH_PARTY_MANAGER__ = watchPartyManager;
+}
 
 // ===================================
 // Server Initialization
@@ -441,7 +443,7 @@ app.prepare().then(() => {
   });
 
   // Initialize Socket.IO server
-  watchPartyRoomManager.initialize(httpServer);
+  watchPartyManager.initialize(httpServer);
 
   httpServer
     .once('error', (err) => {

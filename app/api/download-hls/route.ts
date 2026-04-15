@@ -4,8 +4,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyToken, extractTokenFromHeader } from '@/lib/auth';
-import { isUrlAllowedSync, getAllowedOrigin } from '@/lib/ssrf-protection';
+import { isProxyAuthenticated } from '@/lib/auth';
+import { isUrlAllowed, getAllowedOrigin } from '@/lib/ssrf-protection';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -15,26 +15,34 @@ export const dynamic = 'force-dynamic';
  */
 async function proxyFetch(url: string): Promise<ReadableStream> {
   // SSRF protection
-  if (!isUrlAllowedSync(url)) {
+  if (!(await isUrlAllowed(url))) {
     throw new Error('URL not allowed: private/internal addresses are blocked');
   }
 
-  const response = await fetch(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      'Accept': '*/*',
-    },
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
 
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': '*/*',
+      },
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    if (!response.body) {
+      throw new Error('No response body');
+    }
+
+    return response.body;
+  } finally {
+    clearTimeout(timeout);
   }
-
-  if (!response.body) {
-    throw new Error('No response body');
-  }
-
-  return response.body;
 }
 
 /**
@@ -147,42 +155,14 @@ async function parseHLSManifest(manifestUrl: string): Promise<HLSManifestData> {
   return { videoSegments, subtitleSegments };
 }
 
-const MAX_SEGMENTS_PER_DOWNLOAD = 100;
-
-/**
- * Auth check: require valid JWT OR valid referer from app's own domain
- */
-async function isProxyAuthenticated(request: NextRequest): Promise<boolean> {
-  const authHeader = request.headers.get('authorization');
-  const token = extractTokenFromHeader(authHeader);
-  if (token) {
-    const payload = verifyToken(token);
-    if (payload) return true;
-  }
-  const referer = request.headers.get('referer');
-  if (referer) {
-    try {
-      const refererHost = new URL(referer).hostname;
-      const host = request.headers.get('host')?.split(':')[0] || '';
-      if (
-        refererHost === 'localhost' ||
-        refererHost === '127.0.0.1' ||
-        refererHost.endsWith('.animeverse.app') ||
-        refererHost === host
-      ) {
-        return true;
-      }
-    } catch {}
-  }
-  return false;
-}
+const MAX_SEGMENTS_PER_DOWNLOAD = 50;
 
 /**
  * GET /api/download-hls?url=<manifest-url>&title=<anime-title>&episode=<number>
  * Downloads video with subtitles as a ZIP file
  */
 export async function GET(request: NextRequest) {
-  // Auth check: require valid JWT or app-domain referer
+  // Auth check: require valid JWT (no referer bypass)
   if (!(await isProxyAuthenticated(request))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -202,8 +182,8 @@ export async function GET(request: NextRequest) {
     if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
       return NextResponse.json({ error: 'Invalid URL protocol' }, { status: 400 });
     }
-    // SSRF protection
-    if (!isUrlAllowedSync(manifestUrl)) {
+    // SSRF protection (with DNS resolution)
+    if (!(await isUrlAllowed(manifestUrl))) {
       return NextResponse.json({ error: 'URL not allowed: private/internal addresses are blocked' }, { status: 403 });
     }
   } catch {

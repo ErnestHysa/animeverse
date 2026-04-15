@@ -356,6 +356,7 @@ export async function getAuthenticatedUser(request: Request): Promise<AdminUser 
 
 /**
  * Require superadmin role
+ * Fix L2: Also verify user still exists in the admin store
  */
 export async function isSuperAdminRequest(request: Request): Promise<boolean> {
   const authHeader = request.headers.get('authorization');
@@ -373,7 +374,26 @@ export async function isSuperAdminRequest(request: Request): Promise<boolean> {
   if (!token) return false;
 
   const payload = verifyToken(token);
-  return payload?.role === 'superadmin' || false;
+  if (!payload) return false;
+
+  // Verify user still exists in the admin store (same pattern as isAdminRequest)
+  const userRecord = getUserByUsername(payload.username);
+  if (!userRecord) return false;
+
+  return payload.role === 'superadmin';
+}
+
+/**
+ * Proxy authentication check: require valid JWT only (no referer fallback)
+ * Fix C1 + H2: Removed referer-based auth bypass
+ */
+export async function isProxyAuthenticated(request: Request): Promise<boolean> {
+  const authHeader = request.headers.get('authorization');
+  const token = extractTokenFromHeader(authHeader);
+  if (!token) return false;
+
+  const payload = verifyToken(token);
+  return payload !== null;
 }
 
 // ===================================
@@ -461,6 +481,7 @@ export default {
   isAdminRequest,
   getAuthenticatedUser,
   isSuperAdminRequest,
+  isProxyAuthenticated,
   isUsernameLocked,
   recordFailedLogin,
   clearLoginAttempts,

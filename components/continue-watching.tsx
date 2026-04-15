@@ -14,6 +14,9 @@ import Link from "next/link";
 import Image from "next/image";
 import type { Media } from "@/types/anilist";
 import { cn } from "@/lib/utils";
+import { createScopedLogger } from "@/lib/logger";
+
+const logger = createScopedLogger('continue-watching');
 
 interface AnimeWithProgress {
   anime: Media;
@@ -63,7 +66,7 @@ export function ContinueWatching() {
 
       setAnimeWithProgress(combined as AnimeWithProgress[]);
     } catch (err) {
-      console.error("Error loading continue watching:", err);
+      logger.error("Error loading continue watching:", err);
       setError("Failed to load continue watching");
     } finally {
       setLoading(false);

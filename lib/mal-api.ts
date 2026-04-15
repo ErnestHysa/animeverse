@@ -81,22 +81,39 @@ export async function getMALAnimeList(token: string): Promise<MALListEntry[]> {
   let nextUrl: string | null =
     `${MAL_API_BASE}/users/@me/animelist?fields=list_status,num_episodes&limit=500&nsfw=true`;
 
-  while (nextUrl) {
-    const resp = await fetch(nextUrl, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-    });
+  const MAX_PAGES = 50;
+  let pageCount = 0;
 
-    if (!resp.ok) {
-      if (resp.status === 401) throw new Error("MAL token expired");
-      throw new Error(`MAL API error: ${resp.status}`);
+  while (nextUrl) {
+    pageCount++;
+    if (pageCount >= MAX_PAGES) {
+      console.warn(`[MAL] Reached max pages (${MAX_PAGES}), stopping pagination`);
+      break;
     }
 
-    const pageData: { data: MALListEntry[]; paging?: { next?: string } } = await resp.json();
-    entries.push(...(pageData.data ?? []));
-    nextUrl = pageData.paging?.next ?? null;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+
+    try {
+      const resp = await fetch(nextUrl, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        signal: controller.signal,
+      });
+
+      if (!resp.ok) {
+        if (resp.status === 401) throw new Error("MAL token expired");
+        throw new Error(`MAL API error: ${resp.status}`);
+      }
+
+      const pageData: { data: MALListEntry[]; paging?: { next?: string } } = await resp.json();
+      entries.push(...(pageData.data ?? []));
+      nextUrl = pageData.paging?.next ?? null;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   return entries;

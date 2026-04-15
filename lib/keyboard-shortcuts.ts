@@ -61,9 +61,27 @@ class KeyboardShortcutsManager {
 
 export const keyboardManager = new KeyboardShortcutsManager();
 
-// Initialize global shortcuts
-if (typeof window !== "undefined") {
-  window.addEventListener("keydown", (e) => keyboardManager.handleKeyDown(e));
+// Stored handler reference for cleanup
+let keydownHandler: ((e: KeyboardEvent) => void) | null = null;
+
+/**
+ * Register the global keydown listener.
+ * Call this on component mount (e.g., in a top-level layout useEffect).
+ */
+export function registerShortcuts() {
+  if (typeof window === "undefined" || keydownHandler) return;
+  keydownHandler = (e: KeyboardEvent) => keyboardManager.handleKeyDown(e);
+  window.addEventListener("keydown", keydownHandler);
+}
+
+/**
+ * Unregister the global keydown listener.
+ * Call this on component unmount to prevent memory leaks.
+ */
+export function unregisterShortcuts() {
+  if (typeof window === "undefined" || !keydownHandler) return;
+  window.removeEventListener("keydown", keydownHandler);
+  keydownHandler = null;
 }
 
 // Default shortcuts

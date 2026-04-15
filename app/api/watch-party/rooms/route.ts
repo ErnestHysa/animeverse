@@ -37,7 +37,7 @@ interface RoomResponse {
  */
 function getRoomManager() {
   // @ts-ignore - Global is set by custom server
-  return global.__WATCH_PARTY_MANAGER__;
+  return globalThis.__WATCH_PARTY_MANAGER__;
 }
 
 /**

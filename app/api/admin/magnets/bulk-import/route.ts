@@ -72,6 +72,7 @@ async function writeDatabase(data: MagnetsDatabase): Promise<void> {
 
 /**
  * Parse CSV content
+ * Fix L1: Handle quoted fields to prevent splitting on commas inside magnet links
  */
 function parseCSV(csvContent: string): Array<{
   animeId: string;
@@ -83,10 +84,10 @@ function parseCSV(csvContent: string): Array<{
 }> {
   const lines = csvContent.trim().split("\n");
   const results = [];
-  const headers = lines[0].split(",").map((h) => h.trim());
+  const headers = parseCSVLine(lines[0]);
 
   for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split(",").map((v) => v.trim());
+    const values = parseCSVLine(lines[i]);
     const row: Record<string, string> = {};
 
     headers.forEach((header, index) => {
@@ -107,6 +108,55 @@ function parseCSV(csvContent: string): Array<{
   }
 
   return results;
+}
+
+/**
+ * Parse a single CSV line, handling quoted fields with embedded commas and escaped quotes ("")
+ * Fix L1: Properly handles fields enclosed in double quotes
+ */
+function parseCSVLine(line: string): string[] {
+  const fields: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  let i = 0;
+
+  while (i < line.length) {
+    const ch = line[i];
+
+    if (inQuotes) {
+      if (ch === '"') {
+        // Check for escaped quote ""
+        if (i + 1 < line.length && line[i + 1] === '"') {
+          current += '"';
+          i += 2;
+        } else {
+          // End of quoted field
+          inQuotes = false;
+          i++;
+        }
+      } else {
+        current += ch;
+        i++;
+      }
+    } else {
+      if (ch === '"') {
+        inQuotes = true;
+        i++;
+      } else if (ch === ',') {
+        fields.push(current.trim());
+        current = '';
+        i++;
+      } else {
+        current += ch;
+        i++;
+      }
+    }
+  }
+
+  // Push the last field
+  fields.push(current.trim());
+
+  return fields;
 }
 
 /**

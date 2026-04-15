@@ -8,8 +8,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import logger from "@/lib/logger";
-import { verifyToken, extractTokenFromHeader } from "@/lib/auth";
-import { isUrlAllowedSync, getAllowedOrigin } from "@/lib/ssrf-protection";
+import { isProxyAuthenticated } from "@/lib/auth";
+import { isUrlAllowed, getAllowedOrigin } from "@/lib/ssrf-protection";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,44 +21,12 @@ const TIMEOUT_MS = 60000; // CRITICAL: Increased from 30s to 60s for slow upstre
 const MANIFEST_TIMEOUT_MS = 60000; // CRITICAL: 60s timeout for manifest loading
 
 /**
- * Auth check: require valid JWT OR valid referer from app's own domain
- */
-async function isProxyAuthenticated(request: NextRequest): Promise<boolean> {
-  // Check for valid JWT token
-  const authHeader = request.headers.get("authorization");
-  const token = extractTokenFromHeader(authHeader);
-  if (token) {
-    const payload = verifyToken(token);
-    if (payload) return true;
-  }
-
-  // Check for valid referer from app's own domain
-  const referer = request.headers.get("referer");
-  if (referer) {
-    try {
-      const refererHost = new URL(referer).hostname;
-      const host = request.headers.get("host")?.split(":")[0] || "";
-      if (
-        refererHost === "localhost" ||
-        refererHost === "127.0.0.1" ||
-        refererHost.endsWith(".animeverse.app") ||
-        refererHost === host
-      ) {
-        return true;
-      }
-    } catch {}
-  }
-
-  return false;
-}
-
-/**
  * GET /api/proxy-hls?url=<encoded_url>&type=<manifest|segment|video>&referer=<optional_referer>
  * Proxies video content requests to bypass CORS and hotlink protection
  */
 export async function GET(request: NextRequest) {
   try {
-    // Auth check: require valid JWT or app-domain referer
+    // Auth check: require valid JWT (no referer bypass)
     if (!(await isProxyAuthenticated(request))) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -76,8 +44,8 @@ export async function GET(request: NextRequest) {
 
     const targetUrl = decodeURIComponent(encodedUrl);
 
-    // SSRF protection: block private IPs and localhost
-    if (!isUrlAllowedSync(targetUrl)) {
+    // SSRF protection: block private IPs and localhost (with DNS resolution)
+    if (!(await isUrlAllowed(targetUrl))) {
       return NextResponse.json(
         { error: "URL not allowed: private/internal addresses are blocked" },
         { status: 403 }

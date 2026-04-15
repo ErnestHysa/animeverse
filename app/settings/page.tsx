@@ -7,8 +7,9 @@
 
 export const dynamic = "force-dynamic";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -16,6 +17,9 @@ import { Dialog } from "@/components/ui/dialog";
 import { ErrorBoundary } from "@/components/error/error-boundary";
 import { usePreferences, useWatchlist, useFavorites, useAniListAuth, type AniListUser } from "@/store";
 import { useTheme } from "@/components/providers/theme-provider";
+import { createScopedLogger } from "@/lib/logger";
+
+const logger = createScopedLogger('settings');
 import {
   Settings,
   Moon,
@@ -116,6 +120,9 @@ export default function SettingsPage() {
 
   // FIX 4: State-based confirmation dialog instead of window.confirm
   const [pendingConfirm, setPendingConfirm] = useState<null | (() => void)>(null);
+
+  // FIX: OAuth callback ref guard to prevent re-processing
+  const oauthProcessedRef = useRef(false);
 
   const [historyCount, setHistoryCount] = useState(() => {
     // Initialize with 0 on server, actual count on client
@@ -294,11 +301,11 @@ export default function SettingsPage() {
         toast.success(`Synced ${allEntries.length} anime from AniList! Data migrated successfully.`);
       } else {
         const errorText = await response.text();
-        console.error("AniList API error:", errorText);
+        logger.error("AniList API error:", errorText);
         toast.error("Failed to sync AniList data. Please try again.");
       }
     } catch (error) {
-      console.error("Error fetching AniList data:", error);
+      logger.error("Error fetching AniList data:", error);
       toast.error("Failed to sync AniList data. Please try again.");
     } finally {
       setIsSyncing(false);
@@ -308,6 +315,8 @@ export default function SettingsPage() {
   // Handle OAuth callback from URL hash
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (oauthProcessedRef.current) return;
+    oauthProcessedRef.current = true;
 
     const params = new URLSearchParams(window.location.search);
     const authStatus = params.get("auth");
@@ -370,7 +379,7 @@ export default function SettingsPage() {
                 }
               }
             } catch (e) {
-              console.error("Error parsing Zustand state:", e);
+              logger.error("Error parsing Zustand state:", e);
             }
           }
         }, 100);
@@ -500,7 +509,7 @@ export default function SettingsPage() {
       // Fetch and sync AniList data
       fetchAniListData(accessToken.trim());
     } catch (error) {
-      console.error('Token verification error:', error);
+      logger.error('Token verification error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       toast.error(`Failed to authenticate: ${errorMessage}`);
     }
@@ -815,9 +824,11 @@ export default function SettingsPage() {
                   {/* User Profile */}
                   <div className="flex items-center gap-4 p-4 bg-white/5 rounded-lg">
                     {anilistUser.avatar && (
-                      <img
+                      <Image
                         src={anilistUser.avatar.large || anilistUser.avatar.medium}
                         alt={anilistUser.name}
+                        width={64}
+                        height={64}
                         className="w-16 h-16 rounded-full object-cover"
                       />
                     )}

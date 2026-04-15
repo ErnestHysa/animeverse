@@ -16,13 +16,23 @@ interface RateLimitEntry {
 
 const rateLimitStore = new Map<string, RateLimitEntry>();
 
-// Cleanup old entries every 60 seconds
+// Cleanup old entries every 60 seconds and cap map size
 if (typeof setInterval !== 'undefined') {
   setInterval(() => {
     const now = Date.now();
     for (const [key, entry] of rateLimitStore.entries()) {
       if (now > entry.resetTime) {
         rateLimitStore.delete(key);
+      }
+    }
+    // Fix M1: Cap map size — if over 10000, delete oldest entries
+    if (rateLimitStore.size > 10000) {
+      const entriesToDelete = rateLimitStore.size - 10000;
+      let deleted = 0;
+      for (const key of rateLimitStore.keys()) {
+        if (deleted >= entriesToDelete) break;
+        rateLimitStore.delete(key);
+        deleted++;
       }
     }
   }, 60 * 1000);
@@ -42,14 +52,20 @@ const RATE_LIMIT_RULES: RateLimitRule[] = [
 ];
 
 function getClientIp(request: NextRequest): string {
+  // Fix M9: Only trust the first (leftmost) IP in x-forwarded-for, as that's the client.
+  // NOTE: In production, this should be configured with trusted proxy IPs to prevent spoofing.
+  const forwarded = request.headers.get('x-forwarded-for');
+  if (forwarded) {
+    const firstIp = forwarded.split(',')[0]?.trim();
+    if (firstIp) return firstIp;
+  }
   return (
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
     request.headers.get('x-real-ip') ||
     'unknown'
   );
 }
 
-function checkRateLimit(ip: string, pathname: string): { allowed: boolean; rule?: RateLimitRule } {
+function checkRateLimit(ip: string, pathname: string): { allowed: boolean; rule?: RateLimitRule; remaining?: number; resetTime?: number } {
   for (const rule of RATE_LIMIT_RULES) {
     if (pathname.startsWith(rule.pathPrefix)) {
       const key = `${ip}:${rule.pathPrefix}`;
@@ -57,16 +73,17 @@ function checkRateLimit(ip: string, pathname: string): { allowed: boolean; rule?
       const entry = rateLimitStore.get(key);
 
       if (!entry || now > entry.resetTime) {
-        rateLimitStore.set(key, { count: 1, resetTime: now + rule.windowMs });
-        return { allowed: true, rule };
+        const resetTime = now + rule.windowMs;
+        rateLimitStore.set(key, { count: 1, resetTime });
+        return { allowed: true, rule, remaining: rule.maxRequests - 1, resetTime };
       }
 
       if (entry.count >= rule.maxRequests) {
-        return { allowed: false, rule };
+        return { allowed: false, rule, remaining: 0, resetTime: entry.resetTime };
       }
 
       entry.count++;
-      return { allowed: true, rule };
+      return { allowed: true, rule, remaining: rule.maxRequests - entry.count, resetTime: entry.resetTime };
     }
   }
   return { allowed: true };
@@ -140,7 +157,7 @@ export function middleware(request: NextRequest) {
   // Rate limiting for API routes
   if (pathname.startsWith('/api/')) {
     const ip = getClientIp(request);
-    const { allowed, rule } = checkRateLimit(ip, pathname);
+    const { allowed, rule, remaining, resetTime } = checkRateLimit(ip, pathname);
 
     if (!allowed) {
       return new NextResponse(
@@ -162,6 +179,13 @@ export function middleware(request: NextRequest) {
     response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, Range');
     response.headers.set('Access-Control-Allow-Credentials', 'true');
+
+    // Fix M5: Add rate limit headers to help clients adapt behavior
+    if (rule) {
+      response.headers.set('X-RateLimit-Limit', String(rule.maxRequests));
+      response.headers.set('X-RateLimit-Remaining', String(remaining ?? 0));
+      response.headers.set('X-RateLimit-Reset', String(Math.ceil((resetTime ?? 0) / 1000)));
+    }
 
     return response;
   }

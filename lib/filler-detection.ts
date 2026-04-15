@@ -102,9 +102,25 @@ export async function getNextNonFillerEpisode(
   currentEpisode: number,
   totalEpisodes: number
 ): Promise<number> {
+  // Fetch filler data ONCE, then iterate locally instead of fetching per episode
+  const fillerData = await getFillerData(malId);
+
+  if (!fillerData) return currentEpisode + 1;
+
+  // Build a Set of filler episode numbers for O(1) lookup
+  const fillerSet = new Set(
+    fillerData.episodes
+      .filter(
+        (ep) =>
+          ep.type === "filler" ||
+          ep.type === "mixed_filller" ||
+          ep.type === "mixed_canon"
+      )
+      .map((ep) => ep.number)
+  );
+
   for (let ep = currentEpisode + 1; ep <= totalEpisodes; ep++) {
-    const isFiller = await isFillerEpisode(malId, ep);
-    if (!isFiller) return ep;
+    if (!fillerSet.has(ep)) return ep;
   }
 
   return currentEpisode + 1; // Fallback if all remaining are filler

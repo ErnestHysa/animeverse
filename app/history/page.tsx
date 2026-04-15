@@ -7,6 +7,7 @@
 
 export const dynamic = "force-dynamic";
 
+import { useState } from "react";
 import { useStore } from "@/store";
 import { Clock, Play, Trash2, Film, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,8 @@ export default function HistoryPage() {
   const anilistMediaList = useStore((s) => s.anilistMediaList);
   const isAuthenticated = useStore((s) => s.isAuthenticated);
 
+  const [confirmDialog, setConfirmDialog] = useState<{ msg: string; onConfirm: () => void } | null>(null);
+
   // Get unique anime from watch history (most recent first)
   const uniqueHistory = [...watchHistory]
     .sort((a, b) => b.timestamp - a.timestamp)
@@ -37,15 +40,21 @@ export default function HistoryPage() {
   const completed = uniqueHistory.filter((item) => item.completed);
 
   const handleClearAll = () => {
-    if (confirm("Are you sure you want to clear all watch history?")) {
-      clearWatchHistory();
-    }
+    setConfirmDialog({
+      msg: "Are you sure you want to clear all watch history?",
+      onConfirm: () => {
+        clearWatchHistory();
+      },
+    });
   };
 
   const handleClearMedia = (mediaId: number) => {
-    if (confirm("Remove this anime from history?")) {
-      clearMediaHistory(mediaId);
-    }
+    setConfirmDialog({
+      msg: "Remove this anime from history?",
+      onConfirm: () => {
+        clearMediaHistory(mediaId);
+      },
+    });
   };
 
   const handleExportJSON = () => {
@@ -192,7 +201,7 @@ export default function HistoryPage() {
               if (!media) return null;
 
               const progressPercent = item.progress
-                ? Math.min(100, (item.progress / (media.episodes || 24 * 60)) * 100)
+                ? Math.min(100, (item.progress / ((media.duration || 24) * 60)) * 100)
                 : 0;
 
               return (
@@ -285,6 +294,30 @@ export default function HistoryPage() {
     </div>
       </main>
       <Footer />
+      {confirmDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-gray-800 rounded-lg p-6 max-w-sm mx-4">
+            <p className="text-white mb-4">{confirmDialog.msg}</p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setConfirmDialog(null)}
+                className="px-4 py-2 text-gray-400 hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  confirmDialog.onConfirm();
+                  setConfirmDialog(null);
+                }}
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

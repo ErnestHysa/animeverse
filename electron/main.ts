@@ -286,15 +286,15 @@ function setupIPCHandlers(): void {
 // ===================================
 
 async function startTorrentSession(magnetUri: string): Promise<TorrentSession> {
-  // This is a placeholder - in production, you would use a BitTorrent library
-  // like "torrent-stream" or "webtorrent" with full protocol support
+  // Torrent streaming is not yet implemented - return error placeholder
+  console.warn('[Electron] startTorrentSession called but torrent streaming is not yet implemented');
 
   const infoHash = extractInfoHash(magnetUri);
   const session: TorrentSession = {
     infoHash,
-    name: "Unknown Torrent",
+    name: "Torrent streaming not yet implemented",
     path: path.join(config.downloadPath, infoHash),
-    seeding: true,
+    seeding: false,
     downloaded: 0,
     uploaded: 0,
     ratio: 0,
@@ -305,11 +305,11 @@ async function startTorrentSession(magnetUri: string): Promise<TorrentSession> {
     peers: 0,
   };
 
-  activeSessions.set(infoHash, session);
-  updateTrayMenu();
-
-  // Notify renderer
-  mainWindow?.webContents.send("torrent-started", session);
+  // Notify renderer about the error
+  mainWindow?.webContents.send("torrent-error", {
+    infoHash,
+    error: 'Torrent streaming not yet implemented',
+  });
 
   return session;
 }

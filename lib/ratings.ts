@@ -28,6 +28,7 @@ export function getRating(animeId: number): AnimeRating | null {
 }
 
 export function setRating(animeId: number, score: number, review?: string): AnimeRating {
+  if (score < 1 || score > 10) throw new Error('Score must be between 1 and 10');
   const ratings = getRatings();
   const existing = ratings[animeId];
   const rating: AnimeRating = {

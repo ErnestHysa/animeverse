@@ -30,6 +30,15 @@ interface AnalyticsEvent {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Simple in-memory cache to avoid reading all analytics files on every request
+interface CachedSummary {
+  period: string;
+  summary: Record<string, unknown>;
+  computedAt: number;
+}
+let cachedSummary: CachedSummary | null = null;
+const CACHE_TTL_MS = 60 * 1000; // 60 seconds
+
 /**
  * GET /api/analytics/summary
  * Get analytics summary for the specified period
@@ -60,11 +69,19 @@ export async function GET(request: NextRequest) {
         startTime = now - 24 * 60 * 60 * 1000;
     }
 
+    // Check cache first — return cached result if fresh
+    if (cachedSummary && cachedSummary.period === period && (Date.now() - cachedSummary.computedAt) < CACHE_TTL_MS) {
+      return NextResponse.json(cachedSummary.summary);
+    }
+
     // Read analytics events from files
     const events = await loadAnalyticsEvents(startTime);
 
     // Calculate summary
     const summary = calculateSummary(events, period);
+
+    // Store in cache
+    cachedSummary = { period, summary, computedAt: Date.now() };
 
     return NextResponse.json(summary);
   } catch (error) {

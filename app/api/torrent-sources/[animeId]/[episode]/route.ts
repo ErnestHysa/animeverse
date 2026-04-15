@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   getTorrentSourcesWithFallback,
 } from "@/lib/torrent-finder";
+import { isAdminRequest } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -137,6 +138,14 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ animeId: string; episode: string }> }
 ): Promise<NextResponse<{ success: boolean; message: string }>> {
+  // Fix C5: Require admin auth for POST
+  if (!(await isAdminRequest(request))) {
+    return NextResponse.json(
+      { success: false, message: "Unauthorized" },
+      { status: 401 }
+    );
+  }
+
   const { animeId, episode } = await params;
 
   try {

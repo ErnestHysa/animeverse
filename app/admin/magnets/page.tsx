@@ -26,6 +26,9 @@ import {
   Download,
   Filter,
 } from "lucide-react";
+import { createScopedLogger } from "@/lib/logger";
+
+const logger = createScopedLogger('admin-magnets');
 
 interface MagnetEntry {
   id: string;
@@ -47,6 +50,12 @@ interface MagnetEntry {
 }
 
 export default function AdminMagnetsPage() {
+  // Client-side auth guard
+  useEffect(() => {
+    const token = localStorage.getItem('admin_token');
+    if (!token) { window.location.href = '/admin/login'; return; }
+  }, []);
+
   const [magnets, setMagnets] = useState<MagnetEntry[]>([]);
   const [filteredMagnets, setFilteredMagnets] = useState<MagnetEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,6 +82,7 @@ export default function AdminMagnetsPage() {
   // CSV import
   const [csvData, setCsvData] = useState("");
   const [importing, setImporting] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{ msg: string; onConfirm: () => void } | null>(null);
 
   useEffect(() => {
     const loadMagnets = async () => {
@@ -82,7 +92,7 @@ export default function AdminMagnetsPage() {
         const data = await response.json();
         setMagnets(data.magnets || []);
       } catch (error) {
-        console.error("Error fetching magnets:", error);
+        logger.error("Error fetching magnets:", error);
         toast.error("Failed to load magnets");
       } finally {
         setLoading(false);
@@ -93,7 +103,7 @@ export default function AdminMagnetsPage() {
 
   useEffect(() => {
     filterMagnets();
-  }, [magnets, statusFilter, providerFilter, searchQuery]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [magnets, statusFilter, providerFilter, searchQuery, qualityFilter, sourceFilter]);
 
   const fetchMagnets = async () => {
     try {
@@ -102,7 +112,7 @@ export default function AdminMagnetsPage() {
       const data = await response.json();
       setMagnets(data.magnets || []);
     } catch (error) {
-      console.error("Error fetching magnets:", error);
+      logger.error("Error fetching magnets:", error);
       toast.error("Failed to load magnets");
     } finally {
       setLoading(false);
@@ -162,7 +172,7 @@ export default function AdminMagnetsPage() {
         toast.error(data.error || "Failed to add magnet");
       }
     } catch (error) {
-      console.error("Error adding magnet:", error);
+      logger.error("Error adding magnet:", error);
       toast.error("Failed to add magnet");
     }
   };
@@ -192,7 +202,7 @@ export default function AdminMagnetsPage() {
         toast.error(data.error || "Failed to import magnets");
       }
     } catch (error) {
-      console.error("Error importing magnets:", error);
+      logger.error("Error importing magnets:", error);
       toast.error("Failed to import magnets");
     } finally {
       setImporting(false);
@@ -216,33 +226,34 @@ export default function AdminMagnetsPage() {
         toast.error(data.error || "Failed to validate magnet");
       }
     } catch (error) {
-      console.error("Error validating magnet:", error);
+      logger.error("Error validating magnet:", error);
       toast.error("Failed to validate magnet");
     }
   };
 
   const handleDeleteMagnet = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this magnet link?")) {
-      return;
-    }
+    setConfirmDialog({
+      msg: "Are you sure you want to delete this magnet link?",
+      onConfirm: async () => {
+        try {
+          const response = await fetch(`/api/admin/magnets?id=${id}`, {
+            method: "DELETE",
+          });
 
-    try {
-      const response = await fetch(`/api/admin/magnets?id=${id}`, {
-        method: "DELETE",
-      });
+          const data = await response.json();
 
-      const data = await response.json();
-
-      if (response.ok) {
-        toast.success(data.message);
-        fetchMagnets();
-      } else {
-        toast.error(data.error || "Failed to delete magnet");
-      }
-    } catch (error) {
-      console.error("Error deleting magnet:", error);
-      toast.error("Failed to delete magnet");
-    }
+          if (response.ok) {
+            toast.success(data.message);
+            fetchMagnets();
+          } else {
+            toast.error(data.error || "Failed to delete magnet");
+          }
+        } catch (error) {
+          logger.error("Error deleting magnet:", error);
+          toast.error("Failed to delete magnet");
+        }
+      },
+    });
   };
 
   const getStatusBadge = (status: string) => {
@@ -686,6 +697,30 @@ export default function AdminMagnetsPage() {
           </div>
         )}
       </div>
+      {confirmDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-gray-800 rounded-lg p-6 max-w-sm mx-4">
+            <p className="text-white mb-4">{confirmDialog.msg}</p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setConfirmDialog(null)}
+                className="px-4 py-2 text-gray-400 hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  confirmDialog.onConfirm();
+                  setConfirmDialog(null);
+                }}
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

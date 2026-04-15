@@ -240,9 +240,22 @@ export async function getAnimeById(malId: number): Promise<Media | null> {
  * Get anime by multiple IDs (batch)
  */
 export async function getAnimeByIds(malIds: number[]): Promise<Media[]> {
-  const results = await Promise.all(
-    malIds.map(id => getAnimeById(id))
-  );
+  const results: (Media | null)[] = [];
+  const BATCH_SIZE = 3;
+  const BATCH_DELAY = 1000; // 1 second between batches
+
+  for (let i = 0; i < malIds.length; i += BATCH_SIZE) {
+    const batch = malIds.slice(i, i + BATCH_SIZE);
+    const batchResults = await Promise.all(
+      batch.map(id => getAnimeById(id))
+    );
+    results.push(...batchResults);
+
+    // Delay between batches to respect rate limits
+    if (i + BATCH_SIZE < malIds.length) {
+      await new Promise(r => setTimeout(r, BATCH_DELAY));
+    }
+  }
 
   return results.filter((m): m is Media => m !== null);
 }
@@ -419,7 +432,7 @@ export const GENRE_IDS: Record<string, number> = {
   "Adventure": 2,
   "Comedy": 4,
   "Drama": 8,
-  "Sci-Fi": 14,
+  "Sci-Fi": 24,
   "Fantasy": 10,
   "Slice of Life": 36,
   "Romance": 22,

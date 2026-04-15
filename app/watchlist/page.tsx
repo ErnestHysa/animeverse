@@ -17,6 +17,9 @@ import { anilist } from "@/lib/anilist";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import type { Media } from "@/types/anilist";
+import { createScopedLogger } from "@/lib/logger";
+
+const logger = createScopedLogger('watchlist');
 
 export default function WatchlistPage() {
   const { watchlist } = useWatchlist();
@@ -52,7 +55,7 @@ export default function WatchlistPage() {
             watchlist.includes(m.id)
           ) ?? [];
         } catch (error) {
-          console.error("Failed to fetch watchlist from AniList:", error);
+          logger.error("Failed to fetch watchlist from AniList:", error);
         }
       }
 

@@ -51,6 +51,12 @@ export async function PUT(request: NextRequest) {
   }
 
   try {
+    // Fix M7: Body size check
+    const contentLength = parseInt(request.headers.get('content-length') || '0');
+    if (contentLength > 1048576) {
+      return NextResponse.json({ error: 'Request too large' }, { status: 413 });
+    }
+
     const body = await request.json();
     const { featureKey, phase, enabled, addUser, removeUser } = body;
 

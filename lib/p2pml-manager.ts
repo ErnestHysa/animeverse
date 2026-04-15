@@ -18,6 +18,28 @@ import Hls from "hls.js";
 // Types
 // ===================================
 
+/**
+ * Minimal interface for the P2PML engine to replace `any` casts.
+ * Covers the methods actually used by the manager.
+ */
+interface P2PMLEngine {
+  on(event: string, handler: (...args: unknown[]) => void): void;
+  attach(hlsInstance: Hls): void;
+  getStats(): { downloadSpeed?: number; uploadSpeed?: number } | null;
+  getPeers(): Array<{ id: string; downloadSpeed: number; uploadSpeed: number }> | null;
+  destroy(): void;
+}
+
+interface P2PMLEngineConstructor {
+  HlsJsP2PEngine?: new (engine: unknown) => P2PMLEngine;
+  [key: string]: unknown;
+}
+
+interface P2PMLEngineCore {
+  Engine?: new (config: Record<string, unknown>) => unknown;
+  [key: string]: unknown;
+}
+
 export interface P2PMLConfig {
   enabled: boolean;
   segmentDuration?: number; // Default: auto-detected
@@ -78,7 +100,7 @@ const DEFAULT_CONFIG: Partial<P2PMLConfig> = {
 
 class P2PMLManagerImpl implements P2PMLManager {
   private hls: Hls | null = null;
-  private p2pml: any = null;
+  private p2pml: P2PMLEngine | null = null;
   private config: P2PMLConfig = DEFAULT_CONFIG as P2PMLConfig;
   private initialized = false;
   private stats: P2PMLStats = {
@@ -121,8 +143,10 @@ class P2PMLManagerImpl implements P2PMLManager {
       this.config = { ...DEFAULT_CONFIG, ...config };
 
       // Create P2PML engine
-      const engine = new (p2pmlHls as any).HlsJsP2PEngine(
-        new (p2pmlCore as any).Engine({
+      const HlsJsP2PEngine = (p2pmlHls as unknown as P2PMLEngineConstructor).HlsJsP2PEngine!;
+      const Engine = (p2pmlCore as unknown as P2PMLEngineCore).Engine!;
+      const engine = new HlsJsP2PEngine(
+        new Engine({
           segmentDuration: this.config.segmentDuration,
           simultaneousDownloads: this.config.simultaneousDownloads,
           bufferedSegmentsCount: this.config.bufferedSegmentsCount,
@@ -135,7 +159,7 @@ class P2PMLManagerImpl implements P2PMLManager {
       );
 
       // Attach to hls.js
-      (engine as any).attach(this.hls);
+      engine.attach(this.hls);
 
       this.p2pml = engine;
       this.initialized = true;
@@ -158,17 +182,17 @@ class P2PMLManagerImpl implements P2PMLManager {
     if (!this.p2pml) return;
 
     // Peer connect event
-    this.p2pml.on("on-peer-connect", (peerId: string) => {
+    this.p2pml.on("on-peer-connect", (peerId: unknown) => {
       console.log(`[P2PMLManager] Peer connected: ${peerId}`);
       this.stats.peersCount++;
-      this.config.onPeerConnect?.(peerId);
+      this.config.onPeerConnect?.(String(peerId));
     });
 
     // Peer disconnect event
-    this.p2pml.on("on-peer-disconnect", (peerId: string) => {
+    this.p2pml.on("on-peer-disconnect", (peerId: unknown) => {
       console.log(`[P2PMLManager] Peer disconnected: ${peerId}`);
       this.stats.peersCount = Math.max(0, this.stats.peersCount - 1);
-      this.config.onPeerDisconnect?.(peerId);
+      this.config.onPeerDisconnect?.(String(peerId));
     });
 
     // Segment downloaded event
@@ -221,7 +245,8 @@ class P2PMLManagerImpl implements P2PMLManager {
         this.stats.uploadSpeed = engineStats.uploadSpeed || 0;
       }
     } catch (error) {
-      // Ignore stats errors
+      // Stats retrieval may fail if engine is in an invalid state
+      console.warn('[P2PMLManager] Stats retrieval error:', error);
     }
   }
 

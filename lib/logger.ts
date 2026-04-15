@@ -1,70 +1,50 @@
 /**
- * Production-ready logger utility
- * Logs are only output in development or when explicitly enabled
+ * Logger Utility
+ * Provides both a default console logger and scoped logger factories
  */
 
-type LogLevel = 'error' | 'warn' | 'info' | 'debug' | 'log';
-
-const isDevelopment = process.env.NODE_ENV === 'development';
-const isLoggingEnabled = process.env.NEXT_PUBLIC_ENABLE_LOGGING === 'true' || isDevelopment;
-
-// Determine the minimum log level
-const logLevel = (process.env.NEXT_PUBLIC_LOG_LEVEL || 'info') as LogLevel;
-
-const levelPriority: Record<LogLevel, number> = {
-  error: 0,
-  warn: 1,
-  info: 2,
-  log: 3,
-  debug: 4,
-};
-
-function shouldLog(level: LogLevel): boolean {
-  if (!isLoggingEnabled) {
-    return false;
-  }
-  return levelPriority[level] <= (levelPriority[logLevel] || 2);
+interface Logger {
+  log: (...args: unknown[]) => void;
+  warn: (...args: unknown[]) => void;
+  error: (...args: unknown[]) => void;
+  info: (...args: unknown[]) => void;
+  debug: (...args: unknown[]) => void;
 }
 
-const logger = {
-  error: (...args: unknown[]) => {
-    if (shouldLog('error')) {
-      console.error('[App]', ...args);
-    }
-  },
-  warn: (...args: unknown[]) => {
-    if (shouldLog('warn')) {
-      console.warn('[App]', ...args);
-    }
-  },
-  info: (...args: unknown[]) => {
-    if (shouldLog('info')) {
-      console.info('[App]', ...args);
-    }
-  },
-  log: (...args: unknown[]) => {
-    if (shouldLog('log')) {
-      console.log('[App]', ...args);
-    }
-  },
-  debug: (...args: unknown[]) => {
-    if (shouldLog('debug')) {
-      console.debug('[App]', ...args);
-    }
-  },
+interface ScopedLogger {
+  error: (...args: unknown[]) => void;
+  warn: (...args: unknown[]) => void;
+  info: (...args: unknown[]) => void;
+}
+
+/**
+ * Default logger that wraps console methods
+ */
+const logger: Logger = {
+  log: (...args: unknown[]) => console.log(...args),
+  warn: (...args: unknown[]) => console.warn(...args),
+  error: (...args: unknown[]) => console.error(...args),
+  info: (...args: unknown[]) => console.info(...args),
+  debug: (...args: unknown[]) => console.debug(...args),
 };
 
 export default logger;
 
 /**
- * Create a scoped logger with a prefix
+ * Create a scoped logger with a prefix tag
  */
-export function createScopedLogger(scope: string) {
+export function createScopedLogger(scope: string): ScopedLogger {
+  const prefix = `[${scope}]`;
+
   return {
-    error: (...args: unknown[]) => logger.error(`[${scope}]`, ...args),
-    warn: (...args: unknown[]) => logger.warn(`[${scope}]`, ...args),
-    info: (...args: unknown[]) => logger.info(`[${scope}]`, ...args),
-    log: (...args: unknown[]) => logger.log(`[${scope}]`, ...args),
-    debug: (...args: unknown[]) => logger.debug(`[${scope}]`, ...args),
+    error: (...args: unknown[]) => {
+      console.error(prefix, ...args);
+    },
+    warn: (...args: unknown[]) => {
+      console.warn(prefix, ...args);
+    },
+    info: (...args: unknown[]) => {
+      console.info(prefix, ...args);
+    },
   };
 }

@@ -11,7 +11,6 @@ import {
   isUsernameLocked,
   recordFailedLogin,
   clearLoginAttempts,
-  getRemainingAttempts,
 } from '@/lib/auth';
 
 export const runtime = 'nodejs';
@@ -64,7 +63,6 @@ interface LoginResponse {
     createdAt: number;
     lastLogin?: number;
   };
-  remainingAttempts?: number;
 }
 
 /**
@@ -103,7 +101,6 @@ export async function POST(request: NextRequest): Promise<NextResponse<LoginResp
         {
           success: false,
           error: 'Too many failed login attempts from your IP. Please try again later.',
-          remainingAttempts: 0,
         },
         { status: 429 }
       );
@@ -115,7 +112,6 @@ export async function POST(request: NextRequest): Promise<NextResponse<LoginResp
         {
           success: false,
           error: 'Too many failed login attempts. Please try again later.',
-          remainingAttempts: 0,
         },
         { status: 429 }
       );
@@ -128,13 +124,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<LoginResp
       // Record failed attempt for both username and IP
       recordFailedLogin(username);
       recordFailedIpLogin(clientIp);
-      const remaining = getRemainingAttempts(username);
 
       return NextResponse.json(
         {
           success: false,
-          error: result.error || 'Authentication failed',
-          remainingAttempts: remaining,
+          error: result.error || 'Invalid credentials',
         },
         { status: 401 }
       );

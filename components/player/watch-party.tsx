@@ -58,7 +58,8 @@ export function useWatchParty(animeId: number, episodeNumber: number) {
     viewers: [],
     chat: [],
   });
-  const [userName] = useState(() => {
+  const [userName, setUserNameState] = useState(() => {
+    if (typeof window === 'undefined') return '';
     const saved = localStorage.getItem(`${STORAGE_KEY}-username`);
     return saved || `User${Math.floor(Math.random() * 10000)}`;
   });
@@ -256,7 +257,7 @@ export function useWatchParty(animeId: number, episodeNumber: number) {
     userName,
     setUserName: (name: string) => {
       localStorage.setItem(`${STORAGE_KEY}-username`, name);
-      setState((prev) => ({ ...prev, viewers: [] })); // Trigger re-render
+      setUserNameState(name);
     },
     createRoom,
     joinRoom,

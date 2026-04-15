@@ -234,6 +234,7 @@ export function EpisodeNotifications({ airingSchedule = [] }: EpisodeNotificatio
     if (permission !== "granted" || airingSchedule.length === 0) return;
 
     const checkInterval = setInterval(() => {
+      if (document.hidden) return;
       airingSchedule.forEach((item) => {
         const pref = prefs.find((p) => p.mediaId === item.mediaId);
         if (pref?.enabled && item.nextEpisode > pref.episodeOffset) {
@@ -488,6 +489,7 @@ export function useAiringSchedule() {
  */
 export function NotificationPermissionRequest() {
   const [permission, setPermission] = useState<NotificationPermission>("default");
+  const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
     if ("Notification" in window) {
@@ -501,7 +503,7 @@ export function NotificationPermissionRequest() {
     setPermission(result);
   };
 
-  if (permission === "granted") {
+  if (permission === "granted" || permission === "denied" || dismissed) {
     return null;
   }
 
@@ -522,7 +524,7 @@ export function NotificationPermissionRequest() {
                 Enable
               </Button>
               <Button
-                onClick={() => setPermission("denied")}
+                onClick={() => setDismissed(true)}
                 variant="outline"
                 size="sm"
               >
@@ -531,7 +533,7 @@ export function NotificationPermissionRequest() {
             </div>
           </div>
           <button
-            onClick={() => setPermission("denied")}
+            onClick={() => setDismissed(true)}
             className="p-1 hover:bg-white/10 rounded-lg transition-colors"
           >
             <X className="w-4 h-4" />

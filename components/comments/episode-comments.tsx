@@ -72,6 +72,7 @@ export function EpisodeComments({
       content: newComment,
       timestamp,
       isSpoiler,
+      likedBy: [],
     });
 
     setNewComment("");

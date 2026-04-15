@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 
 import { useMemo } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -158,9 +159,11 @@ export default function ProfilePage() {
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 mb-8">
             <div className="relative">
               {isAuthenticated && anilistUser?.avatar ? (
-                <img
+                <Image
                   src={anilistUser.avatar.large || anilistUser.avatar.medium}
                   alt={anilistUser.name}
+                  width={96}
+                  height={96}
                   className="w-24 h-24 rounded-2xl object-cover ring-2 ring-primary/30"
                 />
               ) : (
