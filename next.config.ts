@@ -78,6 +78,18 @@ const nextConfig = {
         key: "Permissions-Policy",
         value: "camera=(), microphone=(), geolocation=()",
       },
+      {
+        key: "Content-Security-Policy",
+        value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://s4.anilist.co https://img.youtube.com https://googlevideo.com; connect-src 'self' https://graphql.anilist.co https://api.jikan.moe https://api.myanimelist.net wss: ws:; media-src 'self' blob: https://*.googlevideo.com; font-src 'self'; frame-src 'self'; worker-src 'self' blob:;",
+      },
+      {
+        key: "Strict-Transport-Security",
+        value: "max-age=63072000; includeSubDomains; preload",
+      },
+      {
+        key: "X-XSS-Protection",
+        value: "1; mode=block",
+      },
     ];
 
     return [

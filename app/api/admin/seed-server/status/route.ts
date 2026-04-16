@@ -43,12 +43,12 @@ export async function GET(request: NextRequest) {
     const now = Date.now();
     const uptime = Math.floor((now - seedServerStatus.lastHeartbeat) / 1000);
 
-    // Simulate some activity
+    // Simulate some activity (deterministic defaults for mock data)
     const mockStatus = {
-      online: Math.random() > 0.1, // 90% uptime
-      activeTorrents: Math.floor(Math.random() * 50) + 10,
-      totalPeers: Math.floor(Math.random() * 200) + 50,
-      uploadSpeed: Math.floor(Math.random() * 100 * 1024 * 1024), // Up to 100 MB/s
+      online: true,
+      activeTorrents: 0,
+      totalPeers: 0,
+      uploadSpeed: 0,
       uptime: uptime,
       lastHeartbeat: now,
       version: "1.0.0",

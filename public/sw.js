@@ -5,7 +5,7 @@
  */
 
 // Bump this version on each release to bust old caches
-const CACHE_VERSION = "1";
+const CACHE_VERSION = "2026-04-15";
 
 const STATIC_CACHE = "animeverse-static-v" + CACHE_VERSION;
 const DYNAMIC_CACHE = "animeverse-dynamic-v" + CACHE_VERSION;
@@ -109,6 +109,36 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // Network-first strategy for HTML requests
+  const isHtmlRequest = request.headers.get("accept")?.includes("text/html");
+
+  if (isHtmlRequest) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          // Cache successful responses
+          if (response && response.status === 200 && response.type === "basic") {
+            const responseToCache = response.clone();
+            caches.open(DYNAMIC_CACHE).then((cache) => {
+              cache.put(request, responseToCache);
+            }).catch(() => {});
+          }
+          return response;
+        })
+        .catch(() => {
+          // Network failed — fall back to cache
+          return caches.match(request).then((cached) => {
+            if (cached) return cached;
+            // No cached version — return offline page
+            const offlinePage = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Offline - AnimeVerse</title><style>body{background:#0a0a1a;color:#e2e8f0;font-family:system-ui;display:flex;align-items:center;justify-content:center;min-height:100vh;}.container{text-align:center;padding:2rem;}h1{font-size:1.5rem;margin-bottom:0.5rem;}p{color:#94a3b8;}</style></head><body><div class="container"><h1>You're Offline</h1><p>Check your internet connection and try again.</p></div></body></html>`;
+            return new Response(offlinePage, { headers: { "Content-Type": "text/html" } });
+          });
+        })
+    );
+    return;
+  }
+
+  // Cache-first strategy for non-HTML requests
   event.respondWith(
     caches.match(request).then((cached) => {
       if (cached) {

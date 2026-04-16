@@ -299,15 +299,16 @@ class TorrentPreloaderImpl {
       this.activeTorrents.set(taskId, torrent);
 
       // Monitor download progress
-      const interval = setInterval(() => {
+      const progressInterval = setInterval(() => {
         if (task.status === "cancelled" || task.status === "error") {
-          clearInterval(interval);
+          clearInterval(progressInterval);
+          clearTimeout(maxDuration);
           return;
         }
 
         const downloaded = torrent.downloaded;
         const downloadSpeed = torrent.downloadSpeed;
-        const progress = downloaded / task.targetBytes;
+        const progress = task.targetBytes > 0 ? downloaded / task.targetBytes : 0;
 
         task.progress = Math.min(progress, 1);
         task.downloadedBytes = downloaded;
@@ -335,15 +336,29 @@ class TorrentPreloaderImpl {
 
         // Check if target bytes reached
         if (downloaded >= task.targetBytes || torrent.progress === 1) {
-          clearInterval(interval);
+          clearInterval(progressInterval);
+          clearTimeout(maxDuration);
           this.markTaskCompleted(taskId);
         }
       }, 1000);
 
+      // Max duration timeout to prevent interval leak (M3)
+      const maxDuration = setTimeout(() => {
+        clearInterval(progressInterval);
+        this.markTaskError(taskId, "Preload timed out after 10 minutes");
+      }, 600000); // 10 minutes
+
       // Handle torrent errors
       torrent.on("error", (err: Error) => {
-        clearInterval(interval);
+        clearInterval(progressInterval);
+        clearTimeout(maxDuration);
         this.markTaskError(taskId, err.message);
+      });
+
+      // Handle torrent done
+      torrent.on("done", () => {
+        clearInterval(progressInterval);
+        clearTimeout(maxDuration);
       });
 
       // Handle torrent ready (metadata received)
@@ -658,6 +673,15 @@ function getTorrentPreloader(): TorrentPreloaderImpl {
     torrentPreloader = TorrentPreloaderImpl.getInstance();
   }
   return torrentPreloader;
+}
+
+// HMR dispose handler (M5)
+if (typeof module !== 'undefined' && (module as any).hot) {
+  (module as any).hot.dispose(() => {
+    if (torrentPreloader) {
+      torrentPreloader.destroy();
+    }
+  });
 }
 
 // ===================================

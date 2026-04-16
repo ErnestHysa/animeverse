@@ -68,6 +68,7 @@ class StatsTracker {
   constructor(filePath) {
     this.filePath = filePath;
     this.stats = this.load();
+    this.saveTimeout = null;
   }
 
   load() {
@@ -127,7 +128,6 @@ class StatsTracker {
   }
 
   // Debounced save: coalesce rapid updates into a single write (H10)
-  private saveTimeout: ReturnType<typeof setTimeout> | null = null;
   debouncedSave() {
     if (this.saveTimeout) clearTimeout(this.saveTimeout);
     this.saveTimeout = setTimeout(() => {
@@ -543,21 +543,31 @@ if (require.main === module) {
   const server = new SeedServer(CONFIG);
 
   // Handle shutdown
-  process.on("SIGINT", () => {
-    log("info", "Received SIGINT, shutting down...");
+  const shutdown = () => {
+    log("info", "Shutting down...");
+    if (statusServer) {
+      statusServer.close();
+    }
     server.stop();
     process.exit(0);
+  };
+
+  process.on("SIGINT", () => {
+    log("info", "Received SIGINT, shutting down...");
+    shutdown();
   });
 
   process.on("SIGTERM", () => {
     log("info", "Received SIGTERM, shutting down...");
-    server.stop();
-    process.exit(0);
+    shutdown();
   });
 
   // Handle uncaught errors
   process.on("uncaughtException", (err) => {
     log("error", "Uncaught exception:", err);
+    if (statusServer) {
+      statusServer.close();
+    }
     server.stop();
     process.exit(1);
   });
@@ -571,10 +581,26 @@ if (require.main === module) {
 
   // Simple HTTP status endpoint (optional)
   const http = require("http");
+  const { verify } = require("jsonwebtoken");
   const STATUS_PORT = parseInt(process.env.STATUS_PORT || "3001", 10);
 
   const statusServer = http.createServer((req, res) => {
     if (req.url === "/status") {
+      // Authenticate status endpoint
+      const token = (req.headers.authorization || '').replace('Bearer ', '');
+      if (!token) {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Unauthorized" }));
+        return;
+      }
+      try {
+        verify(token, process.env.JWT_SECRET || "default-secret");
+      } catch {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Invalid token" }));
+        return;
+      }
+
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(server.getStatus(), null, 2));
     } else if (req.url === "/health") {

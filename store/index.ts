@@ -326,14 +326,21 @@ export const useStore = create<StoreState>()(
             (h) => !(h.mediaId === item.mediaId && h.episodeNumber === item.episodeNumber)
           );
 
-          return {
-            watchHistory: [
+          const updated = [
               {
                 ...item,
                 timestamp: Date.now(),
               },
               ...filtered,
-            ].slice(0, 100), // Keep only last 100 entries
+            ];
+
+          // Cap at 200 entries to prevent unbounded growth
+          while (updated.length > 200) {
+            updated.shift();
+          }
+
+          return {
+            watchHistory: updated,
           };
         }),
 

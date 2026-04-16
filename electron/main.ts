@@ -87,6 +87,7 @@ app.whenReady().then(() => {
   createTray();
   startLocalServer();
   setupIPCHandlers();
+  setAutoStart(config.autoStart);
 
   if (config.startInBackground) {
     mainWindow?.hide();
@@ -246,13 +247,21 @@ function setupIPCHandlers(): void {
   // Config handlers
   ipcMain.handle("get-config", () => config);
   ipcMain.handle("set-config", (_, newConfig: Partial<AppConfig>) => {
-    config = { ...config, ...newConfig };
+    const allowedKeys = ['downloadPath', 'maxConnections', 'autoStart', 'seedRatio'];
+    const safeConfig: Record<string, any> = {};
+    for (const key of allowedKeys) {
+      if (key in newConfig) { (safeConfig as any)[key] = (newConfig as any)[key]; }
+    }
+    config = { ...config, ...safeConfig };
     saveConfig();
     return config;
   });
 
   // Torrent handlers
   ipcMain.handle("start-torrent", async (_, magnetUri: string) => {
+    if (!magnetUri || typeof magnetUri !== 'string' || !magnetUri.startsWith('magnet:')) {
+      return { error: 'Invalid magnet URI' };
+    }
     return startTorrentSession(magnetUri);
   });
 
@@ -419,8 +428,8 @@ function startLocalServer(): void {
     res.end(JSON.stringify({ status: "ok" }));
   });
 
-  server.listen(localServerPort, () => {
-    console.log(`[AnimeStreamDesktop] Local server running on port ${localServerPort}`);
+  server.listen(localServerPort, '127.0.0.1', () => {
+    console.log(`[AnimeStreamDesktop] Local server running on 127.0.0.1:${localServerPort}`);
   });
 }
 
@@ -434,6 +443,3 @@ function setAutoStart(enabled: boolean): void {
     openAsHidden: config.startInBackground,
   });
 }
-
-// Enable/disable auto-start based on config
-setAutoStart(config.autoStart);

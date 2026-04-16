@@ -503,8 +503,8 @@ class BandwidthManagerImpl {
     if (bytes === 0) return "0 B";
 
     const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB", "TB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    const sizes = ["B", "KB", "MB", "GB", "TB", "PB"];
+    const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
 
     return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
   }
@@ -578,24 +578,25 @@ class BandwidthManagerImpl {
 // Export singleton instance
 // ===================================
 
-let bandwidthManager: BandwidthManagerImpl;
-
-if (typeof window !== 'undefined') {
-  bandwidthManager = BandwidthManagerImpl.getInstance();
-
-  if (typeof module !== 'undefined' && (module as any).hot) {
-    const bwInterval = (bandwidthManager as any).updateInterval;
-    if (bwInterval) {
-      (module as any).hot.dispose(() => clearInterval(bwInterval));
-    }
-  }
-}
+let bandwidthManager: BandwidthManagerImpl | null = null;
 
 function getBandwidthManager(): BandwidthManagerImpl {
+  if (!bandwidthManager && typeof window !== 'undefined') {
+    bandwidthManager = BandwidthManagerImpl.getInstance();
+  }
   if (!bandwidthManager) {
     bandwidthManager = BandwidthManagerImpl.getInstance();
   }
   return bandwidthManager;
+}
+
+if (typeof module !== 'undefined' && (module as any).hot) {
+  (module as any).hot.dispose(() => {
+    if (bandwidthManager) {
+      bandwidthManager.destroy();
+      bandwidthManager = null;
+    }
+  });
 }
 
 // ===================================

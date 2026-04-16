@@ -154,6 +154,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const animeId = searchParams.get('animeId');
     const limit = parseInt(searchParams.get('limit') || '50', 10);
+    const clampedLimit = Math.min(Math.max(limit, 1), 100);
 
     // Get room manager
     const roomManager = getRoomManager();
@@ -165,7 +166,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get public rooms from WebSocket manager
-    let publicRooms = roomManager.getPublicRooms(limit);
+    let publicRooms = roomManager.getPublicRooms(clampedLimit);
 
     // Filter by anime if specified
     if (animeId) {

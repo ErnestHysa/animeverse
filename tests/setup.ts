@@ -87,8 +87,6 @@ global.cancelAnimationFrame = (id: number) => {
 // Suppress console errors in tests unless debugging
 const originalError = console.error;
 console.error = (...args) => {
-  if (args[0]?.includes?.('Warning:') || args[0]?.includes?.('deprecated')) {
-    return;
-  }
+  if (args[0]?.includes?.('Warning: componentWillMount') || args[0]?.includes?.('Warning: componentWillReceiveProps')) return;
   originalError(...args);
 };

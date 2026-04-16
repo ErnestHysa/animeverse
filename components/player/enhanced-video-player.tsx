@@ -37,7 +37,10 @@ import {
   getEstimatedTimestamps,
   type IntroOutroTimestamps,
 } from "@/lib/aniskip";
-import Hls, { type HlsConfig } from "hls.js";
+// Lazy-loaded hls.js to reduce initial bundle size (H13)
+let HlsConstructor: typeof import('hls.js').default | null = null;
+type HlsType = typeof import('hls.js').default;
+import { type HlsConfig } from "hls.js";
 
 // Dynamic import for watch party controls to reduce initial bundle
 const WatchPartyControls = dynamic(
@@ -149,7 +152,7 @@ export function EnhancedVideoPlayer({
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
   const settingsDropdownRef = useRef<HTMLDivElement>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
-  const hlsRef = useRef<Hls | null>(null);
+  const hlsRef = useRef<import('hls.js').default | null>(null);
   const bufferingSafetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   // Debounce timeout for waiting event to prevent false positive buffering overlay
   const waitingDebounceRef = useRef<NodeJS.Timeout | null>(null);
@@ -165,6 +168,8 @@ export function EnhancedVideoPlayer({
   const subtitleTimerRef = useRef<NodeJS.Timeout | null>(null);
   // Ref for seek timeout in play() function (to clear on unmount)
   const playFallbackRef2 = useRef<NodeJS.Timeout | null>(null);
+  // Debounce ref for volume localStorage writes
+  const volumeSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // State
   const [isPlaying, setIsPlaying] = useState(false);
@@ -486,6 +491,10 @@ export function EnhancedVideoPlayer({
     const video = videoRef.current;
     if (!video) return;
 
+    let cancelled = false;
+    let innerCleanup: (() => void) | null = null;
+
+    (async () => {
     logger.log("[VideoPlayer] Loading video source:", {
       type: source.type,
       url: source.url,
@@ -579,7 +588,26 @@ export function EnhancedVideoPlayer({
         needsProxy,
       });
 
-      if (isHls && typeof Hls !== "undefined" && Hls.isSupported()) {
+      if (isHls) {
+        // Lazy-load hls.js on demand (H13)
+        if (!HlsConstructor) {
+          const hlsModule = await import('hls.js');
+          HlsConstructor = hlsModule.default;
+        }
+        const Hls = HlsConstructor;
+
+        if (!Hls.isSupported()) {
+          // Fallback to native HLS (Safari)
+          if (video.canPlayType("application/vnd.apple.mpegurl")) {
+            const videoUrl = needsProxy ? createProxyUrl(source.url, "manifest") : source.url;
+            video.src = videoUrl;
+            const clearLoading = () => { clearTimeout(loadingTimeout); clearTimeout(safetyTimeout); setIsLoading(false); };
+            video.addEventListener("loadeddata", clearLoading, { once: true });
+            video.addEventListener("canplay", clearLoading, { once: true });
+            video.addEventListener("error", handleError, { once: true });
+            video.addEventListener("loadedmetadata", () => { if (preferences.autoplay) video.play().catch(() => {}); }, { once: true });
+          }
+        } else {
         // Use HLS.js for browsers that don't support HLS natively
         // Configure for better compatibility with various CDN formats
         const hlsConfig: Partial<HlsConfig> = {
@@ -865,46 +893,14 @@ export function EnhancedVideoPlayer({
           }
         });
 
-        return () => {
+        innerCleanup = () => {
           clearTimeout(loadingTimeout);
           clearTimeout(safetyTimeout);
           clearTimeout(manifestFallbackTimeout);
           if (parseCheckTimeout) clearTimeout(parseCheckTimeout);
           hls.destroy();
         };
-      } else if (isHls && video.canPlayType("application/vnd.apple.mpegurl")) {
-        // Native HLS support (Safari)
-        // Use proxied URL to bypass CORS if needed
-        const videoUrl = needsProxy ? createProxyUrl(source.url, "manifest") : source.url;
-        video.src = videoUrl;
-
-        // Add multiple event handlers to ensure loading state is cleared
-        const clearLoading = () => {
-          clearTimeout(loadingTimeout);
-          clearTimeout(safetyTimeout);
-          setIsLoading(false);
-        };
-
-        video.addEventListener("loadeddata", clearLoading, { once: true });
-        video.addEventListener("canplay", clearLoading, { once: true });
-        video.addEventListener("canplaythrough", clearLoading, { once: true });
-        video.addEventListener("error", handleError, { once: true });
-
-        // Try autoplay if enabled
-        video.addEventListener("loadedmetadata", () => {
-          if (preferences.autoplay) {
-            video.play().catch(() => {});
-          }
-        }, { once: true });
-
-        return () => {
-          clearTimeout(loadingTimeout);
-          clearTimeout(safetyTimeout);
-          video.removeEventListener("loadeddata", clearLoading);
-          video.removeEventListener("canplay", clearLoading);
-          video.removeEventListener("canplaythrough", clearLoading);
-          video.removeEventListener("error", handleError);
-        };
+        }
       } else {
         // Regular MP4 video - use proxy if needed for CORS
         const videoUrl = (needsProxy && source.url.includes(".mp4")) ? createProxyUrl(source.url, "video") : source.url;
@@ -929,7 +925,7 @@ export function EnhancedVideoPlayer({
           }
         }, { once: true });
 
-        return () => {
+        innerCleanup = () => {
           clearTimeout(loadingTimeout);
           clearTimeout(safetyTimeout);
           video.removeEventListener("loadeddata", clearLoading);
@@ -940,7 +936,6 @@ export function EnhancedVideoPlayer({
       }
     } else {
       // WebTorrent handling (magnet/torrent links)
-      let cancelled = false;
       import("@/lib/webtorrent").then(({ webTorrentManager }) => {
         if (cancelled) return;
         webTorrentManager.loadDirectVideo(source.url, video, {
@@ -960,8 +955,17 @@ export function EnhancedVideoPlayer({
           },
         });
       });
-      return () => { cancelled = true; clearTimeout(loadingTimeout); clearTimeout(safetyTimeout); };
     }
+    })(); // end async IIFE
+
+    return () => {
+      cancelled = true;
+      if (innerCleanup) innerCleanup();
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+    };
   }, [source.url, source.type, source.referer, preferences.autoplay]);
 
   // ===================================
@@ -1948,7 +1952,7 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
       };
 
       // Listen for MANIFEST_PARSED if not already ready
-      hls.once(Hls.Events.MANIFEST_PARSED, onManifestParsed);
+      hls.once(HlsConstructor!.Events.MANIFEST_PARSED, onManifestParsed);
 
       // Also try to play after a short delay as fallback
       if (playFallbackRef2.current) clearTimeout(playFallbackRef2.current);
@@ -2269,8 +2273,14 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('player-volume', volume.toString());
+      if (volumeSaveRef.current) clearTimeout(volumeSaveRef.current);
+      volumeSaveRef.current = setTimeout(() => {
+        localStorage.setItem('player-volume', volume.toString());
+      }, 500);
     }
+    return () => {
+      if (volumeSaveRef.current) clearTimeout(volumeSaveRef.current);
+    };
   }, [volume]);
 
   // ===================================

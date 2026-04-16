@@ -85,6 +85,7 @@ class HybridStreamManagerImpl {
   private static instance: HybridStreamManagerImpl;
   private analyticsEnabled = false;
   private fallbackStartTime = 0;
+  private lastSwitchTime = 0;
 
   private constructor() {
     // Singleton pattern
@@ -171,12 +172,21 @@ class HybridStreamManagerImpl {
         // Check if we should fallback due to low seed count
         if (primary === "webtorrent" && primaryResult.seeders !== undefined) {
           if (primaryResult.seeders < MIN_SEED_THRESHOLD) {
+            // Stream switching cooldown (M14)
+            if (Date.now() - this.lastSwitchTime < 5000) {
+              return {
+                source: primaryResult.source,
+                method: primary,
+                fallbackOccurred: false,
+              };
+            }
+
             const timeToFallback = Date.now() - this.fallbackStartTime;
             logger.warn(
               `[HybridStream] WebTorrent has low seed count (${primaryResult.seeders}), falling back to HLS`
             );
             onFallback?.("webtorrent", "hls", `Low seed count (${primaryResult.seeders} < ${MIN_SEED_THRESHOLD})`);
-
+            this.lastSwitchTime = Date.now();
             // Track fallback event (Phase 9)
             if (this.analyticsEnabled) {
               try {
@@ -222,6 +232,17 @@ class HybridStreamManagerImpl {
 
       // Primary method failed, try secondary
       if (secondary) {
+        // Stream switching cooldown (M14)
+        if (Date.now() - this.lastSwitchTime < 5000) {
+          return {
+            source: null,
+            method: primary,
+            fallbackOccurred: false,
+            error: primaryResult.error || new Error("Primary method failed, cooldown active"),
+          };
+        }
+        this.lastSwitchTime = Date.now();
+
         const timeToFallback = Date.now() - this.fallbackStartTime;
         logger.warn(
           `[HybridStream] Primary method (${primary}) failed: ${primaryResult.error?.message}`,
@@ -314,6 +335,7 @@ class HybridStreamManagerImpl {
     this.cancelAllAttempts();
     this.analyticsEnabled = false;
     this.fallbackStartTime = 0;
+    HybridStreamManagerImpl.instance = null as any;
   }
 
   // ===================================
@@ -521,12 +543,13 @@ class HybridStreamManagerImpl {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-    // Combine abort signals
+    // Combine abort signals with proper cleanup (M12)
+    const abortHandler = () => {
+      controller.abort();
+      clearTimeout(timeoutId);
+    };
     if (signal) {
-      signal.addEventListener("abort", () => {
-        controller.abort();
-        clearTimeout(timeoutId);
-      });
+      signal.addEventListener("abort", abortHandler);
     }
 
     try {
@@ -541,6 +564,10 @@ class HybridStreamManagerImpl {
         throw new Error(`Request timeout after ${timeout}ms`);
       }
       throw error;
+    } finally {
+      if (signal) {
+        signal.removeEventListener("abort", abortHandler);
+      }
     }
   }
 

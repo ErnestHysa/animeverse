@@ -49,6 +49,7 @@ const RATE_LIMIT_RULES: RateLimitRule[] = [
   { pathPrefix: '/api/community', maxRequests: 30, windowMs: 60 * 1000 },
   { pathPrefix: '/api/analytics', maxRequests: 60, windowMs: 60 * 1000 },
   { pathPrefix: '/api/admin/login', maxRequests: 10, windowMs: 60 * 1000 },
+  { pathPrefix: '/api/search-suggestions', maxRequests: 30, windowMs: 60 * 1000 },
 ];
 
 function getClientIp(request: NextRequest): string {
@@ -99,12 +100,14 @@ function getCorsOrigin(request: NextRequest): string {
   if (origin) {
     try {
       const originHost = new URL(origin).hostname;
-      if (
-        originHost === 'localhost' ||
-        originHost === '127.0.0.1' ||
+      const isDev = process.env.NODE_ENV !== 'production';
+      const isProductionOrigin =
         originHost.endsWith('.animeverse.app') ||
-        originHost === host.split(':')[0]
-      ) {
+        originHost === host.split(':')[0];
+      const isDevLocalhost =
+        isDev && (originHost === 'localhost' || originHost === '127.0.0.1');
+
+      if (isDevLocalhost || isProductionOrigin) {
         return origin;
       }
     } catch {}

@@ -72,11 +72,15 @@ class WatchPartyRoomManager {
   private socketToUser: Map<string, string> = new Map(); // socketId -> userId
   private readonly ROOM_TIMEOUT = 24 * 60 * 60 * 1000; // 24 hours
   private readonly VIEWER_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+  private readonly DISCONNECTED_VIEWER_TIMEOUT = 30 * 1000; // 30 seconds for disconnected viewers
   private readonly MAX_ROOMS = 100;
   private readonly MAX_MESSAGES_PER_ROOM = 200;
   private messagesPerRoom: Map<string, number> = new Map();
   private io: SocketIOServer | null = null;
   private cleanupInterval: ReturnType<typeof setInterval> | null = null;
+
+  // Per-socket rate limiter: track last event timestamp
+  private socketLastEvent: Map<string, number> = new Map();
 
   constructor() {
     // Clean up inactive rooms every 5 minutes
@@ -115,43 +119,71 @@ class WatchPartyRoomManager {
     this.io.on('connection', (socket) => {
       console.log('[WatchParty] Client connected:', socket.id);
 
+      // Per-socket rate limit helper: min 50ms between events
+      const checkRateLimit = (): boolean => {
+        const lastEvent = this.socketLastEvent.get(socket.id) || 0;
+        if (Date.now() - lastEvent < 50) return false;
+        this.socketLastEvent.set(socket.id, Date.now());
+        return true;
+      };
+
       // Join room
       socket.on('join_room', (data: { roomId: string; username: string; password?: string }) => {
+        if (!checkRateLimit()) return;
+        // Validate and sanitize username
+        if (data.username) {
+          data.username = data.username.replace(/[\x00-\x1F\x7F]/g, '').slice(0, 30);
+        }
         this.handleJoinRoom(socket, data);
       });
 
       // Leave room
       socket.on('leave_room', () => {
+        if (!checkRateLimit()) return;
         this.handleLeaveRoom(socket);
       });
 
       // Playback sync from host
       socket.on('sync_playback', (data: PlaybackSyncState) => {
+        if (!checkRateLimit()) return;
+        // Validate playback values
+        if (data.currentTime !== undefined && (data.currentTime < 0 || data.currentTime > 86400)) return;
+        if (data.playbackRate !== undefined && (data.playbackRate < 0.25 || data.playbackRate > 4)) return;
         this.handlePlaybackSync(socket, data);
       });
 
       // Chat message
       socket.on('send_message', (data: { message: string }) => {
+        if (!checkRateLimit()) return;
+        // Validate message length
+        if (!data.message || data.message.length > 1000) return;
         this.handleChatMessage(socket, data);
       });
 
       // Timeline reaction
       socket.on('send_reaction', (data: { emoji: string; timestamp: number }) => {
+        if (!checkRateLimit()) return;
+        // Validate emoji length and timestamp range
+        if (!data.emoji || data.emoji.length > 10) return;
+        if (data.timestamp < 0 || data.timestamp > 86400) return;
         this.handleTimelineReaction(socket, data);
       });
 
       // Request sync state (newly joined viewer)
       socket.on('request_sync', () => {
+        if (!checkRateLimit()) return;
         this.handleSyncRequest(socket);
       });
 
       // Viewer activity update
       socket.on('update_activity', () => {
+        if (!checkRateLimit()) return;
         this.handleActivityUpdate(socket);
       });
 
       // Disconnect
       socket.on('disconnect', () => {
+        this.socketLastEvent.delete(socket.id);
         this.handleDisconnect(socket);
       });
 
@@ -209,6 +241,14 @@ class WatchPartyRoomManager {
     const existingRoomId = this.userToRoom.get(socket.id);
     if (existingRoomId) {
       socket.emit('error', { message: 'Already in a room' });
+      return;
+    }
+
+    // Check for duplicate username in the room
+    const existingUsername = Array.from(room.viewers.values())
+      .find(v => v.username === username);
+    if (existingUsername) {
+      socket.emit('error', { message: 'Username already taken in this room' });
       return;
     }
 
@@ -377,7 +417,7 @@ class WatchPartyRoomManager {
     viewer.lastSeen = Date.now();
 
     const reaction: TimelineReaction = {
-      id: `reaction-${Date.now()}-${Math.random()}`,
+      id: `reaction-${Date.now()}-${crypto.randomUUID()}`,
       roomId,
       userId: viewer.id,
       username: viewer.username,
@@ -448,7 +488,8 @@ class WatchPartyRoomManager {
 
     const viewer = room.viewers.get(socket.id);
     if (viewer) {
-      // Mark as potentially disconnected but keep in room for timeout
+      // Mark as disconnected (shorter cleanup timeout will remove them)
+      (viewer as any).disconnected = true;
       viewer.lastSeen = Date.now();
 
       // Notify others
@@ -456,6 +497,19 @@ class WatchPartyRoomManager {
         viewerId: viewer.id,
         username: viewer.username,
       });
+
+      // Transfer host if the disconnecting user is the host
+      if (socket.id === room.hostId) {
+        const viewers = Array.from(room.viewers.values())
+          .filter(v => v.socketId !== socket.id && v.lastSeen > 0)
+          .sort((a, b) => a.joinedAt - b.joinedAt);
+        if (viewers.length > 0) {
+          room.hostId = viewers[0].socketId;
+          viewers[0].isHost = true;
+          this.broadcastToRoom(roomId, { type: 'system', message: `${viewers[0].username} is now the host` });
+          this.io?.to(roomId).emit('host_changed', { newHost: viewers[0].username });
+        }
+      }
     }
   }
 
@@ -539,7 +593,9 @@ class WatchPartyRoomManager {
     for (const [roomId, room] of this.rooms.entries()) {
       // Remove inactive viewers
       for (const [socketId, viewer] of room.viewers.entries()) {
-        if (now - viewer.lastSeen > this.VIEWER_TIMEOUT) {
+        const isDisconnected = (viewer as any).disconnected === true;
+        const timeout = isDisconnected ? this.DISCONNECTED_VIEWER_TIMEOUT : this.VIEWER_TIMEOUT;
+        if (now - viewer.lastSeen > timeout) {
           room.viewers.delete(socketId);
           this.userToRoom.delete(socketId);
 

@@ -15,7 +15,8 @@ export async function GET(
 ) {
   const { malId } = await params;
 
-  if (!malId || isNaN(Number(malId))) {
+  const id = parseInt(malId, 10);
+  if (isNaN(id) || id <= 0) {
     return NextResponse.json({ error: "Invalid MAL ID" }, { status: 400 });
   }
 
@@ -24,7 +25,7 @@ export async function GET(
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     const response = await fetch(
-      `https://api.animefillerlist.com/v1/anime/${malId}`,
+      `https://api.animefillerlist.com/v1/anime/${id}`,
       {
         headers: {
           "User-Agent":

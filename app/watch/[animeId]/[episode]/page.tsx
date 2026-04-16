@@ -6,18 +6,17 @@ export const dynamic = "force-dynamic";
 
 import { Suspense } from "react";
 import Link from "next/link";
+import nextDynamic from "next/dynamic";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { Media } from "@/types/anilist";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
-import { VideoSourceLoader } from "@/components/player/video-source-loader";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
 import { ShareButton } from "@/components/player/share-dialog";
 import { ReportButton } from "@/components/player/report-dialog";
 import { KeyboardShortcutsButton } from "@/components/player/keyboard-shortcuts";
 import { ImageWithFallback } from "@/components/ui/image-with-fallback";
-import { EpisodeList } from "@/components/player/episode-list";
 import { anilist, getAnimeTitle } from "@/lib/anilist";
 import { sanitizeDescription } from "@/lib/html-sanitizer";
 import {
@@ -29,6 +28,15 @@ import { EpisodeCommentsSection } from "@/components/watch/episode-comments-sect
 import { CacheAnime } from "@/components/anime/cache-anime";
 import { MiniPlayerActivator } from "@/components/player/mini-player-activator";
 import { ClientErrorBoundary } from "@/components/error/client-error-boundary";
+
+const VideoSourceLoader = nextDynamic(
+  () => import("@/components/player/video-source-loader").then(m => ({ default: m.VideoSourceLoader })),
+  { ssr: false, loading: () => <VideoPlayerSkeleton /> }
+);
+const EpisodeList = nextDynamic(
+  () => import("@/components/player/episode-list").then(m => ({ default: m.EpisodeList })),
+  { ssr: false, loading: () => <EpisodeListSkeleton /> }
+);
 
 function LinkButton({ href, children }: { href: string; children: React.ReactNode }) {
   return (

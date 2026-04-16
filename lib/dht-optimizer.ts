@@ -71,6 +71,7 @@ class DHTOptimizerImpl {
   private connectionStats: Map<string, { attempts: number; successes: number; failures: number }> = new Map();
   private static instance: DHTOptimizerImpl;
   private webTorrentClient: any = null;
+  private lastSaveTime = 0;
 
   private constructor(options: Partial<DHTOptions> = {}) {
     this.options = {
@@ -194,7 +195,11 @@ class DHTOptimizerImpl {
       this.nodeCache.set(key, { ...node });
     }
 
-    this.saveNodeCache();
+    // Debounced saveNodeCache (M10) - only save every 30 seconds
+    if (Date.now() - this.lastSaveTime > 30000) {
+      this.saveNodeCache();
+      this.lastSaveTime = Date.now();
+    }
   }
 
   /**
@@ -239,6 +244,16 @@ class DHTOptimizerImpl {
 
     if (node) {
       node.failureCount++;
+    } else {
+      // Track failed nodes so they stay in the cache for future reference
+      this.nodeCache.set(key, {
+        address,
+        port,
+        lastSeen: Date.now(),
+        successCount: 0,
+        failureCount: 1,
+        averageLatency: 0,
+      });
     }
 
     // Update connection stats
@@ -466,6 +481,16 @@ class DHTOptimizerImpl {
       this.connectionStats.delete(key);
     }
 
+    // Cap connectionStats size to prevent unbounded growth (M9)
+    if (this.connectionStats.size > 500) {
+      const entries = Array.from(this.connectionStats.entries())
+        .sort((a, b) => (b[1].attempts) - (a[1].attempts));
+      this.connectionStats.clear();
+      for (const [key, value] of entries.slice(0, 250)) {
+        this.connectionStats.set(key, value);
+      }
+    }
+
     if (toDelete.length > 0) {
       console.log("[DHTOptimizer] Removed", toDelete.length, "stale nodes");
       this.saveNodeCache();
@@ -479,48 +504,67 @@ class DHTOptimizerImpl {
     this.connectionStats.clear();
     console.log("[DHTOptimizer] Stats reset");
   }
+
+  /**
+   * Destroy the optimizer, clearing all state (L10)
+   */
+  destroy(): void {
+    this.connectionStats.clear();
+    this.nodeCache.clear();
+    this.saveNodeCache();
+    this.webTorrentClient = null;
+    DHTOptimizerImpl.instance = undefined as any;
+  }
 }
 
 // ===================================
-// Export singleton instance
+// Export lazy singleton
 // ===================================
 
-export const dhtOptimizer = DHTOptimizerImpl.getInstance();
+let _dhtOptimizer: DHTOptimizerImpl | null = null;
+
+function getDHTOptimizer(): DHTOptimizerImpl {
+  if (!_dhtOptimizer) _dhtOptimizer = DHTOptimizerImpl.getInstance();
+  return _dhtOptimizer;
+}
+
+export { DHTOptimizerImpl, getDHTOptimizer };
 
 // ===================================
 // Export convenience functions
 // ===================================
 
 export function optimizeDHT(options?: Partial<DHTOptions>): DHTOptimizerImpl {
+  const dht = getDHTOptimizer();
   if (options) {
-    dhtOptimizer.updateOptions(options);
+    dht.updateOptions(options);
   }
-  return dhtOptimizer;
+  return dht;
 }
 
 export async function preconnectToDHT(client: any): Promise<void> {
-  return dhtOptimizer.preconnectToDHT(client);
+  return getDHTOptimizer().preconnectToDHT(client);
 }
 
 export function getOptimizedTrackers(): string[] {
-  return dhtOptimizer.getOptimizedTrackers();
+  return getDHTOptimizer().getOptimizedTrackers();
 }
 
 export function buildMagnetWithOptimizedTrackers(
   infoHash: string,
   title?: string
 ): string {
-  return dhtOptimizer.buildMagnetWithOptimizedTrackers(infoHash, title);
+  return getDHTOptimizer().buildMagnetWithOptimizedTrackers(infoHash, title);
 }
 
 export function getDHTStats(): DHTStats {
-  return dhtOptimizer.getStats();
+  return getDHTOptimizer().getStats();
 }
 
 export function recordDHTSuccess(address: string, port: number, latency: number): void {
-  dhtOptimizer.recordSuccess(address, port, latency);
+  getDHTOptimizer().recordSuccess(address, port, latency);
 }
 
 export function recordDHTFailure(address: string, port: number): void {
-  dhtOptimizer.recordFailure(address, port);
+  getDHTOptimizer().recordFailure(address, port);
 }

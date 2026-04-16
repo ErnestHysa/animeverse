@@ -104,7 +104,13 @@ export async function GET(request: NextRequest) {
     const response = NextResponse.redirect(settingsUrl);
 
     // Clear the verifier cookie
-    response.cookies.set("mal_code_verifier", "", { maxAge: 0, path: "/" });
+    response.cookies.set("mal_code_verifier", "", {
+      maxAge: 0,
+      path: "/",
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+    });
 
     // Store token in httpOnly cookie as well
     response.cookies.set("mal_token", tokenData.access_token, {

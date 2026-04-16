@@ -34,7 +34,6 @@
     "archiver": "^7.0.1",
     "axios": "^1.14.0",
     "bcrypt": "^6.0.0",
-    "cheerio": "^1.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dashjs": "^5.1.1",
@@ -65,7 +64,6 @@
     "@types/archiver": "^7.0.0",
     "@types/bcrypt": "^6.0.0",
     "@types/cookie": "^0.6.0",
-    "@types/cheerio": "^0.22.35",
     "@types/ws": "^8.18.1",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20",
@@ -83,6 +81,7 @@
     "tailwindcss": "^4.2.2",
     "typescript": "^5",
     "vite": "^8.0.3",
+    "ts-node": "^10.9.2",
     "vitest": "^4.1.2"
   },
   "overrides": {

@@ -88,6 +88,8 @@ const pendingVerifications: Set<string> = new Set();
 class AnimeTracker {
   private server: http.Server | null = null;
   private wsServer: WebSocketServer | null = null;
+  private cleanupInterval: ReturnType<typeof setInterval> | null = null;
+  private statsInterval: ReturnType<typeof setInterval> | null = null;
 
   /**
    * Start the tracker servers
@@ -118,6 +120,14 @@ class AnimeTracker {
    * Stop the tracker servers
    */
   stop(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+    if (this.statsInterval) {
+      clearInterval(this.statsInterval);
+      this.statsInterval = null;
+    }
     if (this.server) {
       this.server.close();
       this.server = null;
@@ -132,6 +142,10 @@ class AnimeTracker {
    * Handle HTTP announce requests
    */
   private handleHTTPRequest(req: http.IncomingMessage, res: http.ServerResponse): void {
+    // Add CORS headers to all responses (M18)
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST');
+
     const url = parseUrl(req.url || "", true);
     const path = url.pathname;
 
@@ -218,7 +232,10 @@ class AnimeTracker {
 
       // Add new peer entry if not stopped
       if (event !== "stopped") {
-        torrentPeers.add(peerInfo);
+        // Cap peers per torrent to prevent unbounded growth
+        if (torrentPeers.size < 200) {
+          torrentPeers.add(peerInfo);
+        }
       }
 
       // Update torrent statistics
@@ -330,6 +347,11 @@ class AnimeTracker {
       };
 
       torrents.set(infoHash, torrentInfo);
+      // Cap pendingVerifications to prevent unbounded growth
+      if (pendingVerifications.size > 1000) {
+        const first = pendingVerifications.values().next().value;
+        if (first) pendingVerifications.delete(first);
+      }
       pendingVerifications.add(infoHash);
 
       res.writeHead(201, { "Content-Type": "application/json" });
@@ -471,8 +493,8 @@ class AnimeTracker {
    * Update user statistics
    */
   private updateUserStats(user: UserInfo, uploaded: number, downloaded: number, event: string): void {
-    const deltaUploaded = uploaded - (user.prevUploaded || 0);
-    const deltaDownloaded = downloaded - (user.prevDownloaded || 0);
+    const deltaUploaded = Math.max(0, uploaded - (user.prevUploaded || 0));
+    const deltaDownloaded = Math.max(0, downloaded - (user.prevDownloaded || 0));
     user.uploaded += deltaUploaded;
     user.downloaded += deltaDownloaded;
     user.prevUploaded = uploaded;
@@ -488,7 +510,7 @@ class AnimeTracker {
    */
   private startPeriodicTasks(): void {
     // Clean up inactive peers every 5 minutes
-    setInterval(() => {
+    this.cleanupInterval = setInterval(() => {
       const now = Date.now();
       const timeout = 3600000; // 1 hour
 
@@ -504,7 +526,7 @@ class AnimeTracker {
     }, 300000);
 
     // Update torrent stats every minute
-    setInterval(() => {
+    this.statsInterval = setInterval(() => {
       for (const infoHash of torrents.keys()) {
         const torrentPeers = peers.get(infoHash) || new Set();
         let seeders = 0;
@@ -552,6 +574,8 @@ class AnimeTracker {
       return `${data.length}:${data}`;
     } else if (typeof data === "number") {
       return `i${data}e`;
+    } else if (Buffer.isBuffer(data)) {
+      return `${data.length}:${data.toString('latin1')}`;
     } else if (Array.isArray(data)) {
       return `l${data.filter((item) => item != null).map((item) => this.bencode(item)).join("")}e`;
     } else if (typeof data === "object") {

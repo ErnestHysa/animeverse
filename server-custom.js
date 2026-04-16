@@ -9,6 +9,7 @@ const { createServer } = require('http');
 const { parse } = require('url');
 const next = require('next');
 const { Server: SocketIOServer } = require('socket.io');
+const crypto = require('crypto');
 
 // ===================================
 // Configuration
@@ -32,6 +33,9 @@ class WatchPartyRoomManager {
     this.socketToUser = new Map();
     this.ROOM_TIMEOUT = 24 * 60 * 60 * 1000; // 24 hours
     this.VIEWER_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+    this.MAX_ROOMS = 50;
+    this.MAX_MESSAGES_PER_ROOM = 200;
+    this.messagesPerRoom = new Map();
     this.io = null;
 
     // Clean up inactive rooms every 5 minutes
@@ -104,6 +108,13 @@ class WatchPartyRoomManager {
 
   handleJoinRoom(socket, data) {
     const { roomId, username, password } = data;
+
+    // Validate username
+    if (!username || typeof username !== 'string' || username.length > 30) {
+      socket.emit('error', { message: 'Invalid username' });
+      return;
+    }
+
     const room = this.rooms.get(roomId);
 
     if (!room) {
@@ -111,12 +122,41 @@ class WatchPartyRoomManager {
       return;
     }
 
-    if (!room.isPublic && room.password !== password) {
-      socket.emit('error', { message: 'Invalid room password' });
-      return;
+    if (!room.isPublic && room.password) {
+      if (!password) {
+        socket.emit('error', { message: 'Invalid room password' });
+        return;
+      }
+      try {
+        const a = Buffer.from(room.password, 'utf-8');
+        const b = Buffer.from(password, 'utf-8');
+        if (a.length !== b.length) {
+          const hashA = crypto.createHash('sha256').update(a).digest();
+          const hashB = crypto.createHash('sha256').update(b).digest();
+          if (!crypto.timingSafeEqual(hashA, hashB)) {
+            socket.emit('error', { message: 'Invalid room password' });
+            return;
+          }
+        } else {
+          if (!crypto.timingSafeEqual(a, b)) {
+            socket.emit('error', { message: 'Invalid room password' });
+            return;
+          }
+        }
+      } catch {
+        socket.emit('error', { message: 'Invalid room password' });
+        return;
+      }
     }
 
     const viewerId = `viewer-${socket.id}`;
+
+    // Enforce room user limit
+    if (room.userLimit && room.viewers.size >= room.userLimit) {
+      socket.emit('error', { message: 'Room is full' });
+      return;
+    }
+
     const viewer = {
       id: viewerId,
       username,
@@ -221,12 +261,25 @@ class WatchPartyRoomManager {
     room.lastActivity = Date.now();
     viewer.lastSeen = Date.now();
 
+    // Validate message length
+    if (!data.message || typeof data.message !== 'string' || data.message.length > 500) {
+      return;
+    }
+
+    // Enforce max messages per room
+    const msgCount = this.messagesPerRoom.get(roomId) || 0;
+    if (msgCount >= this.MAX_MESSAGES_PER_ROOM) {
+      socket.emit('error', { message: 'Room message limit reached' });
+      return;
+    }
+    this.messagesPerRoom.set(roomId, msgCount + 1);
+
     const message = {
-      id: `msg-${Date.now()}-${Math.random()}`,
+      id: `msg-${Date.now()}-${crypto.randomUUID()}`,
       roomId,
       userId: viewer.id,
       username: viewer.username,
-      message: data.message,
+      message: data.message ? data.message.replace(/<[^>]*>/g, '') : '',
       timestamp: Date.now(),
       type: 'text',
     };
@@ -248,7 +301,7 @@ class WatchPartyRoomManager {
     viewer.lastSeen = Date.now();
 
     const reaction = {
-      id: `reaction-${Date.now()}-${Math.random()}`,
+      id: `reaction-${Date.now()}-${crypto.randomUUID()}`,
       roomId,
       userId: viewer.id,
       username: viewer.username,
@@ -313,10 +366,29 @@ class WatchPartyRoomManager {
         viewerId: viewer.id,
         username: viewer.username,
       });
+
+      // Transfer host if the disconnecting user is the host
+      if (socket.id === room.hostId) {
+        const viewers = Array.from(room.viewers.values())
+          .filter(v => v.socketId !== socket.id && v.lastSeen > 0)
+          .sort((a, b) => a.joinedAt - b.joinedAt);
+        if (viewers.length > 0) {
+          room.hostId = viewers[0].socketId;
+          viewers[0].isHost = true;
+          this.broadcastToRoom(roomId, { type: 'system', message: `${viewers[0].username} is now the host` });
+          this.io.to(roomId).emit('host_changed', { newHost: viewers[0].username });
+        }
+      }
     }
   }
 
   createRoom(data) {
+    // Enforce max rooms limit
+    if (this.rooms.size >= this.MAX_ROOMS) {
+      console.warn('[WatchParty] Max rooms limit reached, cannot create new room');
+      return null;
+    }
+
     const roomId = this.generateRoomId();
 
     const room = {
@@ -330,6 +402,7 @@ class WatchPartyRoomManager {
       createdAt: Date.now(),
       lastActivity: Date.now(),
       viewers: new Map(),
+      userLimit: 50,
     };
 
     this.rooms.set(roomId, room);
@@ -384,6 +457,7 @@ class WatchPartyRoomManager {
 
       if (room.viewers.size === 0 || now - room.lastActivity > this.ROOM_TIMEOUT) {
         this.rooms.delete(roomId);
+        this.messagesPerRoom.delete(roomId);
         console.log(`[WatchParty] Room removed: ${roomId}`);
       }
     }

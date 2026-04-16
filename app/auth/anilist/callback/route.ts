@@ -154,7 +154,7 @@ export async function GET(request: NextRequest) {
 
     if (userData) {
       response.cookies.set("anilist_user", JSON.stringify(userData), {
-        httpOnly: false,
+        httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
         maxAge: tokenData.expires_in || 31536000,

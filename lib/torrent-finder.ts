@@ -312,6 +312,7 @@ export async function scrapeNyaa(
         /<a[^>]*href="\/view\/\d+"[^>]*title="([^"]+)"/
       );
       const title = titleMatch ? titleMatch[1].trim() : "";
+      if (!title) continue;
 
       // Extract magnet link
       const magnetMatch = row.match(/href="(magnet:\?[^"]+)"/);
@@ -430,6 +431,7 @@ export async function scrapeNyaaLand(
         /<a[^>]*href="\/view\/\d+"[^>]*title="([^"]+)"/
       );
       const title = titleMatch ? titleMatch[1].trim() : "";
+      if (!title) continue;
 
       const magnetMatch = row.match(/href="(magnet:\?[^"]+)"/);
       if (!magnetMatch) continue;
@@ -516,21 +518,13 @@ export async function scrapeAniDex(
 
     const magnets: MagnetLink[] = [];
 
-    // AniDex uses different HTML structure
-    // Look for magnet links in torrent rows
-    const magnetRegex = /href="(magnet:\?[^"]+)"/g;
-    let match;
-    while ((match = magnetRegex.exec(html)) !== null) {
-      // We iterate to advance the regex; matches are extracted per-entry below
-    }
-
     // AniDex structure: Look for torrent entries
     const entries: string[] = [];
     let currentEntry = "";
     let inEntry = false;
 
     for (const line of html.split("\n")) {
-      if (line.includes('<tr') && line.includes('torrent')) {
+      if (line.includes('<tr') && (line.includes('torrent') || line.includes('table-row') || line.includes('torrent-row'))) {
         inEntry = true;
         currentEntry = line;
       } else if (inEntry) {
@@ -552,6 +546,7 @@ export async function scrapeAniDex(
       // Extract title from link
       const titleMatch = entry.match(/<td[^>]*class="[^"]*title[^"]*"[^>]*>\s*<a[^>]*>([^<]+)<\/a>/);
       const title = titleMatch ? titleMatch[1].trim() : "";
+      if (!title) continue;
 
       const magnetMatch = entry.match(/href="(magnet:\?[^"]+)"/);
       if (!magnetMatch) continue;
@@ -765,14 +760,16 @@ interface CacheData {
 /**
  * Ensure cache directory exists
  */
-function ensureCacheDir(): void {
+async function ensureCacheDir(): Promise<void> {
   if (typeof window === "undefined") {
     // Node.js environment
-    const fs = require("fs");
-    const path = require("path");
-    const cachePath = path.join(process.cwd(), CACHE_DIR);
-    if (!fs.existsSync(cachePath)) {
-      fs.mkdirSync(cachePath, { recursive: true });
+    try {
+      const fs = await import('fs');
+      const path = await import('path');
+      const cachePath = path.join(process.cwd(), CACHE_DIR);
+      await fs.promises.mkdir(cachePath, { recursive: true });
+    } catch (error) {
+      // Silent error handling - directory may already exist
     }
   }
 }
@@ -780,7 +777,7 @@ function ensureCacheDir(): void {
 /**
  * Load cache from file
  */
-function loadCache(): CacheData {
+async function loadCache(): Promise<CacheData> {
   try {
     if (typeof window !== "undefined") {
       // Browser environment - use localStorage
@@ -788,12 +785,14 @@ function loadCache(): CacheData {
       return cached ? JSON.parse(cached) : { entries: {}, lastUpdated: 0 };
     } else {
       // Node.js environment
-      const fs = require("fs");
-      const path = require("path");
+      const fs = await import('fs');
+      const path = await import('path');
       const cachePath = path.join(process.cwd(), CACHE_FILE);
-      if (fs.existsSync(cachePath)) {
-        const data = fs.readFileSync(cachePath, "utf-8");
+      try {
+        const data = await fs.promises.readFile(cachePath, "utf-8");
         return JSON.parse(data);
+      } catch {
+        // File doesn't exist or can't be read
       }
     }
   } catch (error) {
@@ -805,7 +804,7 @@ function loadCache(): CacheData {
 /**
  * Save cache to file
  */
-function saveCache(data: CacheData): void {
+async function saveCache(data: CacheData): Promise<void> {
   try {
     data.lastUpdated = Date.now();
     if (typeof window !== "undefined") {
@@ -813,11 +812,11 @@ function saveCache(data: CacheData): void {
       localStorage.setItem("torrent-cache", JSON.stringify(data));
     } else {
       // Node.js environment
-      ensureCacheDir();
-      const fs = require("fs");
-      const path = require("path");
+      await ensureCacheDir();
+      const fs = await import('fs');
+      const path = await import('path');
       const cachePath = path.join(process.cwd(), CACHE_FILE);
-      fs.writeFileSync(cachePath, JSON.stringify(data, null, 2));
+      await fs.promises.writeFile(cachePath, JSON.stringify(data, null, 2));
     }
   } catch (error) {
     console.error("[Cache] Error saving cache:", error);
@@ -834,11 +833,11 @@ export function getCacheKey(animeId: number, episode: number): string {
 /**
  * Get cached magnet links
  */
-export function getCachedMagnets(
+export async function getCachedMagnets(
   animeId: number,
   episode: number
-): MagnetLink[] | undefined {
-  const cache = loadCache();
+): Promise<MagnetLink[] | undefined> {
+  const cache = await loadCache();
   const key = getCacheKey(animeId, episode);
   const entry = cache.entries[key];
 
@@ -851,7 +850,7 @@ export function getCachedMagnets(
   if (age > CACHE_TTL) {
     // Cache expired, remove it
     delete cache.entries[key];
-    saveCache(cache);
+    await saveCache(cache);
     return undefined;
   }
 
@@ -868,7 +867,7 @@ export function cacheMagnets(
   magnets: MagnetLink[]
 ): void {
   cacheWriteLock = cacheWriteLock.then(async () => {
-    const cache = loadCache();
+    const cache = await loadCache();
     const key = getCacheKey(animeId, episode);
 
     cache.entries[key] = {
@@ -878,11 +877,11 @@ export function cacheMagnets(
       timestamp: Date.now(),
     };
 
-    saveCache(cache);
+    await saveCache(cache);
     console.log(`[Cache] STORED ${key} with ${magnets.length} magnets`);
 
     // Clean up old entries
-    cleanupOldCache(cache);
+    await cleanupOldCache(cache);
   }).catch((err) => {
     console.error('[Cache] Error in cacheMagnets:', err);
   });
@@ -891,7 +890,7 @@ export function cacheMagnets(
 /**
  * Clean up old cache entries
  */
-function cleanupOldCache(cache: CacheData): void {
+async function cleanupOldCache(cache: CacheData): Promise<void> {
   const now = Date.now();
   const keysToDelete: string[] = [];
 
@@ -908,7 +907,7 @@ function cleanupOldCache(cache: CacheData): void {
   }
 
   if (keysToDelete.length > 0) {
-    saveCache(cache);
+    await saveCache(cache);
     console.log(`[Cache] Cleaned up ${keysToDelete.length} old entries`);
   }
 }
@@ -942,24 +941,28 @@ export async function findTorrentSources(
   episode: number,
   animeTitle?: string
 ): Promise<MagnetLink[]> {
+  // Input validation (M1)
+  if (!animeTitle || typeof animeTitle !== 'string') return [];
+  animeTitle = animeTitle.slice(0, 200).replace(/[<>"'\\]/g, '');
+  episode = Math.max(1, Math.floor(Number(episode) || 1));
+
   // Check cache first
-  const cached = getCachedMagnets(animeId, episode);
+  const cached = await getCachedMagnets(animeId, episode);
   if (cached && cached.length > 0) {
     return cached;
   }
 
-  if (!animeTitle) {
-    console.warn(`[Torrent] No anime title provided for animeId ${animeId}`);
-    return [];
-  }
-
   console.log(`[Torrent] Finding sources for: ${animeTitle} Episode ${episode}`);
 
-  // Try all sources in parallel with timeout
+  // Try all sources in parallel with timeout, threading AbortController through
+  const nyaaController = new AbortController();
+  const nyaaLandController = new AbortController();
+  const anidexController = new AbortController();
+
   const results = await Promise.allSettled([
-    withTimeout(scrapeNyaa(animeTitle, episode), 15000),
-    withTimeout(scrapeNyaaLand(animeTitle, episode), 15000),
-    withTimeout(scrapeAniDex(animeTitle, episode), 15000),
+    withTimeout(scrapeNyaa(animeTitle, episode), 15000, nyaaController),
+    withTimeout(scrapeNyaaLand(animeTitle, episode), 15000, nyaaLandController),
+    withTimeout(scrapeAniDex(animeTitle, episode), 15000, anidexController),
   ]);
 
   // Collect all successful results
@@ -1036,12 +1039,15 @@ function removeDuplicateMagnets(magnets: MagnetLink[]): MagnetLink[] {
 }
 
 /**
- * Add timeout to a promise
+ * Add timeout to a promise with optional abort controller support
  */
-async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, abortController?: AbortController): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeoutPromise = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`Timeout after ${timeoutMs}ms`)), timeoutMs);
+    timer = setTimeout(() => {
+      if (abortController) abortController.abort();
+      reject(new Error(`Timeout after ${timeoutMs}ms`));
+    }, timeoutMs);
   });
   try {
     return await Promise.race([promise, timeoutPromise]);
