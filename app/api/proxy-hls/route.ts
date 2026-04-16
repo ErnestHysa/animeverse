@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import logger from "@/lib/logger";
 import { isProxyAuthenticated } from "@/lib/auth";
-import { isUrlAllowed, getAllowedOrigin } from "@/lib/ssrf-protection";
+import { isUrlAllowed, buildCorsHeaders } from "@/lib/ssrf-protection";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -262,9 +262,7 @@ export async function GET(request: NextRequest) {
         status: 200,
         headers: {
           "Content-Type": contentType,
-          "Access-Control-Allow-Origin": getAllowedOrigin(request),
-          "Access-Control-Allow-Methods": "GET, OPTIONS",
-          "Access-Control-Allow-Headers": "Range, Content-Type",
+          ...buildCorsHeaders(request, 'GET, OPTIONS', 'Range, Content-Type'),
           "Cache-Control": "public, max-age=300", // 5 minutes for manifests
         },
       });
@@ -274,9 +272,7 @@ export async function GET(request: NextRequest) {
     const contentLengthHeader = response.headers.get("content-length");
     const headers: Record<string, string> = {
       "Content-Type": contentType,
-      "Access-Control-Allow-Origin": getAllowedOrigin(request),
-      "Access-Control-Allow-Methods": "GET, OPTIONS",
-      "Access-Control-Allow-Headers": "Range, Content-Type",
+      ...buildCorsHeaders(request, 'GET, OPTIONS', 'Range, Content-Type'),
       "Cache-Control": type === "video" ? "public, max-age=3600" : "public, max-age=86400", // 1 hour for videos, 24 hours for segments
       "Accept-Ranges": "bytes",
     };
@@ -331,9 +327,7 @@ export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
     status: 200,
     headers: {
-      "Access-Control-Allow-Origin": getAllowedOrigin(request),
-      "Access-Control-Allow-Methods": "GET, OPTIONS",
-      "Access-Control-Allow-Headers": "Range, Content-Type",
+      ...buildCorsHeaders(request, 'GET, OPTIONS', 'Range, Content-Type'),
     },
   });
 }

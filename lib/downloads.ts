@@ -30,12 +30,20 @@ const STALE_DOWNLOAD_THRESHOLD = 5 * 60 * 1000;
 
 class DownloadManager {
   private db: IDBDatabase | null = null;
+  private initPromise: Promise<void> | null = null;
+  private activeBlobUrls = new Map<string, string>(); // cacheKey -> blobUrl
 
   async init(): Promise<void> {
-    return new Promise((resolve, reject) => {
+    if (this.db) return;
+    if (this.initPromise) return this.initPromise;
+
+    this.initPromise = new Promise<void>((resolve, reject) => {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-      request.onerror = () => reject(request.error);
+      request.onerror = () => {
+        this.initPromise = null;
+        reject(request.error);
+      };
       request.onsuccess = async () => {
         this.db = request.result;
         // Clean up stale downloads after opening
@@ -52,6 +60,8 @@ class DownloadManager {
         }
       };
     });
+
+    return this.initPromise;
   }
 
   /**
@@ -363,10 +373,29 @@ class DownloadManager {
 
     if (response) {
       const blob = await response.blob();
-      return URL.createObjectURL(blob);
+
+      // Revoke previous blob URL if exists for this key
+      const prevUrl = this.activeBlobUrls.get(videoUrl);
+      if (prevUrl) {
+        URL.revokeObjectURL(prevUrl);
+      }
+
+      const blobUrl = URL.createObjectURL(blob);
+      this.activeBlobUrls.set(videoUrl, blobUrl);
+      return blobUrl;
     }
 
     return null;
+  }
+
+  /**
+   * Revoke all active blob URLs to free memory
+   */
+  revokeAllBlobUrls(): void {
+    for (const url of this.activeBlobUrls.values()) {
+      URL.revokeObjectURL(url);
+    }
+    this.activeBlobUrls.clear();
   }
 }
 

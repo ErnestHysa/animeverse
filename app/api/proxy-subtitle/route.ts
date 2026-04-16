@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { isProxyAuthenticated } from "@/lib/auth";
-import { isUrlAllowed, getAllowedOrigin } from "@/lib/ssrf-protection";
+import { isUrlAllowed, buildCorsHeaders } from "@/lib/ssrf-protection";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -111,8 +111,7 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         "Content-Type": "text/vtt; charset=utf-8",
-        "Access-Control-Allow-Origin": getAllowedOrigin(request),
-        "Access-Control-Allow-Methods": "GET",
+        ...buildCorsHeaders(request, 'GET', 'Content-Type'),
         "Cache-Control": "public, max-age=86400", // Cache for 24 hours
       },
     });

@@ -129,6 +129,16 @@ export function UserRating({ animeId, animeTitle, compact = false }: UserRatingP
               onClick={() => handleScoreClick(score)}
               onMouseEnter={() => setHoveredScore(score)}
               onMouseLeave={() => setHoveredScore(null)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleScoreClick(score);
+                }
+              }}
+              aria-label={`Rate ${score} out of 10`}
+              role="radio"
+              aria-checked={rating?.score === score}
+              tabIndex={0}
               className={cn(
                 "w-7 h-7 rounded text-xs font-bold transition-all",
                 isActive

@@ -11,6 +11,10 @@ import type { SeedSession, SeedStats, SeedAchievement, SeedRank } from "@/types/
 // Constants
 // ===================================
 
+// NOTE: lib/achievements.ts is the canonical achievement definition source.
+// The SEED_ACHIEVEMENTS and SEED_RANKS defined here are seed-specific and
+// re-exported via achievements.ts for unified consumer access.
+
 export const SEED_ACHIEVEMENTS: SeedAchievement[] = [
   {
     id: "first_seed",
@@ -172,7 +176,14 @@ export function updateSeedSession(
 ): SeedSession {
   const now = Date.now();
   const duration = Math.floor((now - session.startedAt) / 1000);
-  const seedRatio = downloaded > 0 ? uploaded / downloaded : uploaded > 0 ? Infinity : 0;
+  let seedRatio: number;
+  if (downloaded === 0 && uploaded > 0) {
+    seedRatio = 999; // Cap instead of Infinity to avoid corrupting averages
+  } else if (downloaded > 0) {
+    seedRatio = uploaded / downloaded;
+  } else {
+    seedRatio = 0;
+  }
 
   return {
     ...session,
@@ -206,10 +217,12 @@ export function calculateSeedStats(sessions: SeedSession[]): SeedStats {
   const totalSeededTime = completedSessions.reduce((sum, s) => sum + s.duration, 0);
   const totalPeersHelped = completedSessions.reduce((sum, s) => sum + s.peers, 0);
 
-  const averageSeedRatio =
-    completedSessions.length > 0
-      ? completedSessions.reduce((sum, s) => sum + s.seedRatio, 0) / completedSessions.length
-      : 0;
+  const validRatios = completedSessions
+    .filter(s => isFinite(s.seedRatio))
+    .map(s => s.seedRatio);
+  const averageSeedRatio = validRatios.length > 0
+    ? validRatios.reduce((sum, r) => sum + r, 0) / validRatios.length
+    : 0;
 
   return {
     totalSessions: completedSessions.length,
@@ -280,6 +293,7 @@ export function getSeedRank(stats: SeedStats): SeedRank {
  * Format bytes to human-readable string
  */
 export function formatBytes(bytes: number): string {
+  if (bytes < 0) bytes = 0;
   if (bytes === 0) return "0 B";
 
   const k = 1024;

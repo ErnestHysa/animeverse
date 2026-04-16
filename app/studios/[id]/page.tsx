@@ -10,6 +10,7 @@ import { anilist } from "@/lib/anilist";
 import { Building2, ArrowLeft } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 
 interface StudioPageProps {
   params: Promise<{
@@ -17,8 +18,8 @@ interface StudioPageProps {
   }>;
 }
 
-async function getStudioAnime(studioId: string) {
-  const result = await anilist.getByStudio(parseInt(studioId), 1, 50);
+async function getStudioAnime(studioIdNum: number) {
+  const result = await anilist.getByStudio(studioIdNum, 1, 50);
   return {
     anime: result.data?.Page.media ?? [],
     total: result.data?.Page.pageInfo.total ?? 0,
@@ -27,7 +28,28 @@ async function getStudioAnime(studioId: string) {
 
 export default async function StudioDetailPage({ params }: StudioPageProps) {
   const { id } = await params;
-  const { anime, total } = await getStudioAnime(id);
+
+  // L4: NaN guard for studioId
+  const studioIdNum = parseInt(id, 10);
+  if (isNaN(studioIdNum) || studioIdNum <= 0) {
+    return notFound();
+  }
+
+  let anime: Awaited<ReturnType<typeof getStudioAnime>>["anime"];
+  let total: number;
+  try {
+    const data = await getStudioAnime(studioIdNum);
+    anime = data.anime;
+    total = data.total;
+  } catch (error) {
+    console.error('Failed to load studio page:', error);
+    return (
+      <div className="container mx-auto px-4 py-8 text-center">
+        <h2 className="text-2xl font-bold text-red-400">Failed to load content</h2>
+        <p className="text-gray-400 mt-2">Please try again later.</p>
+      </div>
+    );
+  }
 
   if (anime.length === 0) {
     return (
@@ -54,7 +76,7 @@ export default async function StudioDetailPage({ params }: StudioPageProps) {
   }
 
   // Get studio name from first anime
-  const studioName = anime[0]?.studios?.nodes.find((s) => s.id === parseInt(id))?.name || "Unknown Studio";
+  const studioName = anime[0]?.studios?.nodes.find((s) => s.id === studioIdNum)?.name || "Unknown Studio";
 
   return (
     <>

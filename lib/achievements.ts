@@ -1,6 +1,10 @@
 /**
  * Achievement System
  * Gamification to increase user engagement
+ *
+ * CANONICAL SOURCE: This file is the canonical achievement definition source.
+ * Other modules (e.g., seed-tracker.ts) should reference achievement definitions
+ * from here rather than maintaining their own parallel achievement arrays.
  */
 
 export interface Achievement {
@@ -185,3 +189,11 @@ export function getAchievementRequirement(achievementId: string): number {
   const achievement = ACHIEVEMENTS.find((a) => a.id === achievementId);
   return achievement?.requirement || 0;
 }
+
+// ===================================
+// Re-exports for unified achievement access
+// ===================================
+
+// Re-export seed-tracker achievements and ranks so consumers can import
+// from this canonical module instead of reaching into seed-tracker directly.
+export { SEED_ACHIEVEMENTS, SEED_RANKS, checkSeedAchievements, getSeedRank } from "./seed-tracker";

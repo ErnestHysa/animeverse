@@ -152,9 +152,16 @@ export async function POST(
     const body = await request.json();
     const { magnet, quality } = body;
 
-    if (!magnet) {
+    if (!magnet || typeof magnet !== 'string' || !magnet.startsWith('magnet:')) {
       return NextResponse.json(
-        { success: false, message: "Magnet link is required" },
+        { success: false, message: 'Invalid magnet URI' },
+        { status: 400 }
+      );
+    }
+
+    if (quality !== undefined && (typeof quality !== 'string' || !quality.trim())) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid quality value' },
         { status: 400 }
       );
     }

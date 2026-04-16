@@ -27,7 +27,18 @@ async function fetchHiddenGems() {
 // ===================================
 
 async function HiddenGemsGrid() {
-  const anime = await fetchHiddenGems();
+  let anime;
+  try {
+    anime = await fetchHiddenGems();
+  } catch (error) {
+    console.error('Failed to load hidden gems:', error);
+    return (
+      <div className="container mx-auto px-4 py-8 text-center">
+        <h2 className="text-2xl font-bold text-red-400">Failed to load content</h2>
+        <p className="text-gray-400 mt-2">Please try again later.</p>
+      </div>
+    );
+  }
 
   if (anime.length === 0) {
     return (

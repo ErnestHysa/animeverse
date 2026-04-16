@@ -114,7 +114,7 @@ export function SeedStatsPanel({ stats, achievements = [] }: SeedStatsPanelProps
             </div>
             <div className="text-xs text-gray-500">
               {formatBytes(
-                rankProgress.next.requirement.value - stats.totalUploaded
+                Math.max(0, rankProgress.next.requirement.value - stats.totalUploaded)
               )}{" "}
               remaining
             </div>

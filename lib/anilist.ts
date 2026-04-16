@@ -59,9 +59,46 @@ class AniListClient {
   private readonly url: string;
   private readonly options: RequestInit;
 
+  // Rate limiter: AniList allows ~90 req/min, we stay at 80 for headroom
+  private rateLimiter = {
+    calls: [] as number[],
+    maxCalls: 80,
+    windowMs: 60_000,
+
+    async wait(): Promise<void> {
+      const now = Date.now();
+      this.calls = this.calls.filter(t => now - t < this.windowMs);
+      if (this.calls.length >= this.maxCalls) {
+        const oldestInWindow = this.calls[0];
+        const waitTime = this.windowMs - (now - oldestInWindow) + 100;
+        await new Promise(r => setTimeout(r, waitTime));
+      }
+      this.calls.push(Date.now());
+    }
+  };
+
   constructor() {
     this.url = ANILIST_API_URL;
     this.options = API_CONFIG.anilist.defaultOptions;
+  }
+
+  /**
+   * Retry with exponential backoff for transient failures (429, 5xx)
+   */
+  private async fetchWithRetry(url: string, options: RequestInit, maxRetries: number = 3): Promise<Response> {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      const response = await fetch(url, options);
+      if (response.status === 429 || response.status >= 500) {
+        if (attempt < maxRetries) {
+          const backoffMs = Math.pow(2, attempt) * 1000 + Math.random() * 500;
+          await new Promise(r => setTimeout(r, backoffMs));
+          continue;
+        }
+      }
+      return response;
+    }
+    // Should not reach here, but satisfy TypeScript
+    throw new Error("Max retries exceeded");
   }
 
   private async query<T>(
@@ -69,10 +106,12 @@ class AniListClient {
     variables: Record<string, unknown> = {}
   ): Promise<APIResult<T>> {
     try {
+      await this.rateLimiter.wait();
+
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 10000);
 
-      const response = await fetch(this.url, {
+      const response = await this.fetchWithRetry(this.url, {
         ...this.options,
         body: JSON.stringify({ query, variables }),
         next: { revalidate: 300 },
@@ -261,7 +300,9 @@ class AniListClient {
       }
     }`;
     try {
-      const response = await fetch(this.url, {
+      await this.rateLimiter.wait();
+
+      const response = await this.fetchWithRetry(this.url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

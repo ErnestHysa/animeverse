@@ -35,6 +35,20 @@ export function ShareStatsCard({
     canvas.height = 360;
     const ctx = canvas.getContext("2d")!;
 
+    // Polyfill roundRect for older browsers
+    if (!CanvasRenderingContext2D.prototype.roundRect) {
+      CanvasRenderingContext2D.prototype.roundRect = function (x: number, y: number, w: number, h: number, radii: number | number[]) {
+        const r = typeof radii === 'number' ? radii : Array.isArray(radii) ? radii[0] : 0;
+        this.moveTo(x + r, y);
+        this.arcTo(x + w, y, x + w, y + h, r);
+        this.arcTo(x + w, y + h, x, y + h, r);
+        this.arcTo(x, y + h, x, y, r);
+        this.arcTo(x, y, x + w, y, r);
+        this.closePath();
+        return this;
+      };
+    }
+
     // Background gradient
     const grad = ctx.createLinearGradient(0, 0, 600, 360);
     grad.addColorStop(0, "#0f0c29");

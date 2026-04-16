@@ -48,9 +48,12 @@ export function WebTorrentPlayer({
   const videoRef = useRef<HTMLVideoElement>(null);
   const clientRef = useRef<any>(null);
   const torrentRef = useRef<any>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const [isClientReady, setIsClientReady] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const isLoadingRef = useRef(isLoading);
+  isLoadingRef.current = isLoading;
   const [isPlaying, setIsPlaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<TorrentProgress>({
@@ -142,7 +145,7 @@ export function WebTorrentPlayer({
 
     // Add timeout for torrent loading
     const loadTimeout = setTimeout(() => {
-      if (isLoading) {
+      if (isLoadingRef.current) {
         const timeoutMsg = "Torrent loading timeout. No seeds found.";
         setError(timeoutMsg);
         setIsLoading(false);
@@ -180,8 +183,8 @@ export function WebTorrentPlayer({
 
       console.log("[WebTorrent] Video file found:", videoFile.name);
 
-      // Stream to video element
-      videoFile.appendTo(document.body, (err: Error) => {
+      // Stream to video element via dedicated container
+      videoFile.appendTo(containerRef.current, (err: Error) => {
         if (err) {
           setError(err.message);
           setIsLoading(false);
@@ -190,8 +193,8 @@ export function WebTorrentPlayer({
           return;
         }
 
-        // Get the video element created by WebTorrent
-        const videoElement = document.querySelector("video");
+        // Get the video element created by WebTorrent (scoped to container)
+        const videoElement = containerRef.current?.querySelector("video");
         if (videoElement && videoRef.current) {
           // Replace the WebTorrent video with our controlled video element
           videoRef.current.src = videoElement.src;
@@ -203,17 +206,23 @@ export function WebTorrentPlayer({
         }
       });
 
-      // Update progress
+      // Update progress (throttled to avoid excessive re-renders)
+      let lastProgressUpdate = 0;
+      const PROGRESS_THROTTLE_MS = 500;
       torrent.on("download", () => {
-        setProgress({
-          progress: torrent.progress,
-          downloadSpeed: torrent.downloadSpeed,
-          uploadSpeed: torrent.uploadSpeed,
-          numPeers: torrent.numPeers,
-          timeRemaining: torrent.timeRemaining,
-          downloaded: torrent.downloaded,
-          uploaded: torrent.uploaded,
-        });
+        const now = Date.now();
+        if (now - lastProgressUpdate >= PROGRESS_THROTTLE_MS) {
+          lastProgressUpdate = now;
+          setProgress({
+            progress: torrent.progress,
+            downloadSpeed: torrent.downloadSpeed,
+            uploadSpeed: torrent.uploadSpeed,
+            numPeers: torrent.numPeers,
+            timeRemaining: torrent.timeRemaining,
+            downloaded: torrent.downloaded,
+            uploaded: torrent.uploaded,
+          });
+        }
       });
 
       torrent.on("upload", () => {
@@ -241,7 +250,7 @@ export function WebTorrentPlayer({
     return () => {
       clearTimeout(loadTimeout);
     };
-  }, [isClientReady, magnet, infoHash, onReady, onError, isLoading]);
+  }, [isClientReady, magnet, infoHash, onReady, onError]);
 
   // Toggle play/pause
   const togglePlayPause = useCallback(() => {
@@ -283,6 +292,9 @@ export function WebTorrentPlayer({
 
   return (
     <div className={`webtorrent-player relative ${className}`}>
+      {/* Hidden container for WebTorrent video injection */}
+      <div ref={containerRef} style={{ display: "none" }} />
+
       {/* Video Element */}
       <video
         ref={videoRef}

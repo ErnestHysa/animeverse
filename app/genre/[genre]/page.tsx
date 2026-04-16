@@ -90,7 +90,18 @@ export default async function GenreDetailPage({ params, searchParams }: GenrePag
   const { page: pageParam } = await searchParams;
   const page = parseInt(pageParam || "1", 10);
 
-  const data = await getGenreAnime(genre, page);
+  let data;
+  try {
+    data = await getGenreAnime(genre, page);
+  } catch (error) {
+    console.error('Failed to load genre page:', error);
+    return (
+      <div className="container mx-auto px-4 py-8 text-center">
+        <h2 className="text-2xl font-bold text-red-400">Failed to load content</h2>
+        <p className="text-gray-400 mt-2">Please try again later.</p>
+      </div>
+    );
+  }
 
   if (!data) {
     notFound();

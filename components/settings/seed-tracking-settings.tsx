@@ -182,7 +182,7 @@ export function SeedTrackingSettings() {
                   </div>
                   <div className="text-xs text-gray-500">
                     {formatBytes(
-                      rankProgress.next.requirement.value - stats.totalUploaded
+                      Math.max(0, rankProgress.next.requirement.value - stats.totalUploaded)
                     )}{" "}
                     remaining
                   </div>
@@ -291,7 +291,7 @@ export function SeedTrackingSettings() {
       {/* View Detailed Stats Button */}
       <button
         onClick={() => {
-          window.open("/admin/magnets", "_blank");
+          window.open("/stats", "_blank");
         }}
         className="w-full px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors flex items-center justify-center gap-2"
       >

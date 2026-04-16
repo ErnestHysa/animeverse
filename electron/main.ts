@@ -356,11 +356,23 @@ function extractInfoHash(magnetUri: string): string {
 // Configuration Management
 // ===================================
 
+function sanitizeConfig(parsed: unknown): Record<string, unknown> {
+  if (typeof parsed !== 'object' || parsed === null) return {};
+  const safe: Record<string, unknown> = {};
+  const allowedKeys = Object.keys(DEFAULT_CONFIG);
+  for (const key of allowedKeys) {
+    if (key in parsed && key !== '__proto__' && key !== 'constructor' && key !== 'prototype') {
+      safe[key] = (parsed as Record<string, unknown>)[key];
+    }
+  }
+  return safe;
+}
+
 function loadConfig(): void {
   try {
     if (fs.existsSync(CONFIG_PATH)) {
       const data = fs.readFileSync(CONFIG_PATH, "utf-8");
-      config = { ...DEFAULT_CONFIG, ...JSON.parse(data) };
+      config = { ...DEFAULT_CONFIG, ...sanitizeConfig(JSON.parse(data)) };
     }
   } catch (error) {
     console.error("[AnimeStreamDesktop] Failed to load config:", error);

@@ -439,24 +439,18 @@ export default function SettingsPage() {
     }
   }, [isAuthenticated, anilistUser, anilistToken, setAniListAuth, fetchAniListData, setMALAuth]);
 
-  // Login with AniList using Authorization Code Grant
-  // This is the proper OAuth 2.0 flow with client_secret
+  // Login with AniList via server-side initiation route
+  // Fix H8: The server route generates a CSRF state parameter and stores it in a cookie
+  // before redirecting to AniList, which the callback validates.
   const handleAniListLogin = () => {
-    if (!clientId) {
-      toast.error("AniList OAuth is not configured. Set NEXT_PUBLIC_ANILIST_CLIENT_ID in your environment.", { duration: 8000 });
-      return;
-    }
-    const redirectUri = `${window.location.origin}/auth/anilist/callback`;
-    const authUrl = `https://anilist.co/api/v2/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
-
-    toast(`Redirecting to AniList...\n\nMake sure your AniList app has this redirect URL:\n${redirectUri}`, {
-      duration: 5000,
+    toast('Redirecting to AniList...', {
+      duration: 3000,
       icon: '🔗',
     });
 
     // Small delay to allow toast to show
     setTimeout(() => {
-      window.location.href = authUrl;
+      window.location.href = '/auth/anilist';
     }, 100);
   };
 

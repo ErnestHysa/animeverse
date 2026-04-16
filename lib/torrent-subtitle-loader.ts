@@ -248,6 +248,36 @@ export async function loadSubtitlesFromTorrent(
 // ===================================
 
 /**
+ * Detect encoding of a subtitle file buffer using heuristic approaches:
+ * - Check BOM for UTF-8/UTF-16
+ * - Try strict UTF-8 validation
+ * - Fall back to Shift-JIS detection or windows-1252
+ */
+function detectEncoding(buffer: Buffer): string {
+  // Check BOM (Byte Order Mark)
+  if (buffer.length >= 3 && buffer[0] === 0xEF && buffer[1] === 0xBB && buffer[2] === 0xBF) return 'utf-8';
+  if (buffer.length >= 2 && buffer[0] === 0xFF && buffer[1] === 0xFE) return 'utf-16le';
+  if (buffer.length >= 2 && buffer[0] === 0xFE && buffer[1] === 0xFF) return 'utf-16be';
+
+  // Try UTF-8 validation using fatal mode
+  try {
+    const decoder = new TextDecoder('utf-8', { fatal: true });
+    decoder.decode(buffer);
+    return 'utf-8';
+  } catch {
+    // Not valid UTF-8 — check for common Shift-JIS patterns
+    // (high bytes 0x81-0x9F or 0xE0-0xEF followed by valid second byte)
+    const hasShiftJIS = buffer.some((b, i) =>
+      i > 0 &&
+      ((buffer[i - 1] >= 0x81 && buffer[i - 1] <= 0x9F) || (buffer[i - 1] >= 0xE0 && buffer[i - 1] <= 0xEF)) &&
+      b >= 0x40 && b <= 0xFC && b !== 0x7F
+    );
+    if (hasShiftJIS) return 'shift-jis';
+    return 'windows-1252'; // safe fallback for most Latin text
+  }
+}
+
+/**
  * Load subtitle file and create blob URL
  */
 export async function loadSubtitleFile(file: any): Promise<string | null> {
@@ -265,9 +295,11 @@ export async function loadSubtitleFile(file: any): Promise<string | null> {
       });
     });
 
-    // Convert to text
-    const decoder = new TextDecoder("utf-8");
-    let content = decoder.decode(arrayBuffer);
+    // Convert to text using encoding detection
+    const buffer = Buffer.from(arrayBuffer);
+    const encoding = detectEncoding(buffer);
+    const decoder = new TextDecoder(encoding);
+    let content = decoder.decode(buffer);
 
     // Convert to VTT if needed
     if (file.name.endsWith(".srt")) {

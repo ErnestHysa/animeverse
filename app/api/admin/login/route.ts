@@ -11,12 +11,16 @@ import {
   isUsernameLocked,
   recordFailedLogin,
   clearLoginAttempts,
+  verifyToken,
+  blacklistToken,
 } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 // IP-based rate limiting
+// TODO (M11): In-memory rate limiting resets on server restart. For production,
+// migrate to Redis-backed rate limiting so limits persist across restarts.
 const ipLoginAttempts = new Map<string, { count: number; resetTime: number }>();
 const MAX_LOGIN_ATTEMPTS = 10;
 const LOCKOUT_DURATION = 60 * 1000; // 1 minute
@@ -198,8 +202,32 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
 /**
  * DELETE handler - Logout
+ * Fix H10: Blacklists the JWT token so it cannot be reused after logout
  */
-export async function DELETE(_request: NextRequest): Promise<NextResponse> {
+export async function DELETE(request: NextRequest): Promise<NextResponse> {
+  // Fix H10: Extract and blacklist the token before clearing cookie
+  const authHeader = request.headers.get('authorization');
+  let token: string | null = null;
+
+  if (authHeader?.startsWith('Bearer ')) {
+    token = authHeader.substring(7);
+  } else {
+    try {
+      const { cookies: getCookies } = await import('next/headers');
+      const cookieStore = await getCookies();
+      token = cookieStore.get('auth_token')?.value || null;
+    } catch {
+      // Cookie not available
+    }
+  }
+
+  if (token) {
+    const payload = verifyToken(token);
+    if (payload?.jti && payload.exp) {
+      blacklistToken(payload.jti, payload.exp);
+    }
+  }
+
   const response = NextResponse.json({ success: true });
 
   // Clear auth cookies

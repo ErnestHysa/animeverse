@@ -43,7 +43,16 @@ export function useFeatureFlag(featureKey: FeatureKey): UseFeatureFlagResult {
   useEffect(() => {
     const checkFeatureFlag = async () => {
       try {
-        // Get user context from localStorage (set by your auth system)
+        // WARNING: Reading role from localStorage is NOT secure — an attacker can
+        // set `localStorage.setItem('userRole', 'admin')` to bypass feature gates.
+        // These headers are sent as "client-claimed" hints only and MUST NOT be
+        // trusted by any server-side logic. The server-side feature flag API (if one
+        // exists) MUST validate the user's role against the authenticated session
+        // (e.g. JWT token) and ignore these headers entirely.
+        //
+        // TODO: Implement server-side /api/feature-flags route that resolves the
+        // user's actual role from the session/token and do NOT rely on these
+        // client-provided headers for authorization decisions.
         const userId = localStorage.getItem('userId');
         const email = localStorage.getItem('userEmail');
         const isAdmin = localStorage.getItem('userRole') === 'admin';
@@ -53,10 +62,11 @@ export function useFeatureFlag(featureKey: FeatureKey): UseFeatureFlagResult {
           `/api/feature-flags?feature=${featureKey}`,
           {
             headers: {
-              'x-user-id': userId || '',
-              'x-user-email': email || '',
-              'x-user-role': isAdmin ? 'admin' : 'user',
-              'x-user-beta': isBetaTester ? 'true' : 'false',
+              // Client-claimed identity — NOT authoritative. Server must validate via session/token.
+              'x-client-claimed-user-id': userId || '',
+              'x-client-claimed-email': email || '',
+              'x-client-claimed-role': isAdmin ? 'admin' : 'user',
+              'x-client-claimed-beta': isBetaTester ? 'true' : 'false',
             },
           }
         );
@@ -91,6 +101,10 @@ export function useFeatureFlag(featureKey: FeatureKey): UseFeatureFlagResult {
 /**
  * Server-side function to check feature flags
  * Use in API routes or getServerSideProps
+ *
+ * WARNING: The caller MUST derive userContext from the authenticated session
+ * (e.g. JWT token or server-side cookie), NOT from client-provided headers or
+ * localStorage. Passing client-controlled values here would bypass role checks.
  */
 export async function checkFeatureFlagServer(
   featureKey: FeatureKey,
@@ -106,6 +120,8 @@ export async function checkFeatureFlagServer(
       `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/feature-flags?feature=${featureKey}`,
       {
         headers: {
+          // These are server-to-server headers; the caller is responsible for
+          // ensuring userContext comes from an authenticated session, not client input.
           'x-user-id': userContext.userId?.toString() || '',
           'x-user-email': userContext.email || '',
           'x-user-role': userContext.isAdmin ? 'admin' : 'user',

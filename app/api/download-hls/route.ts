@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { isProxyAuthenticated } from '@/lib/auth';
-import { isUrlAllowed, getAllowedOrigin } from '@/lib/ssrf-protection';
+import { isUrlAllowed, buildCorsHeaders } from '@/lib/ssrf-protection';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -347,9 +347,7 @@ export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
     status: 200,
     headers: {
-      'Access-Control-Allow-Origin': getAllowedOrigin(request),
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      ...buildCorsHeaders(request, 'GET, OPTIONS', 'Content-Type'),
     },
   });
 }

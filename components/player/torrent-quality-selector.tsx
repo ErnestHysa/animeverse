@@ -11,7 +11,7 @@
 
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { ChevronDown, Check, Users, Download, Upload, AlertCircle } from "lucide-react";
 import type { MagnetLink } from "@/lib/torrent-finder";
 import {
@@ -46,6 +46,19 @@ export function TorrentQualitySelector({
   const [isOpen, setIsOpen] = useState(false);
   const [selectedQuality, setSelectedQuality] = useState<string>("");
   const [showDetails, setShowDetails] = useState<string | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
 
   // Group torrents by quality
   const qualityGroups = useMemo(() => {
@@ -141,7 +154,7 @@ export function TorrentQualitySelector({
   };
 
   return (
-    <div className={`torrent-quality-selector ${className}`}>
+    <div ref={dropdownRef} className={`torrent-quality-selector ${className}`}>
       {/* Selected Quality Display */}
       <button
         onClick={() => setIsOpen(!isOpen)}

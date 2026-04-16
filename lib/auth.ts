@@ -8,6 +8,7 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import { cookies } from 'next/headers';
+import { randomUUID } from 'crypto';
 
 // ===================================
 // Types
@@ -26,6 +27,7 @@ export interface AuthTokenPayload {
   userId: string;
   username: string;
   role: string;
+  jti?: string;      // Fix H10: JWT ID for token blacklisting
   iat?: number;
   exp?: number;
 }
@@ -47,17 +49,63 @@ const JWT_EXPIRES_IN = '1h'; // Access token expires in 1 hour
 const BCRYPT_ROUNDS = 12;
 
 // ===================================
+// Fix H10: Token Blacklist
+// ===================================
+
+// In-memory set of blacklisted JWT IDs (jti claims)
+const blacklistedTokens = new Map<string, number>(); // jti -> expiration timestamp
+
+/**
+ * Blacklist a token by its jti claim so it can no longer be used.
+ * The token remains blacklisted until its original expiration time passes.
+ */
+export function blacklistToken(jti: string, exp: number): void {
+  if (!jti) return;
+  blacklistedTokens.set(jti, exp);
+}
+
+/**
+ * Check if a token's jti is in the blacklist.
+ */
+export function isTokenBlacklisted(jti: string | undefined): boolean {
+  if (!jti) return false;
+  return blacklistedTokens.has(jti);
+}
+
+/**
+ * Periodic cleanup: remove expired tokens from the blacklist every 10 minutes.
+ * This prevents unbounded memory growth since tokens naturally expire.
+ */
+if (typeof setInterval !== 'undefined') {
+  setInterval(() => {
+    const now = Date.now() / 1000;
+    let cleaned = 0;
+    for (const [jti, exp] of blacklistedTokens) {
+      if (exp < now) {
+        blacklistedTokens.delete(jti);
+        cleaned++;
+      }
+    }
+    if (cleaned > 0) {
+      console.log(`[Auth] Cleaned ${cleaned} expired tokens from blacklist (remaining: ${blacklistedTokens.size})`);
+    }
+  }, 10 * 60 * 1000).unref?.(); // .unref() so the timer doesn't keep the process alive
+}
+
+// ===================================
 // Token Management
 // ===================================
 
 /**
  * Generate JWT access token
+ * Fix H10: Includes jti (JWT ID) for token blacklisting on logout
  */
 export function generateAccessToken(user: AdminUser): string {
   const payload: AuthTokenPayload = {
     userId: user.id,
     username: user.username,
     role: user.role,
+    jti: randomUUID(),
   };
 
   return jwt.sign(payload, JWT_SECRET, {
@@ -67,10 +115,16 @@ export function generateAccessToken(user: AdminUser): string {
 
 /**
  * Verify JWT token
+ * Fix H10: Also checks the token blacklist
  */
 export function verifyToken(token: string): AuthTokenPayload | null {
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as AuthTokenPayload;
+    // Fix H10: Reject blacklisted tokens
+    if (isTokenBlacklisted(decoded.jti)) {
+      console.warn('[Auth] Rejected blacklisted token:', decoded.jti);
+      return null;
+    }
     return decoded;
   } catch (error) {
     console.error('[Auth] Token verification failed:', error);
@@ -240,21 +294,25 @@ export async function createAdminUser(
 
 /**
  * Authenticate user with credentials
+ * Fix H9: Constant-time comparison — always calls bcrypt.compare to prevent
+ * username enumeration via timing side-channel attacks.
  */
 export async function authenticateUser(
   credentials: LoginCredentials
 ): Promise<{ success: boolean; error?: string; user?: AdminUser; tokens?: { access: string } }> {
   const { username, password } = credentials;
 
-  // Get user
-  const userRecord = getUserByUsername(username);
-  if (!userRecord) {
-    return { success: false, error: 'Invalid username or password' };
-  }
+  // Fix H9: Dummy hash ensures bcrypt.compare always runs, even when user doesn't exist
+  const DUMMY_HASH = '$2b$12$abcdefghijklmnopqrstuvwxymnoABCDEFGHIJ1234567890abcdefghijklm';
 
-  // Verify password
-  const passwordValid = await verifyPassword(password, userRecord.passwordHash);
-  if (!passwordValid) {
+  // Get user (may be undefined)
+  const userRecord = getUserByUsername(username);
+  const hashToCompare = userRecord ? userRecord.passwordHash : DUMMY_HASH;
+
+  // Always compare — takes ~100ms regardless of whether user exists
+  const passwordValid = await bcrypt.compare(password, hashToCompare);
+
+  if (!userRecord || !passwordValid) {
     return { success: false, error: 'Invalid username or password' };
   }
 
@@ -401,6 +459,10 @@ export async function isProxyAuthenticated(request: Request): Promise<boolean> {
 // ===================================
 
 // Track active sessions for rate limiting
+// TODO (M11): In-memory rate limiting resets on server restart. For production,
+// migrate to Redis-backed rate limiting (e.g. using `rate-limiter-flexible` or
+// Upstash Ratelimit) so limits persist across deployments and scale with
+// multiple instances. See: https://github.com/wyattjoh/rate-limiter-flexible
 const loginAttempts = new Map<string, { count: number; resetTime: number }>();
 const MAX_LOGIN_ATTEMPTS = 10;
 const LOCKOUT_DURATION = 60 * 1000; // 1 minute
@@ -486,4 +548,6 @@ export default {
   recordFailedLogin,
   clearLoginAttempts,
   getRemainingAttempts,
+  blacklistToken,
+  isTokenBlacklisted,
 };

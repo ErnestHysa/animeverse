@@ -16,20 +16,30 @@ import type {
   StreamingMethod,
 } from "@/types/analytics";
 
+const MAX_QUEUE_SIZE = 200;
+
+function generateId(): string {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}
+
 class AnalyticsTracker {
   private sessionId: string;
   private eventQueue: AnalyticsEvent[] = [];
   private batchThreshold = 10; // Send events in batches of 10
   private flushInterval = 30000; // Flush every 30 seconds
   private flushTimer: NodeJS.Timeout | null = null;
+  private isFlushing = false;
 
   constructor() {
-    this.sessionId = this.generateSessionId();
+    this.sessionId = generateId();
     this.startFlushTimer();
   }
 
   private generateSessionId(): string {
-    return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return generateId();
   }
 
   private startFlushTimer() {
@@ -225,6 +235,11 @@ class AnalyticsTracker {
   private queueEvent(event: AnalyticsEvent): void {
     this.eventQueue.push(event);
 
+    // Cap queue size to prevent unbounded memory growth (Fix H4)
+    if (this.eventQueue.length >= MAX_QUEUE_SIZE) {
+      this.eventQueue = this.eventQueue.slice(-MAX_QUEUE_SIZE / 2);
+    }
+
     if (this.eventQueue.length >= this.batchThreshold) {
       this.flush();
     }
@@ -234,9 +249,11 @@ class AnalyticsTracker {
    * Flush queued events to server
    */
   private async flush(): Promise<void> {
-    if (this.eventQueue.length === 0) {
+    if (this.isFlushing || this.eventQueue.length === 0) {
       return;
     }
+
+    this.isFlushing = true;
 
     const eventsToSend = [...this.eventQueue];
     this.eventQueue = [];
@@ -253,11 +270,21 @@ class AnalyticsTracker {
       if (!response.ok) {
         // If failed, add events back to queue
         this.eventQueue.unshift(...eventsToSend);
+        // Cap queue size on flush failure (Fix H4)
+        if (this.eventQueue.length >= MAX_QUEUE_SIZE) {
+          this.eventQueue = this.eventQueue.slice(-MAX_QUEUE_SIZE / 2);
+        }
       }
     } catch (error) {
       console.error("Failed to send analytics events:", error);
       // Add events back to queue on error
       this.eventQueue.unshift(...eventsToSend);
+      // Cap queue size on flush failure (Fix H4)
+      if (this.eventQueue.length >= MAX_QUEUE_SIZE) {
+        this.eventQueue = this.eventQueue.slice(-MAX_QUEUE_SIZE / 2);
+      }
+    } finally {
+      this.isFlushing = false;
     }
   }
 
@@ -265,7 +292,7 @@ class AnalyticsTracker {
    * Generate unique event ID
    */
   private generateEventId(): string {
-    return `event_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return generateId();
   }
 
   /**
