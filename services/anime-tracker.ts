@@ -625,6 +625,16 @@ class AnimeTracker {
 
 export const animeTracker = new AnimeTracker();
 
-if (require.main === module) {
+// Check if this file is being run directly (not imported)
+let isMainModule = false;
+try {
+  // CJS mode
+  isMainModule = require.main === module;
+} catch {
+  // ESM mode — require/module are undefined
+  isMainModule = import.meta.url === `file://${process.argv[1]}`;
+}
+
+if (isMainModule) {
   animeTracker.start();
 }

@@ -12,6 +12,8 @@
  */
 
 import type { DASHQuality } from "@/components/player/dash-player";
+import { createScopedLogger } from '@/lib/logger';
+const logger = createScopedLogger('DASHStreamManager');
 
 // ===================================
 // Types
@@ -77,7 +79,7 @@ class DASHStreamManagerImpl {
     } = options;
 
     try {
-      console.log(`[DASHStreamManager] Loading DASH stream for anime ${animeId} episode ${episodeNumber}`);
+      logger.info(`Loading DASH stream for anime ${animeId} episode ${episodeNumber}`);
 
       // Try to get DASH source from API
       const source = await this.fetchDASHSource(animeId, episodeNumber, language, animeTitle, malId, timeout);
@@ -86,7 +88,7 @@ class DASHStreamManagerImpl {
         throw new Error("No DASH source available");
       }
 
-      console.log(`[DASHStreamManager] DASH stream loaded successfully: ${source.provider}`);
+      logger.info(`DASH stream loaded successfully: ${source.provider}`);
 
       return { source };
     } catch (error) {
@@ -123,7 +125,7 @@ class DASHStreamManagerImpl {
 
       if (!response.ok) {
         if (response.status === 404) {
-          console.log(`[DASHStreamManager] Episode not found`);
+          logger.info(`Episode not found`);
           return null;
         }
         throw new Error(`API returned ${response.status}: ${response.statusText}`);
@@ -133,7 +135,7 @@ class DASHStreamManagerImpl {
 
       // Check if DASH source is available
       if (!data.dashSources || data.dashSources.length === 0) {
-        console.log(`[DASHStreamManager] No DASH sources available`);
+        logger.info(`No DASH sources available`);
         return null;
       }
 

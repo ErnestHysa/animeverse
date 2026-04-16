@@ -73,7 +73,7 @@ let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let config: AppConfig = DEFAULT_CONFIG;
 let activeSessions: Map<string, TorrentSession> = new Map();
-let localServerPort = 3000;
+let localServerPort = 3001;
 
 // ===================================
 // App Lifecycle
@@ -136,6 +136,7 @@ function createWindow(): void {
       contextIsolation: true,
       preload: path.join(__dirname, "preload.js"),
       webSecurity: true,
+      sandbox: true,
     },
   });
 
@@ -247,7 +248,7 @@ function setupIPCHandlers(): void {
   // Config handlers
   ipcMain.handle("get-config", () => config);
   ipcMain.handle("set-config", (_, newConfig: Partial<AppConfig>) => {
-    const allowedKeys = ['downloadPath', 'maxConnections', 'autoStart', 'seedRatio'];
+    const allowedKeys = ['downloadPath', 'autoStart', 'minimizeToTray', 'startInBackground', 'seedingEnabled', 'maxUploadSpeed', 'maxDownloadSpeed'];
     const safeConfig: Record<string, any> = {};
     for (const key of allowedKeys) {
       if (key in newConfig) { (safeConfig as any)[key] = (newConfig as any)[key]; }
@@ -347,7 +348,7 @@ function toggleSessionSeeding(infoHash: string): void {
 }
 
 function extractInfoHash(magnetUri: string): string {
-  const match = magnetUri.match(/urn:btih:([a-fA-F0-9]{40})/);
+  const match = magnetUri.match(/urn:btih:([a-fA-F0-9]{40}|[A-Z2-7]{32})/i);
   return match ? match[1].toLowerCase() : "";
 }
 

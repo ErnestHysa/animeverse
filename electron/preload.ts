@@ -67,10 +67,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   onOpenSettings: (callback: () => void) => {
     ipcRenderer.on("open-settings", () => callback());
   },
-
-  // Platform info
-  platform: process.platform,
-  version: process.versions.electron,
 });
 
 // ===================================
@@ -92,8 +88,6 @@ declare global {
       onTorrentStarted: (callback: (session: TorrentSession) => void) => void;
       onTorrentStopped: (callback: (data: { infoHash: string }) => void) => void;
       onOpenSettings: (callback: () => void) => void;
-      platform: string;
-      version: string;
     };
   }
 }

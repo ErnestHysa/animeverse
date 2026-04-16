@@ -75,6 +75,7 @@ class WatchPartyRoomManager {
   private readonly DISCONNECTED_VIEWER_TIMEOUT = 30 * 1000; // 30 seconds for disconnected viewers
   private readonly MAX_ROOMS = 100;
   private readonly MAX_MESSAGES_PER_ROOM = 200;
+  private readonly MAX_VIEWERS_PER_ROOM = 50;
   private messagesPerRoom: Map<string, number> = new Map();
   private io: SocketIOServer | null = null;
   private cleanupInterval: ReturnType<typeof setInterval> | null = null;
@@ -249,6 +250,12 @@ class WatchPartyRoomManager {
       .find(v => v.username === username);
     if (existingUsername) {
       socket.emit('error', { message: 'Username already taken in this room' });
+      return;
+    }
+
+    // Enforce room viewer limit
+    if (room.viewers.size >= this.MAX_VIEWERS_PER_ROOM) {
+      socket.emit('error', { message: 'Room is full' });
       return;
     }
 

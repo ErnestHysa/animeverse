@@ -138,7 +138,24 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Cache-first strategy for non-HTML requests
+  // Stale-while-revalidate for Next.js static assets
+  if (url.pathname.startsWith('/_next/static/')) {
+    event.respondWith(
+      caches.match(request).then(cached => {
+        const fetchPromise = fetch(request).then(response => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(DYNAMIC_CACHE).then(cache => cache.put(request, clone));
+          }
+          return response;
+        }).catch(() => cached);
+        return cached || fetchPromise;
+      })
+    );
+    return;
+  }
+
+  // Cache-first strategy for other non-HTML requests
   event.respondWith(
     caches.match(request).then((cached) => {
       if (cached) {

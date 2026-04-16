@@ -76,6 +76,9 @@ const BANDWIDTH_STORAGE_KEY = "bandwidth_config";
 // Bandwidth Manager Class
 // ===================================
 
+import { createScopedLogger } from '@/lib/logger';
+const logger = createScopedLogger('BandwidthManager');
+
 class BandwidthManagerImpl {
   private config: BandwidthConfig;
   private static instance: BandwidthManagerImpl;
@@ -159,7 +162,7 @@ class BandwidthManagerImpl {
     this.config = { ...this.config, ...config };
     this.saveConfig();
     this.applyThrottling();
-    console.log("[BandwidthManager] Config updated:", this.config);
+    logger.info("Config updated:", this.config);
   }
 
   /**
@@ -238,13 +241,13 @@ class BandwidthManagerImpl {
 
       // WebTorrent doesn't expose this directly, but we can
       // influence it through client settings
-      console.log("[BandwidthManager] Limited to ~", maxUploads, "concurrent uploads");
+      logger.info("Limited to ~", maxUploads, "concurrent uploads");
     }
 
     if (effectiveDownloadLimit > 0 && effectiveDownloadLimit < Infinity) {
       // Similar approach for downloads
       const maxDownloads = Math.max(1, Math.floor(effectiveDownloadLimit / (50 * 1024)));
-      console.log("[BandwidthManager] Limited to ~", maxDownloads, "concurrent downloads");
+      logger.info("Limited to ~", maxDownloads, "concurrent downloads");
     }
 
     // Notify callbacks

@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Bell, BellOff, Check, X } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
@@ -229,6 +229,11 @@ export function EpisodeNotifications({ airingSchedule = [] }: EpisodeNotificatio
     setEnabledCount((prev) => prev - 1);
   }, []);
 
+  // Use ref for prefs so the interval callback always reads the latest value
+  // without depending on the prefs state variable (which would recreate the interval)
+  const prefsRef = useRef(prefs);
+  prefsRef.current = prefs;
+
   // Check for new episodes and send notifications
   useEffect(() => {
     if (permission !== "granted" || airingSchedule.length === 0) return;
@@ -236,7 +241,7 @@ export function EpisodeNotifications({ airingSchedule = [] }: EpisodeNotificatio
     const checkInterval = setInterval(() => {
       if (document.hidden) return;
       airingSchedule.forEach((item) => {
-        const pref = prefs.find((p) => p.mediaId === item.mediaId);
+        const pref = prefsRef.current.find((p) => p.mediaId === item.mediaId);
         if (pref?.enabled && item.nextEpisode > pref.episodeOffset) {
           // New episode detected!
           notificationManager.sendNotification(
@@ -253,7 +258,7 @@ export function EpisodeNotifications({ airingSchedule = [] }: EpisodeNotificatio
     }, 60000); // Check every minute
 
     return () => clearInterval(checkInterval);
-  }, [permission, airingSchedule, prefs]);
+  }, [permission, airingSchedule]);
 
   // Auto-check for upcoming episodes in user's watchlist
   useEffect(() => {

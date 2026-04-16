@@ -1,5 +1,9 @@
 'use client';
+import { useEffect } from 'react';
+
 export default function AnimeError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  useEffect(() => { console.error(error); }, [error]);
+
   return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center">
       <div className="text-center">

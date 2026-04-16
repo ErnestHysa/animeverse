@@ -10,6 +10,7 @@ import { Users, Copy, Check, Send, X, Info } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
 import { toast } from "react-hot-toast";
+import { safeGetItem, safeSetItem, safeRemoveItem, getItemWithFallback } from "@/lib/storage";
 
 // ===================================
 // Types
@@ -59,10 +60,14 @@ export function useWatchParty(animeId: number, episodeNumber: number) {
     chat: [],
   });
   const [userName, setUserNameState] = useState(() => {
-    if (typeof window === 'undefined') return '';
-    const saved = localStorage.getItem(`${STORAGE_KEY}-username`);
-    return saved || `User${Math.floor(Math.random() * 10000)}`;
+    return getItemWithFallback<string>(`${STORAGE_KEY}-username`, `User${Math.floor(Math.random() * 10000)}`);
   });
+
+  // Refs for values needed in callbacks to avoid stale closures (Fix L7)
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  const userNameRef = useRef(userName);
+  userNameRef.current = userName;
 
   // Generate room ID
   const generateRoomId = useCallback(() => {
@@ -75,7 +80,7 @@ export function useWatchParty(animeId: number, episodeNumber: number) {
     const room: WatchPartyRoom = {
       id: roomId,
       name: roomName || "Watch Party",
-      host: userName,
+      host: userNameRef.current,
       viewers: 1,
       animeId,
       episodeNumber,
@@ -83,44 +88,44 @@ export function useWatchParty(animeId: number, episodeNumber: number) {
       createdAt: Date.now(),
     };
 
-    // Store room in localStorage (in production, use backend)
-    localStorage.setItem(`${STORAGE_KEY}-room-${roomId}`, JSON.stringify(room));
-    localStorage.setItem(`${STORAGE_KEY}-current`, JSON.stringify({ roomId, isHost: true }));
+    // Store room (in production, use backend)
+    safeSetItem(`${STORAGE_KEY}-room-${roomId}`, room);
+    safeSetItem(`${STORAGE_KEY}-current`, { roomId, isHost: true });
 
     setState({
       roomId,
       isHost: true,
       currentTime: 0,
       isPlaying: false,
-      viewers: [userName],
+      viewers: [userNameRef.current],
       chat: [],
     });
 
     toast.success(`Room created: ${roomId}`);
     return roomId;
-  }, [animeId, episodeNumber, generateRoomId, userName]);
+  }, [animeId, episodeNumber, generateRoomId]);
 
   // Join an existing room
   const joinRoom = useCallback((roomId: string) => {
-    const roomData = localStorage.getItem(`${STORAGE_KEY}-room-${roomId}`);
+    const result = safeGetItem<WatchPartyRoom>(`${STORAGE_KEY}-room-${roomId}`);
 
-    if (!roomData) {
+    if (!result.success || !result.data) {
       toast.error("Room not found");
       return false;
     }
 
-    const room: WatchPartyRoom = JSON.parse(roomData);
+    const room = result.data;
 
     if (room.animeId !== animeId || room.episodeNumber !== episodeNumber) {
       toast.error("This room is for a different episode");
       return false;
     }
 
-    localStorage.setItem(`${STORAGE_KEY}-current`, JSON.stringify({ roomId, isHost: false }));
+    safeSetItem(`${STORAGE_KEY}-current`, { roomId, isHost: false });
 
     // Add viewer to room
     room.viewers++;
-    localStorage.setItem(`${STORAGE_KEY}-room-${roomId}`, JSON.stringify(room));
+    safeSetItem(`${STORAGE_KEY}-room-${roomId}`, room);
 
     setState({
       roomId,
@@ -133,24 +138,23 @@ export function useWatchParty(animeId: number, episodeNumber: number) {
 
     toast.success(`Joined room: ${roomId}`);
     return true;
-  }, [animeId, episodeNumber, userName]);
+  }, [animeId, episodeNumber]);
 
-  // Leave current room
+  // Leave current room — uses refs to avoid stale closure (Fix L7)
   const leaveRoom = useCallback(() => {
-    const { roomId } = state;
+    const { roomId } = stateRef.current;
     if (!roomId) return;
 
-    const roomData = localStorage.getItem(`${STORAGE_KEY}-room-${roomId}`);
-    if (roomData) {
-      const room: WatchPartyRoom = JSON.parse(roomData);
-
+    const result = safeGetItem<WatchPartyRoom>(`${STORAGE_KEY}-room-${roomId}`);
+    if (result.success && result.data) {
+      const room = result.data;
       if (room.viewers > 0) {
         room.viewers--;
-        localStorage.setItem(`${STORAGE_KEY}-room-${roomId}`, JSON.stringify(room));
+        safeSetItem(`${STORAGE_KEY}-room-${roomId}`, room);
       }
     }
 
-    localStorage.removeItem(`${STORAGE_KEY}-current`);
+    safeRemoveItem(`${STORAGE_KEY}-current`);
     setState({
       roomId: null,
       isHost: false,
@@ -161,36 +165,35 @@ export function useWatchParty(animeId: number, episodeNumber: number) {
     });
 
     toast.success("Left watch party");
-  }, [state]);
+  }, []);
 
-  // Sync playback state
+  // Sync playback state — uses refs to avoid stale closure (Fix L7)
   const syncPlayback = useCallback((currentTime: number, isPlaying: boolean) => {
-    const { roomId, isHost } = state;
+    const { roomId, isHost } = stateRef.current;
     if (!roomId || !isHost) return;
 
     // Update room state (in production, broadcast to all viewers via WebSocket)
-    const roomData = localStorage.getItem(`${STORAGE_KEY}-room-${roomId}`);
-    if (roomData) {
-      const room: WatchPartyRoom = JSON.parse(roomData);
-      localStorage.setItem(`${STORAGE_KEY}-sync-${roomId}`, JSON.stringify({
+    const result = safeGetItem<WatchPartyRoom>(`${STORAGE_KEY}-room-${roomId}`);
+    if (result.success && result.data) {
+      safeSetItem(`${STORAGE_KEY}-sync-${roomId}`, {
         currentTime,
         isPlaying,
         timestamp: Date.now(),
-      }));
+      });
     }
 
     setState((prev) => ({ ...prev, currentTime, isPlaying }));
-  }, [state]);
+  }, []);
 
-  // Send chat message
+  // Send chat message — uses refs to avoid stale closure (Fix L7)
   const sendChat = useCallback((message: string) => {
-    const { roomId } = state;
+    const { roomId } = stateRef.current;
     if (!roomId) return;
 
     const chatMessage: ChatMessage = {
       id: Date.now().toString(),
-      userId: userName,
-      username: userName,
+      userId: userNameRef.current,
+      username: userNameRef.current,
       message,
       timestamp: Date.now(),
     };
@@ -202,10 +205,10 @@ export function useWatchParty(animeId: number, episodeNumber: number) {
 
     // Store in room chat (in production, send via WebSocket)
     const chatKey = `${STORAGE_KEY}-chat-${roomId}`;
-    const existingChat = JSON.parse(localStorage.getItem(chatKey) || "[]");
+    const existingChat = getItemWithFallback<ChatMessage[]>(chatKey, []);
     existingChat.push(chatMessage);
-    localStorage.setItem(chatKey, JSON.stringify(existingChat.slice(-50))); // Keep last 50 messages
-  }, [state, userName]);
+    safeSetItem(chatKey, existingChat.slice(-50)); // Keep last 50 messages
+  }, []);
 
   // Load room chat
   useEffect(() => {
@@ -214,10 +217,9 @@ export function useWatchParty(animeId: number, episodeNumber: number) {
 
     const chatKey = `${STORAGE_KEY}-chat-${roomId}`;
     const loadChat = () => {
-      const chatData = localStorage.getItem(chatKey);
-      if (chatData) {
-        const messages: ChatMessage[] = JSON.parse(chatData);
-        setState((prev) => ({ ...prev, chat: messages }));
+      const result = safeGetItem<ChatMessage[]>(chatKey);
+      if (result.success && result.data) {
+        setState((prev) => ({ ...prev, chat: result.data! }));
       }
     };
 
@@ -235,9 +237,9 @@ export function useWatchParty(animeId: number, episodeNumber: number) {
 
     const interval = setInterval(() => {
       const syncKey = `${STORAGE_KEY}-sync-${roomId}`;
-      const syncData = localStorage.getItem(syncKey);
-      if (syncData) {
-        const sync = JSON.parse(syncData);
+      const result = safeGetItem<{ currentTime: number; isPlaying: boolean; timestamp: number }>(syncKey);
+      if (result.success && result.data) {
+        const sync = result.data;
         // Only sync if recent (within 5 seconds)
         if (Date.now() - sync.timestamp < 5000) {
           setState((prev) => ({
@@ -256,7 +258,7 @@ export function useWatchParty(animeId: number, episodeNumber: number) {
     state,
     userName,
     setUserName: (name: string) => {
-      localStorage.setItem(`${STORAGE_KEY}-username`, name);
+      safeSetItem(`${STORAGE_KEY}-username`, name);
       setUserNameState(name);
     },
     createRoom,

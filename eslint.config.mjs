@@ -12,6 +12,12 @@ const eslintConfig = defineConfig([
     },
   },
   {
+    files: ["server-custom.js", "services/**/*", "electron/**/*", "scripts/**/*"],
+    rules: {
+      "no-console": "off",
+    },
+  },
+  {
     rules: {
       "no-console": ["warn", { allow: ["warn", "error"] }],
     },

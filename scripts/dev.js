@@ -52,9 +52,11 @@ function spawnProcess(name, command, args, cwd, readyPattern, onReady) {
     for (const line of lines) {
       if (name === "API") {
         log.api(line);
+        if (apiLines.length > 1000) apiLines.shift();
         apiLines.push(line);
       } else {
         log.next(line);
+        if (nextLines.length > 1000) nextLines.shift();
         nextLines.push(line);
       }
 
@@ -79,9 +81,11 @@ function spawnProcess(name, command, args, cwd, readyPattern, onReady) {
     for (const line of lines) {
       if (name === "API") {
         log.api(line);
+        if (apiLines.length > 1000) apiLines.shift();
         apiLines.push(line);
       } else {
         log.next(line);
+        if (nextLines.length > 1000) nextLines.shift();
         nextLines.push(line);
       }
     }
@@ -163,6 +167,7 @@ ${ANSI.reset}`);
 
       for (const line of lines) {
         log.next(line);
+        if (nextLines.length > 1000) nextLines.shift();
         nextLines.push(line);
 
         if (!nextReady && line.match(/ready|started|localhost:3000/i)) {
@@ -181,6 +186,7 @@ ${ANSI.reset}`);
 
       for (const line of lines) {
         log.next(line);
+        if (nextLines.length > 1000) nextLines.shift();
         nextLines.push(line);
       }
     });

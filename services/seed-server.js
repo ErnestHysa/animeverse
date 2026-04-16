@@ -594,7 +594,12 @@ if (require.main === module) {
         return;
       }
       try {
-        verify(token, process.env.JWT_SECRET || "default-secret");
+        if (!process.env.JWT_SECRET) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Server configuration error" }));
+          return;
+        }
+        verify(token, process.env.JWT_SECRET);
       } catch {
         res.writeHead(401, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: "Invalid token" }));

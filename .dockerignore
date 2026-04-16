@@ -6,11 +6,11 @@ dist
 coverage
 analysis
 docs
-e2e/screenshots
+e2e
 tests
+scripts/
 *.md
 !README.md
 .env*
 .data
 .claude
-scripts/generate-demo-video.py

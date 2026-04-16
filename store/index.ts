@@ -17,6 +17,11 @@ export const ACHIEVEMENTS_LIST = ACHIEVEMENTS;
 // Memoization cache for getContinueWatching
 let _continueWatchingCache: { watchHistoryRef: WatchHistoryItem[]; limit: number; result: WatchHistoryItem[] } | null = null;
 
+// Clear cache in development HMR
+if (process.env.NODE_ENV === 'development' && typeof (module as any).hot !== 'undefined') {
+  (module as any).hot?.dispose(() => { _continueWatchingCache = null; });
+}
+
 // ===================================
 // Types
 // ===================================
@@ -424,15 +429,7 @@ export const useStore = create<StoreState>()(
         }),
 
       getMediaCache: (id: number) => {
-        const cached = get().mediaCache[id];
-        if (cached) {
-          // Update lastAccessed timestamp on read
-          const now = Date.now();
-          set((state) => ({
-            mediaCache: { ...state.mediaCache, [id]: { ...state.mediaCache[id], _lastAccessed: now } },
-          }));
-        }
-        return cached;
+        return get().mediaCache[id] || null;
       },
 
       clearMediaCache: () => set({ mediaCache: {} }),

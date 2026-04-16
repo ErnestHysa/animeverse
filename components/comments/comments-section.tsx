@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { MessageSquare, ThumbsUp, ThumbsDown, Reply, User, Star } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
@@ -54,6 +54,8 @@ export function CommentsSection({ animeId, animeTitle }: CommentsSectionProps) {
   const [newComment, setNewComment] = useState("");
   const [userRating, setUserRating] = useState(0);
   const [sortBy, setSortBy] = useState<"recent" | "top">("recent");
+  const [likedComments, setLikedComments] = useState<Set<string>>(new Set());
+  const [dislikedComments, setDislikedComments] = useState<Set<string>>(new Set());
   const currentTime = useCurrentTime(); // Hook that updates every minute
   const { anilistUser, isAuthenticated } = useAniListAuth();
 
@@ -119,15 +121,75 @@ export function CommentsSection({ animeId, animeTitle }: CommentsSectionProps) {
   };
 
   const handleLike = (commentId: string) => {
-    // Toggle like (in production, this would be an API call)
+    const isLiked = likedComments.has(commentId);
+    const wasDisliked = dislikedComments.has(commentId);
+
     const updatedComments = comments.map((c) => {
       if (c.id === commentId) {
-        return { ...c, likes: c.likes + 1 };
+        let delta = isLiked ? -1 : 1;
+        // If switching from dislike to like, undo the dislike
+        let dislikeDelta = wasDisliked ? -1 : 0;
+        return { ...c, likes: c.likes + delta, dislikes: c.dislikes + dislikeDelta };
       }
       return c;
     });
     setComments(updatedComments);
     localStorage.setItem(`comments-${animeId}`, JSON.stringify(updatedComments));
+
+    setLikedComments((prev) => {
+      const next = new Set(prev);
+      if (isLiked) {
+        next.delete(commentId);
+      } else {
+        next.add(commentId);
+      }
+      return next;
+    });
+
+    // Also remove from disliked if switching to like
+    if (!isLiked && wasDisliked) {
+      setDislikedComments((prev) => {
+        const next = new Set(prev);
+        next.delete(commentId);
+        return next;
+      });
+    }
+  };
+
+  const handleDislike = (commentId: string) => {
+    const isDisliked = dislikedComments.has(commentId);
+    const wasLiked = likedComments.has(commentId);
+
+    const updatedComments = comments.map((c) => {
+      if (c.id === commentId) {
+        let delta = isDisliked ? -1 : 1;
+        // If switching from like to dislike, undo the like
+        let likeDelta = wasLiked ? -1 : 0;
+        return { ...c, dislikes: c.dislikes + delta, likes: c.likes + likeDelta };
+      }
+      return c;
+    });
+    setComments(updatedComments);
+    localStorage.setItem(`comments-${animeId}`, JSON.stringify(updatedComments));
+
+    setDislikedComments((prev) => {
+      const next = new Set(prev);
+      if (isDisliked) {
+        next.delete(commentId);
+      } else {
+        next.add(commentId);
+      }
+      return next;
+    });
+
+    // Also remove from liked if switching to dislike
+    if (!isDisliked && wasLiked) {
+      setLikedComments((prev) => {
+        const next = new Set(prev);
+        next.delete(commentId);
+        return next;
+      });
+    }
   };
 
   const handleReply = (commentId: string) => {
@@ -300,15 +362,24 @@ export function CommentsSection({ animeId, animeTitle }: CommentsSectionProps) {
                   <div className="flex items-center gap-4 mt-2">
                     <button
                       onClick={() => handleLike(comment.id)}
-                      className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      className={`flex items-center gap-1 text-sm transition-colors ${
+                        likedComments.has(comment.id)
+                          ? "text-primary font-medium"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
                     >
-                      <ThumbsUp className="w-4 h-4" />
+                      <ThumbsUp className={`w-4 h-4 ${likedComments.has(comment.id) ? "fill-primary" : ""}`} />
                       <span>{comment.likes}</span>
                     </button>
                     <button
-                      className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      onClick={() => handleDislike(comment.id)}
+                      className={`flex items-center gap-1 text-sm transition-colors ${
+                        dislikedComments.has(comment.id)
+                          ? "text-red-400 font-medium"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
                     >
-                      <ThumbsDown className="w-4 h-4" />
+                      <ThumbsDown className={`w-4 h-4 ${dislikedComments.has(comment.id) ? "fill-red-400" : ""}`} />
                       <span>{comment.dislikes}</span>
                     </button>
                     <button

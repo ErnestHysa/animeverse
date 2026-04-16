@@ -98,6 +98,9 @@ const ROLLOUT_PHASES: Record<RolloutPhase, { percentage: number; description: st
 // Feature Flag Manager
 // ===================================
 
+import { createScopedLogger } from '@/lib/logger';
+const logger = createScopedLogger('FeatureFlag');
+
 class FeatureFlagManager {
   private static instance: FeatureFlagManager;
 
@@ -216,7 +219,7 @@ class FeatureFlagManager {
       // Update admin-only based on phase
       flag.adminOnly = newPhase === 'admin-only';
 
-      console.log(`[Feature Flag] ${featureKey} phase updated to ${newPhase}`);
+      logger.info(`${featureKey} phase updated to ${newPhase}`);
     }
   }
 
@@ -256,7 +259,7 @@ class FeatureFlagManager {
     const flag = FEATURE_FLAGS[featureKey];
     if (flag) {
       flag.enabled = enabled;
-      console.log(`[Feature Flag] ${featureKey} ${enabled ? 'enabled' : 'disabled'}`);
+      logger.info(`${featureKey} ${enabled ? 'enabled' : 'disabled'}`);
     }
   }
 
@@ -273,7 +276,7 @@ class FeatureFlagManager {
         flag.allowedUserIds = [];
       }
       flag.allowedUserIds.push(userId);
-      console.log(`[Feature Flag] User ${userId} added to ${featureKey}`);
+      logger.info(`User ${userId} added to ${featureKey}`);
     }
   }
 
@@ -287,7 +290,7 @@ class FeatureFlagManager {
     const flag = FEATURE_FLAGS[featureKey];
     if (flag && flag.allowedUserIds) {
       flag.allowedUserIds = flag.allowedUserIds.filter(id => id !== userId);
-      console.log(`[Feature Flag] User ${userId} removed from ${featureKey}`);
+      logger.info(`User ${userId} removed from ${featureKey}`);
     }
   }
 }

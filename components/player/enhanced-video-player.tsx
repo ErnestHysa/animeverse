@@ -493,6 +493,8 @@ export function EnhancedVideoPlayer({
 
     let cancelled = false;
     let innerCleanup: (() => void) | null = null;
+    let loadingTimeoutId: ReturnType<typeof setTimeout> | null = null;
+    let safetyTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
     (async () => {
     logger.log("[VideoPlayer] Loading video source:", {
@@ -518,6 +520,7 @@ export function EnhancedVideoPlayer({
       setIsLoading(false);
       setIsBuffering(false);
     }, 15000); // 15 seconds max (reduced from 30 for faster UX)
+    loadingTimeoutId = loadingTimeout;
 
     // Fallback safety timeout - ensures loading state is always cleared
     const safetyTimeout = setTimeout(() => {
@@ -525,6 +528,7 @@ export function EnhancedVideoPlayer({
       setIsLoading(false);
       setIsBuffering(false);
     }, 30000); // 30 seconds absolute max
+    safetyTimeoutId = safetyTimeout;
 
     const handleLoad = () => {
       clearTimeout(loadingTimeout);
@@ -960,6 +964,8 @@ export function EnhancedVideoPlayer({
 
     return () => {
       cancelled = true;
+      if (loadingTimeoutId) clearTimeout(loadingTimeoutId);
+      if (safetyTimeoutId) clearTimeout(safetyTimeoutId);
       if (innerCleanup) innerCleanup();
       if (hlsRef.current) {
         hlsRef.current.destroy();

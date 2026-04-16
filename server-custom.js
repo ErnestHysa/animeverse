@@ -33,8 +33,9 @@ class WatchPartyRoomManager {
     this.socketToUser = new Map();
     this.ROOM_TIMEOUT = 24 * 60 * 60 * 1000; // 24 hours
     this.VIEWER_TIMEOUT = 5 * 60 * 1000; // 5 minutes
-    this.MAX_ROOMS = 50;
+    this.MAX_ROOMS = 100;
     this.MAX_MESSAGES_PER_ROOM = 200;
+    this.MAX_VIEWERS_PER_ROOM = 50;
     this.messagesPerRoom = new Map();
     this.io = null;
 
@@ -151,8 +152,8 @@ class WatchPartyRoomManager {
 
     const viewerId = `viewer-${socket.id}`;
 
-    // Enforce room user limit
-    if (room.userLimit && room.viewers.size >= room.userLimit) {
+    // Enforce room viewer limit
+    if (room.viewers.size >= this.MAX_VIEWERS_PER_ROOM) {
       socket.emit('error', { message: 'Room is full' });
       return;
     }
@@ -402,7 +403,6 @@ class WatchPartyRoomManager {
       createdAt: Date.now(),
       lastActivity: Date.now(),
       viewers: new Map(),
-      userLimit: 50,
     };
 
     this.rooms.set(roomId, room);
