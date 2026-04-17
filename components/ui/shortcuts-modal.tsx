@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { keyboardManager, registerDefaultShortcuts, formatKey } from "@/lib/keyboard-shortcuts";
 import { X, Keyboard } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -23,6 +23,35 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  // Fix M12: Focus trap for dialog accessibility
+  useEffect(() => {
+    const modal = modalRef.current;
+    if (!modal) return;
+
+    const firstFocusable = modal.querySelector('button, [tabindex]') as HTMLElement | null;
+    firstFocusable?.focus();
+
+    const handleTab = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      const focusable = modal.querySelectorAll('button, [tabindex]:not([tabindex="-1"])');
+      if (focusable.length === 0) return;
+      const first = focusable[0] as HTMLElement;
+      const last = focusable[focusable.length - 1] as HTMLElement;
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    modal.addEventListener('keydown', handleTab);
+    return () => modal.removeEventListener('keydown', handleTab);
+  }, [isOpen]);
+
   const shortcuts = useMemo(
     () => (isOpen ? keyboardManager.getShortcuts() : []),
     [isOpen]
@@ -60,12 +89,12 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
   }, {} as Record<string, typeof shortcuts>);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+    <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="shortcuts-modal-title" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
       <GlassCard className="w-full max-w-2xl max-h-[80vh] overflow-y-auto">
         <div className="sticky top-0 bg-background/95 backdrop-blur-sm p-6 border-b border-white/10 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Keyboard className="w-6 h-6 text-primary" />
-            <h2 className="text-2xl font-bold">Keyboard Shortcuts</h2>
+            <h2 id="shortcuts-modal-title" className="text-2xl font-bold">Keyboard Shortcuts</h2>
           </div>
           <button
             onClick={onClose}

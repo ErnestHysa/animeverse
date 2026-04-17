@@ -17,6 +17,20 @@ const AVG_DURATION_MINUTES: Record<string, number> = {
   MUSIC: 4,
 };
 
+/**
+ * Count unique anime that have at least one completed episode entry.
+ * Groups by mediaId so multiple completed episodes for the same anime count as one.
+ */
+export function countCompletedAnime(watchHistory: WatchHistoryItem[]): number {
+  const completedByAnime = new Set<number>();
+  for (const item of watchHistory) {
+    if (item.completed) {
+      completedByAnime.add(item.mediaId);
+    }
+  }
+  return completedByAnime.size;
+}
+
 export interface UserStats {
   totalEpisodesWatched: number;
   totalMinutesWatched: number;
@@ -92,11 +106,8 @@ export function calculateStats(
     .sort((a, b) => b.count - a.count)
     .slice(0, 5);
 
-  // Calculate completed anime (all main episodes watched)
-  // This is a simplified calculation - in real app would need total episode count
-  const completedAnime = watchHistory.filter(
-    (item) => item.completed && item.episodeNumber >= 12
-  ).length;
+  // Calculate completed anime (unique anime with at least one completed entry)
+  const completedAnime = countCompletedAnime(watchHistory);
 
   // Calculate streaks
   const { currentStreak, longestStreak } = calculateStreaks(watchHistory);

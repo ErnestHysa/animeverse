@@ -26,13 +26,25 @@ class KeyboardShortcutsManager {
   handleKeyDown(event: KeyboardEvent) {
     if (!this.isEnabled) return;
 
-    // Ignore if user is typing in an input
+    // Ignore if user is typing in an input, textarea, or contentEditable element
     const target = event.target as HTMLElement;
     if (
       target.tagName === "INPUT" ||
       target.tagName === "TEXTAREA" ||
+      target.tagName === "SELECT" ||
       target.contentEditable === "true"
     ) {
+      return;
+    }
+
+    // Skip global shortcuts when a video or audio element is focused
+    const active = document.activeElement as HTMLElement | null;
+    if (active && (active.tagName === "VIDEO" || active.tagName === "AUDIO")) {
+      return;
+    }
+
+    // Skip global navigation shortcuts when focus is inside a player container
+    if (active && active.closest("[data-player], .video-player, [data-video-player]")) {
       return;
     }
 

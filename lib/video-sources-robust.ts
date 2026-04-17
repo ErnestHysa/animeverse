@@ -705,13 +705,19 @@ export async function reportBrokenVideo(data: {
     const MAX_REPORTS = 100;
     const EXPIRY_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
-    const reports: Array<{
+    let reports: Array<{
       animeId: number;
       episodeNumber: number;
       reason: string;
       timestamp: number;
       source: string;
-    }> = JSON.parse(localStorage.getItem("video-reports") || "[]");
+    }>;
+    try {
+      reports = JSON.parse(localStorage.getItem("video-reports") || "[]");
+    } catch {
+      localStorage.removeItem("video-reports");
+      reports = [];
+    }
 
     const now = Date.now();
 

@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { X, Keyboard } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
@@ -42,6 +42,34 @@ interface ShortcutsModalProps {
 
 export function KeyboardShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
   const [activeShortcuts, setActiveShortcuts] = useState<Set<string>>(new Set());
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  // Fix M12: Focus trap for dialog accessibility
+  useEffect(() => {
+    const modal = modalRef.current;
+    if (!modal || !isOpen) return;
+
+    const firstFocusable = modal.querySelector('button, [tabindex]') as HTMLElement | null;
+    firstFocusable?.focus();
+
+    const handleTab = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      const focusable = modal.querySelectorAll('button, [tabindex]:not([tabindex="-1"])');
+      if (focusable.length === 0) return;
+      const first = focusable[0] as HTMLElement;
+      const last = focusable[focusable.length - 1] as HTMLElement;
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    modal.addEventListener('keydown', handleTab);
+    return () => modal.removeEventListener('keydown', handleTab);
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -81,7 +109,7 @@ export function KeyboardShortcutsModal({ isOpen, onClose }: ShortcutsModalProps)
   const categories = Array.from(new Set(SHORTCUTS.map(s => s.category)));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+    <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="player-shortcuts-modal-title" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
       <GlassCard className="max-w-2xl w-full max-h-[80vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-white/10">
@@ -90,7 +118,7 @@ export function KeyboardShortcutsModal({ isOpen, onClose }: ShortcutsModalProps)
               <Keyboard className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold">Keyboard Shortcuts</h2>
+              <h2 id="player-shortcuts-modal-title" className="text-xl font-semibold">Keyboard Shortcuts</h2>
               <p className="text-sm text-muted-foreground">
                 Navigate the player without a mouse
               </p>

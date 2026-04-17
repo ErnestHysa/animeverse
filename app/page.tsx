@@ -107,7 +107,11 @@ async function HeroSection({ anime }: { anime: Media[] }) {
 
   const title = featured.title?.userPreferred || featured.title?.english || featured.title?.romaji || "Unknown";
   const cover = featured.bannerImage || featured.coverImage?.extraLarge || "";
-  const description = featured.description?.slice(0, 200) + "...";
+  const description = featured.description
+    ? featured.description.length > 200
+      ? featured.description.slice(0, 200) + "..."
+      : featured.description
+    : "";
 
   return (
     <section className="relative h-[60vh] min-h-[400px] md:h-[70vh] rounded-2xl overflow-hidden mb-12 group" aria-labelledby="hero-title">

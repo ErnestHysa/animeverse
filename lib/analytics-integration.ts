@@ -6,7 +6,8 @@
  */
 
 import { getAnalyticsTracker } from "./analytics-tracker";
-import type { StreamingMethod } from "./hybrid-stream-manager";
+import { normalizeStreamingMethod, type StreamingMethod } from "@/types/analytics";
+export type { StreamingMethod } from "@/types/analytics";
 
 // Track playback start
 export function trackPlaybackStart(params: {
@@ -23,7 +24,7 @@ export function trackPlaybackStart(params: {
       animeId: params.animeId,
       animeTitle: params.animeTitle || `Anime ${params.animeId}`,
       episode: params.episode,
-      method: params.method,
+      method: normalizeStreamingMethod(params.method),
       quality: params.quality,
       sourceProvider: params.sourceProvider,
     });
@@ -47,7 +48,7 @@ export function trackPlaybackEnd(params: {
       animeId: params.animeId,
       animeTitle: params.animeTitle || `Anime ${params.animeId}`,
       episode: params.episode,
-      method: params.method,
+      method: normalizeStreamingMethod(params.method),
       duration: params.duration,
       completionRate: params.completionRate,
       reasons: [],
@@ -98,7 +99,7 @@ export function trackBuffering(params: {
       animeId: params.animeId,
       animeTitle: params.animeTitle || `Anime ${params.animeId}`,
       episode: params.episode,
-      method: params.method,
+      method: normalizeStreamingMethod(params.method),
       bufferDuration: params.bufferDuration,
       currentTime: params.currentTime,
     });
@@ -153,7 +154,7 @@ export function trackQualityChange(params: {
       animeId: params.animeId,
       animeTitle: params.animeTitle || `Anime ${params.animeId}`,
       episode: params.episode,
-      method: params.method,
+      method: normalizeStreamingMethod(params.method),
       fromQuality: params.fromQuality,
       toQuality: params.toQuality,
       reason: params.reason,

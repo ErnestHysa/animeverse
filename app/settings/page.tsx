@@ -393,8 +393,8 @@ export default function SettingsPage() {
             toast.success(`Welcome back, ${displayData.name}!`);
           }
         }
-      } catch (e) {
-        // Cookie parse failed
+      } catch (error) {
+        console.error('Failed to parse user data from cookie:', error);
       }
 
       // Clean URL
@@ -450,7 +450,8 @@ export default function SettingsPage() {
         } else {
           toast.success("MAL connected successfully!");
         }
-      } catch {
+      } catch (error) {
+        console.error('Failed to parse MAL user data from cookie:', error);
         toast.success("MAL connected successfully!");
       }
       window.history.replaceState({}, "", "/settings");

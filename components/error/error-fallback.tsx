@@ -23,7 +23,7 @@ export function ErrorFallback({
   icon = "alert",
 }: ErrorFallbackProps) {
   return (
-    <div className="flex items-center justify-center p-8 min-h-[200px]">
+    <div role="alert" className="flex items-center justify-center p-8 min-h-[200px]">
       <div className="text-center max-w-md">
         <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
           {icon === "alert" ? (

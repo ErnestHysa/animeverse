@@ -25,7 +25,7 @@ export function sanitizeDescription(html: string | null | undefined): string {
   text = text.replace(/&nbsp;/g, " ");
 
   // Strip event handlers that might survive tag stripping (e.g. on* attributes)
-  text = text.replace(/\bon\w+\s*=\s*["'][^"']*["']/gi, "");
+  text = text.replace(/\bon\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "");
 
   // Strip javascript: URLs
   text = text.replace(/javascript:/gi, "");

@@ -22,12 +22,17 @@ export function AnalyticsSettings() {
     // Load settings from localStorage
     const stored = localStorage.getItem("analytics-settings");
     if (stored) {
-      const settings = JSON.parse(stored);
-      setAnalyticsEnabled(settings.analyticsEnabled ?? true);
-      setDiagnosticsEnabled(settings.diagnosticsEnabled ?? false);
-      // Fix L8: Apply saved analytics preference on load
-      if (settings.analyticsEnabled === false) {
-        setTrackerEnabled(false);
+      try {
+        const settings = JSON.parse(stored);
+        setAnalyticsEnabled(settings.analyticsEnabled ?? true);
+        setDiagnosticsEnabled(settings.diagnosticsEnabled ?? false);
+        // Fix L8: Apply saved analytics preference on load
+        if (settings.analyticsEnabled === false) {
+          setTrackerEnabled(false);
+        }
+      } catch (error) {
+        console.error('Failed to parse analytics settings:', error);
+        localStorage.removeItem('analytics-settings');
       }
     }
   }, []);

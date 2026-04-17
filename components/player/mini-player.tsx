@@ -30,7 +30,10 @@ export function MiniPlayer() {
   const progressPercent = historyItem
     ? Math.min(100, historyItem.completed
         ? 100
-        : Math.round((historyItem.progress / 1440) * 100)) // ~24min episode default
+        : (() => {
+            const duration = (historyItem as any).duration || (historyItem as any).totalDuration || 1440;
+            return Math.round((historyItem.progress / duration) * 100);
+          })())
     : 0;
 
   return (

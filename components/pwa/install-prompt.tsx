@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Download, X, Smartphone } from "lucide-react";
 
 interface BeforeInstallPromptEvent extends Event {
@@ -16,6 +16,7 @@ interface BeforeInstallPromptEvent extends Event {
 export function InstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showBanner, setShowBanner] = useState(false);
+  const installStartedRef = useRef(false);
 
   useEffect(() => {
     // Don't show if already dismissed in last 7 days
@@ -38,14 +39,21 @@ export function InstallPrompt() {
   if (!showBanner) return null;
 
   const handleInstall = async () => {
-    if (!deferredPrompt) return;
-    setShowBanner(false);
-    await deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === "dismissed") {
-      localStorage.setItem("pwa-install-dismissed", Date.now().toString());
+    if (installStartedRef.current || !deferredPrompt) return;
+    installStartedRef.current = true;
+    try {
+      await deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === "dismissed") {
+        localStorage.setItem("pwa-install-dismissed", Date.now().toString());
+      }
+    } catch (error) {
+      console.error('Install prompt failed:', error);
+    } finally {
+      setDeferredPrompt(null);
+      setShowBanner(false);
+      installStartedRef.current = false;
     }
-    setDeferredPrompt(null);
   };
 
   const handleDismiss = () => {

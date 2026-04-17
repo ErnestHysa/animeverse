@@ -11,7 +11,7 @@ export default function WatchPageLoading() {
           {/* Play button placeholder */}
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="w-16 h-16 rounded-full bg-gray-600/50 flex items-center justify-center">
-              <div className="w-0 h-0 border-t-8 border-b-8 border-l-12 border-t-transparent border-b-transparent border-l-gray-400/50 ml-1" />
+              <div className="w-0 h-0 border-t-8 border-b-8 border-l-[12px] border-t-transparent border-b-transparent border-l-gray-400/50 ml-1" />
             </div>
           </div>
         </div>

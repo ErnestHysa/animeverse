@@ -10,6 +10,7 @@
 import { motion } from "framer-motion";
 import { Award, TrendingUp, Clock, Users } from "lucide-react";
 import { formatBytes, formatDuration, getRankProgress } from "@/lib/seed-tracker";
+import type { SeedAchievement } from "@/types/seed-tracking";
 
 interface SeedStatsBadgeProps {
   totalUploaded: number;
@@ -72,19 +73,12 @@ interface SeedStatsPanelProps {
     averageSeedRatio: number;
     totalPeersHelped: number;
   };
-  achievements?: Array<{
-    id: string;
-    title: string;
-    description: string;
-    icon: string;
-    unlocked: boolean;
-    unlockedAt?: number;
-  }>;
+  achievements?: SeedAchievement[];
 }
 
 export function SeedStatsPanel({ stats, achievements = [] }: SeedStatsPanelProps) {
   // Add achievements to stats for getRankProgress
-  const statsWithAchievements = { ...stats, achievements: achievements as any };
+  const statsWithAchievements = { ...stats, achievements };
   const rankProgress = getRankProgress(statsWithAchievements);
 
   return (

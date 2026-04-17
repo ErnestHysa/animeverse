@@ -122,7 +122,7 @@ function decodeHtmlEntities(text: string): string {
  * Parse size string (e.g., "1.5 GiB") to bytes
  */
 function parseSize(sizeStr: string): number {
-  const match = sizeStr.match(/^(\d+(?:\.\d+)?)\s*(KiB|MiB|GiB|TiB)$/i);
+  const match = sizeStr.match(/^(\d+(?:\.\d+)?)\s*(KiB|MiB|GiB|TiB|KB|MB|GB|TB)$/i);
   if (!match) return 0;
 
   const value = parseFloat(match[1]);
@@ -133,6 +133,10 @@ function parseSize(sizeStr: string): number {
     mib: 1024 ** 2,
     gib: 1024 ** 3,
     tib: 1024 ** 4,
+    kb: 1000,
+    mb: 1000 * 1000,
+    gb: 1000 * 1000 * 1000,
+    tb: 1000 * 1000 * 1000 * 1000,
   };
 
   return value * (multipliers[unit] || 1);
@@ -233,12 +237,24 @@ export function isValidMagnetLink(magnet: string): boolean {
 }
 
 /**
+ * Normalize quality aliases to a canonical form
+ */
+const QUALITY_NORMALIZE: Record<string, string> = {
+  '4k': '2160p',
+  'uhd': '2160p',
+  'full hd': '1080p',
+  'fullhd': '1080p',
+  'fhd': '1080p',
+  'hd': '720p',
+};
+
+/**
  * Extract quality label from torrent title
  */
 export function extractQuality(title: string): string {
   const qualityPatterns = [
-    /\b(2160p|4K)\b/i,
-    /\b(1080p|Full.?HD)\b/i,
+    /\b(2160p|UHD|4K)\b/i,
+    /\b(1080p|Full.?HD|FHD)\b/i,
     /\b(720p|HD)\b/i,
     /\b(480p|SD)\b/i,
     /\b(360p)\b/i,
@@ -247,7 +263,9 @@ export function extractQuality(title: string): string {
   for (const pattern of qualityPatterns) {
     const match = title.match(pattern);
     if (match) {
-      return match[1].toLowerCase().replace("full.hd", "1080p");
+      const raw = match[1].toLowerCase();
+      const normalized = QUALITY_NORMALIZE[raw] || raw;
+      return normalized;
     }
   }
 

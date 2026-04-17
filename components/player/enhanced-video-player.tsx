@@ -466,7 +466,13 @@ export function EnhancedVideoPlayer({
 
         // Also save to individual progress localStorage for quick resume
         const key = `watch_progress_${mediaId}`;
-        const data = JSON.parse(localStorage.getItem(key) || "{}");
+        let data: Record<string, { progress: number; timestamp: number }>;
+        try {
+          data = JSON.parse(localStorage.getItem(key) || "{}");
+        } catch {
+          localStorage.removeItem(key);
+          data = {};
+        }
         data[epNumber] = {
           progress,
           timestamp: Date.now(),
@@ -1058,9 +1064,13 @@ export function EnhancedVideoPlayer({
 
     let subtitleLoadCancelled = false;
 
-    // Disable all existing text tracks first
-    for (let i = 0; i < video.textTracks.length; i++) {
-      video.textTracks[i].mode = "disabled";
+    // Clear existing text tracks to prevent memory leaks from accumulating tracks
+    for (let i = video.textTracks.length - 1; i >= 0; i--) {
+      const track = video.textTracks[i];
+      while (track.cues && track.cues.length > 0) {
+        track.removeCue(track.cues[0]);
+      }
+      track.mode = 'disabled';
     }
 
     // Add new subtitle tracks if available
@@ -1146,7 +1156,7 @@ export function EnhancedVideoPlayer({
               } else if (currentCue !== null) {
                 // This is subtitle text - append to current cue
                 if (currentCue.text) {
-                  currentCue.text += ' ' + line;
+                  currentCue.text += '\n' + line;
                 } else {
                   currentCue.text = line;
                 }
@@ -1221,6 +1231,17 @@ export function EnhancedVideoPlayer({
     return () => {
       subtitleLoadCancelled = true;
       if (subtitleTimerRef.current) clearTimeout(subtitleTimerRef.current);
+
+      // Clean up text tracks on unmount to prevent memory leaks
+      if (video) {
+        for (let i = video.textTracks.length - 1; i >= 0; i--) {
+          const track = video.textTracks[i];
+          while (track.cues && track.cues.length > 0) {
+            track.removeCue(track.cues[0]);
+          }
+          track.mode = 'disabled';
+        }
+      }
     };
   }, [subtitles, subtitlesEnabled]);
 
@@ -1263,6 +1284,19 @@ export function EnhancedVideoPlayer({
 
       // Read latest handlers from ref to avoid stale closures
       const handlers = handlersRef.current;
+
+      // Keys that the player handles -- stop propagation so the global
+      // keyboard-shortcut system does not also fire for these keys.
+      const PLAYER_KEYS = new Set([
+        " ", "k", "ArrowLeft", "ArrowRight", "j", "l",
+        "ArrowUp", "ArrowDown", "m", "f", "t", "p", "c",
+        "n", "?", "Escape",
+        "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
+      ]);
+
+      if (PLAYER_KEYS.has(e.key)) {
+        e.stopPropagation();
+      }
 
       switch (e.key) {
         case " ":

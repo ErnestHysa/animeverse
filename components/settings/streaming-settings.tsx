@@ -61,9 +61,9 @@ export function StreamingSettings({ className = "" }: StreamingSettingsProps) {
   const [showDetails, setShowDetails] = useState<string | null>(null);
 
   // Get current values with defaults
-  const streamingMethod = preferences?.streamingMethod || "direct";
-  const defaultQuality = preferences?.defaultQuality || "auto";
-  const preferDubs = preferences?.preferDubs || false;
+  const streamingMethod = preferences?.streamingMethod ?? "direct";
+  const defaultQuality = preferences?.defaultQuality ?? "auto";
+  const preferDubs = preferences?.preferDubs ?? false;
 
   const handleStreamingMethodChange = (method: typeof streamingMethod) => {
     updatePreferences({ streamingMethod: method });
@@ -216,6 +216,9 @@ export function StreamingSettings({ className = "" }: StreamingSettingsProps) {
           </p>
         </div>
         <button
+          role="switch"
+          aria-checked={preferDubs}
+          aria-label="Prefer dubbed audio"
           onClick={handlePreferDubsToggle}
           className={`relative w-12 h-6 rounded-full transition-colors ${
             preferDubs ? "bg-primary" : "bg-white/10"

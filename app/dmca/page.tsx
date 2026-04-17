@@ -116,7 +116,12 @@ export default function DMCAPage() {
                   <div className="bg-white/5 p-4 rounded-lg mt-4">
                     <p className="font-medium">DMCA Agent</p>
                     <p className="text-sm">AnimeVerse</p>
-                    <p className="text-sm text-primary">[Contact form available on request]</p>
+                    <p className="text-sm text-primary">
+                      For copyright concerns, please contact us at{" "}
+                      <a href="mailto:dmca@animeverse.app" className="underline">
+                        dmca@animeverse.app
+                      </a>
+                    </p>
                   </div>
                   <p className="text-sm mt-4">
                     You may also use our in-app report feature to flag specific content for review.

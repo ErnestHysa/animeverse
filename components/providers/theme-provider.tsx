@@ -37,11 +37,18 @@ function getStoredTheme(): Theme {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  // Initialize theme from localStorage using lazy initializer
-  const [theme, setThemeState] = useState<Theme>(() => getStoredTheme());
+  // Initialize to server-safe default to avoid SSR hydration mismatch
+  const [theme, setThemeState] = useState<Theme>("system");
 
-  // Derive resolved theme from current theme instead of using state
+  // Read stored theme on client after mount
+  useEffect(() => {
+    const stored = getStoredTheme();
+    if (stored) setThemeState(stored);
+  }, []);
+
+  // Derive resolved theme from current theme (only on client via useEffect)
   const resolvedTheme = useMemo<"dark" | "light">(() => {
+    if (typeof window === "undefined") return "dark";
     return theme === "system" ? getSystemTheme() : theme;
   }, [theme]);
 
@@ -57,10 +64,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, [theme]);
 
-  // Apply theme to document
+  // Apply theme to document (client-only)
   useEffect(() => {
     const root = document.documentElement;
-    const effectiveTheme = resolvedTheme;
+    const effectiveTheme = theme === "system" ? getSystemTheme() : theme;
 
     if (effectiveTheme === "dark") {
       root.classList.add("dark");
@@ -69,7 +76,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       root.classList.add("light");
       root.classList.remove("dark");
     }
-  }, [resolvedTheme]);
+  }, [theme]);
 
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme);

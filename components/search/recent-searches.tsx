@@ -35,11 +35,13 @@ export function RecentSearches({ currentQuery }: { currentQuery?: string }) {
     }
   }, []);
 
-  // Save current query when it exists
+  // Save current query when it exists (debounced to avoid saving partial keystrokes)
   useEffect(() => {
-    if (currentQuery?.trim()) {
+    if (!currentQuery?.trim()) return;
+    const timer = setTimeout(() => {
       saveRecentSearch(currentQuery.trim());
-    }
+    }, 1000); // 1 second debounce
+    return () => clearTimeout(timer);
   }, [currentQuery]);
 
   const removeRecent = (query: string) => {

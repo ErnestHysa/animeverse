@@ -10,6 +10,7 @@ import { useMemo } from "react";
 import type { Media } from "@/types/anilist";
 import { STORAGE_KEYS, DEFAULT_PREFERENCES } from "@/lib/constants";
 import { ACHIEVEMENTS, getAchievementRequirement } from "@/lib/achievements";
+import { countCompletedAnime } from "@/lib/stats";
 
 // Re-export achievements list for use in components
 export const ACHIEVEMENTS_LIST = ACHIEVEMENTS;
@@ -474,12 +475,9 @@ export const useStore = create<StoreState>()(
 
       syncAniListData: (mediaList: unknown[]) =>
         set((state) => {
-          // Process AniList media list - preserve full status data
-          const entries: AniListMediaEntry[] = [];
-          const watchlistIds: number[] = [];
-
-          // Process AniList media list
-          for (const item of mediaList as Array<{
+          // Fix M14: Runtime validation instead of blindly casting unknown[]
+          // Raw AniList API item shape for validation
+          interface RawAniListItem {
             mediaId?: number;
             status: string;
             progress?: number;
@@ -500,7 +498,22 @@ export const useStore = create<StoreState>()(
               description?: string;
               studios?: { nodes: { name: string }[] };
             };
-          }>) {
+          }
+
+          function validateAniListMedia(item: unknown): item is RawAniListItem {
+            if (!item || typeof item !== 'object') return false;
+            const obj = item as Record<string, unknown>;
+            return typeof obj.status === 'string' && obj.media != null && typeof obj.media === 'object';
+          }
+
+          const validMedia = mediaList.filter(validateAniListMedia);
+
+          // Process AniList media list - preserve full status data
+          const entries: AniListMediaEntry[] = [];
+          const watchlistIds: number[] = [];
+
+          // Process AniList media list
+          for (const item of validMedia) {
             if (!item.media) continue;
 
             const mediaId = item.mediaId ?? item.media.id;
@@ -791,7 +804,7 @@ export const useStore = create<StoreState>()(
           // Calculate stats for achievement checking
           const totalEpisodes = state.watchHistory.length;
           const uniqueAnime = new Set(state.watchHistory.map((item) => item.mediaId));
-          const completedAnime = state.watchHistory.filter((item) => item.completed).length;
+          const completedAnime = countCompletedAnime(state.watchHistory);
           const favoritesCount = state.favorites.length;
 
           // Check each achievement
@@ -995,6 +1008,10 @@ export const useStore = create<StoreState>()(
         // Only persist certain fields
         // Fix H14: Remove OAuth tokens from localStorage — they are now in httpOnly cookies.
         // Keep boolean flags for connection status instead of actual tokens.
+        // Don't persist auth-related user data without corresponding tokens
+        // malUser is excluded so state is consistent with malToken (also excluded)
+        // Fix M11: Exclude isAuthenticated from persistence so it is derived fresh
+        // from anilistToken on reload, preventing stale isAuthenticated=true with null token.
         partialize: (state) => ({
           favorites: state.favorites,
           watchlist: state.watchlist,
@@ -1002,9 +1019,7 @@ export const useStore = create<StoreState>()(
           preferences: state.preferences,
           mediaCache: state.mediaCache,
           anilistUser: state.anilistUser,
-          isAuthenticated: state.isAuthenticated,
           anilistMediaList: state.anilistMediaList,
-          malUser: state.malUser,
           achievements: state.achievements,
           unlockedAchievements: state.unlockedAchievements,
           perAnimePrefs: state.perAnimePrefs,

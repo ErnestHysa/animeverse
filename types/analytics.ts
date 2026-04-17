@@ -7,6 +7,15 @@
 
 export type StreamingMethod = "hls" | "webtorrent" | "hybrid";
 
+/**
+ * Normalize a streaming method value from the store (which may use "direct")
+ * to the canonical analytics/internal value ("hls").
+ */
+export function normalizeStreamingMethod(method: string): StreamingMethod {
+  if (method === "direct") return "hls";
+  return method as StreamingMethod;
+}
+
 export interface StreamingEvent {
   id: string;
   timestamp: number;

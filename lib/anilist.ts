@@ -34,7 +34,10 @@ const QUERIES = {
 
   seasonal: `query Seasonal($season: MediaSeason, $year: Int, $page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME, season: $season, seasonYear: $year, sort: POPULARITY_DESC) { ${MEDIA_FULL_FRAGMENT} } } }`,
 
-  airing: `query Airing($page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } airingSchedules(airingAt_greater: ${Math.floor(Date.now() / 1000)}, sort: TIME) { id airingAt timeUntilAiring episode media { ${MEDIA_MINIMAL_FRAGMENT} } } } }`,
+  airing: (sinceTimestamp?: number) => {
+    const since = sinceTimestamp ?? Math.floor(Date.now() / 1000);
+    return `query Airing($page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } airingSchedules(airingAt_greater: ${since}, sort: TIME) { id airingAt timeUntilAiring episode media { ${MEDIA_MINIMAL_FRAGMENT} } } } }`;
+  },
 
   search: `query Search($search: String, $page: Int, $perPage: Int, $sort: [MediaSort], $format: [MediaFormat], $genre: String, $status: MediaStatus, $year: Int, $season: MediaSeason, $minScore: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME search: $search sort: $sort format_in: $format genre: $genre status: $status seasonYear: $year season: $season averageScore_greater: $minScore) { ${MEDIA_FULL_FRAGMENT} } } }`,
 
@@ -73,7 +76,6 @@ class AniListClient {
         const waitTime = this.windowMs - (now - oldestInWindow) + 100;
         await new Promise(r => setTimeout(r, waitTime));
       }
-      this.calls.push(Date.now());
     }
   };
 
@@ -119,6 +121,9 @@ class AniListClient {
       });
 
       clearTimeout(timeout);
+
+      // Push timestamp only after successful response to avoid wasting quota on failures
+      this.rateLimiter.calls.push(Date.now());
 
       const data = await response.json();
 
@@ -171,7 +176,8 @@ class AniListClient {
   }
 
   async getAiring(page: number = 1, perPage: number = 24): Promise<APIResult<AiringResponse>> {
-    return this.query<AiringResponse>(QUERIES.airing, { page, perPage });
+    const query = QUERIES.airing(Math.floor(Date.now() / 1000));
+    return this.query<AiringResponse>(query, { page, perPage });
   }
 
   async search(params: {

@@ -28,10 +28,12 @@ export default function NotFound() {
               Go Home
             </Button>
           </Link>
-          <Button onClick={() => window.history.back()} variant="glass">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Go Back
-          </Button>
+          <Link href="/search">
+            <Button variant="glass">
+              <Search className="w-4 h-4 mr-2" />
+              Search
+            </Button>
+          </Link>
         </div>
       </div>
     </div>

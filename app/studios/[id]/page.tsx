@@ -100,7 +100,7 @@ export default async function StudioDetailPage({ params }: StudioPageProps) {
             <div>
               <h1 className="text-3xl font-display font-bold">{studioName}</h1>
               <p className="text-muted-foreground">
-                {total} anime{total !== 1 ? "" : ""}
+                {total} anime{total !== 1 ? "s" : ""}
               </p>
             </div>
           </div>

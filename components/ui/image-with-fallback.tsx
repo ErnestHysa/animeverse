@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Image from "next/image";
 import { ImageIcon } from "lucide-react";
 
@@ -40,6 +40,12 @@ export function ImageWithFallback({
 }: ImageWithFallbackProps) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
+
+  // Reset loading state when src changes so placeholder shows for new image
+  useEffect(() => {
+    setImageLoaded(false);
+    setImageError(false);
+  }, [src]);
 
   const handleLoad = useCallback(() => {
     setImageLoaded(true);

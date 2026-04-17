@@ -51,6 +51,10 @@ export function WebTorrentPlayer({
   const torrentRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Use ref for onError to avoid client recreation on every parent re-render
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
+
   const [isClientReady, setIsClientReady] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const isLoadingRef = useRef(isLoading);
@@ -87,7 +91,7 @@ export function WebTorrentPlayer({
     if (typeof WebTorrent === "undefined") {
       const errorMsg = "WebTorrent is not loaded. Please ensure webtorrent library is available.";
       setError(errorMsg);
-      onError?.(new Error(errorMsg));
+      onErrorRef.current?.(new Error(errorMsg));
       toast.error(errorMsg);
       return;
     }
@@ -124,10 +128,10 @@ export function WebTorrentPlayer({
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Failed to initialize WebTorrent";
       setError(errorMsg);
-      onError?.(new Error(errorMsg));
+      onErrorRef.current?.(new Error(errorMsg));
       toast.error(`WebTorrent Error: ${errorMsg}`);
     }
-  }, [onError]);
+  }, []);
 
   // Load torrent from magnet link
   useEffect(() => {
@@ -141,7 +145,7 @@ export function WebTorrentPlayer({
         const timeoutMsg = "Torrent loading timeout. No seeds found.";
         setError(timeoutMsg);
         setIsLoading(false);
-        onError?.(new Error(timeoutMsg));
+        onErrorRef.current?.(new Error(timeoutMsg));
         toast.error(timeoutMsg);
       }
     }, 30000); // 30 second timeout
@@ -168,7 +172,7 @@ export function WebTorrentPlayer({
         const errorMsg = "No video file found in torrent";
         setError(errorMsg);
         setIsLoading(false);
-        onError?.(new Error(errorMsg));
+        onErrorRef.current?.(new Error(errorMsg));
         toast.error(errorMsg);
         return;
       }
@@ -180,7 +184,7 @@ export function WebTorrentPlayer({
         if (err) {
           setError(err.message);
           setIsLoading(false);
-          onError?.(err);
+          onErrorRef.current?.(err);
           toast.error(`Streaming Error: ${err.message}`);
           return;
         }
@@ -242,7 +246,7 @@ export function WebTorrentPlayer({
         console.error("[WebTorrent] Torrent error:", err);
         setError(err.message);
         setIsLoading(false);
-        onError?.(err);
+        onErrorRef.current?.(err);
         toast.error(`Torrent Error: ${err.message}`);
       });
     });
@@ -253,7 +257,7 @@ export function WebTorrentPlayer({
         torrentRef.current.removeAllListeners();
       }
     };
-  }, [isClientReady, magnet, infoHash, onReady, onError]);
+  }, [isClientReady, magnet, infoHash, onReady]);
 
   // Toggle play/pause
   const togglePlayPause = useCallback(() => {
