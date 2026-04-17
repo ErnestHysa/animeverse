@@ -105,6 +105,39 @@ export function useWatchParty(animeId: number, episodeNumber: number) {
     return roomId;
   }, [animeId, episodeNumber, generateRoomId]);
 
+  // Helper: atomic-ish localStorage read-modify-write with retry (Fix H8)
+  const atomicRoomUpdate = useCallback(
+    (roomId: string, mutate: (room: WatchPartyRoom) => void, retries = 1): boolean => {
+      try {
+        const result = safeGetItem<WatchPartyRoom>(`${STORAGE_KEY}-room-${roomId}`);
+        if (!result.success || !result.data) return false;
+        const room = result.data;
+        mutate(room);
+        safeSetItem(`${STORAGE_KEY}-room-${roomId}`, room);
+        return true;
+      } catch {
+        if (retries > 0) {
+          // Small random delay to reduce collision probability, then retry once
+          const delay = 50 + Math.floor(Math.random() * 100);
+          const start = Date.now();
+          while (Date.now() - start < delay) { /* busy-wait is fine for <150ms */ }
+          try {
+            const result = safeGetItem<WatchPartyRoom>(`${STORAGE_KEY}-room-${roomId}`);
+            if (!result.success || !result.data) return false;
+            const room = result.data;
+            mutate(room);
+            safeSetItem(`${STORAGE_KEY}-room-${roomId}`, room);
+            return true;
+          } catch {
+            return false;
+          }
+        }
+        return false;
+      }
+    },
+    [],
+  );
+
   // Join an existing room
   const joinRoom = useCallback((roomId: string) => {
     const result = safeGetItem<WatchPartyRoom>(`${STORAGE_KEY}-room-${roomId}`);
@@ -121,51 +154,73 @@ export function useWatchParty(animeId: number, episodeNumber: number) {
       return false;
     }
 
-    safeSetItem(`${STORAGE_KEY}-current`, { roomId, isHost: false });
+    try {
+      safeSetItem(`${STORAGE_KEY}-current`, { roomId, isHost: false });
 
-    // Add viewer to room
-    room.viewers++;
-    safeSetItem(`${STORAGE_KEY}-room-${roomId}`, room);
+      // Add viewer to room with retry (Fix H8)
+      const updated = atomicRoomUpdate(roomId, (r) => { r.viewers++; });
+      if (!updated) {
+        // Write failed after retry — still join but warn
+        console.warn("Failed to update room viewer count after retry");
+      }
 
-    setState({
-      roomId,
-      isHost: false,
-      currentTime: 0,
-      isPlaying: false,
-      viewers: [],
-      chat: [],
-    });
+      setState({
+        roomId,
+        isHost: false,
+        currentTime: 0,
+        isPlaying: false,
+        viewers: [],
+        chat: [],
+      });
 
-    toast.success(`Joined room: ${roomId}`);
-    return true;
-  }, [animeId, episodeNumber]);
+      toast.success(`Joined room: ${roomId}`);
+      return true;
+    } catch {
+      toast.error("Failed to join room. Please try again.");
+      return false;
+    }
+  }, [animeId, episodeNumber, atomicRoomUpdate]);
 
   // Leave current room — uses refs to avoid stale closure (Fix L7)
   const leaveRoom = useCallback(() => {
     const { roomId } = stateRef.current;
     if (!roomId) return;
 
-    const result = safeGetItem<WatchPartyRoom>(`${STORAGE_KEY}-room-${roomId}`);
-    if (result.success && result.data) {
-      const room = result.data;
-      if (room.viewers > 0) {
-        room.viewers--;
-        safeSetItem(`${STORAGE_KEY}-room-${roomId}`, room);
+    try {
+      const updated = atomicRoomUpdate(roomId, (room) => {
+        if (room.viewers > 0) {
+          room.viewers--;
+        }
+      });
+      if (!updated) {
+        console.warn("Failed to decrement room viewer count after retry");
       }
+
+      safeRemoveItem(`${STORAGE_KEY}-current`);
+      setState({
+        roomId: null,
+        isHost: false,
+        currentTime: 0,
+        isPlaying: false,
+        viewers: [],
+        chat: [],
+      });
+
+      toast.success("Left watch party");
+    } catch {
+      // Best-effort: still clear local state even if localStorage write fails
+      safeRemoveItem(`${STORAGE_KEY}-current`);
+      setState({
+        roomId: null,
+        isHost: false,
+        currentTime: 0,
+        isPlaying: false,
+        viewers: [],
+        chat: [],
+      });
+      toast.success("Left watch party");
     }
-
-    safeRemoveItem(`${STORAGE_KEY}-current`);
-    setState({
-      roomId: null,
-      isHost: false,
-      currentTime: 0,
-      isPlaying: false,
-      viewers: [],
-      chat: [],
-    });
-
-    toast.success("Left watch party");
-  }, []);
+  }, [atomicRoomUpdate]);
 
   // Sync playback state — uses refs to avoid stale closure (Fix L7)
   const syncPlayback = useCallback((currentTime: number, isPlaying: boolean) => {
@@ -308,6 +363,7 @@ export function WatchPartyControls({
   const [showChat, setShowChat] = useState(true);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<BroadcastChannel | null>(null);
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // BroadcastChannel for real cross-tab sync
   useEffect(() => {
@@ -351,12 +407,32 @@ export function WatchPartyControls({
     }
   }, [state.chat]);
 
-  const handleCopyRoomId = () => {
+  // Cleanup copied timer on unmount (Fix L5)
+  useEffect(() => {
+    return () => {
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+    };
+  }, []);
+
+  const handleCopyRoomId = async () => {
     if (state.roomId) {
-      navigator.clipboard.writeText(state.roomId);
-      setCopied(true);
-      toast.success("Room ID copied!");
-      setTimeout(() => setCopied(false), 2000);
+      try {
+        await navigator.clipboard.writeText(state.roomId);
+        setCopied(true);
+        toast.success("Room ID copied!");
+      } catch {
+        // Fallback: create a temporary textarea (Fix M8)
+        const textarea = document.createElement('textarea');
+        textarea.value = state.roomId;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        setCopied(true);
+        toast.success("Room ID copied!");
+      }
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+      copiedTimerRef.current = setTimeout(() => setCopied(false), 2000);
     }
   };
 

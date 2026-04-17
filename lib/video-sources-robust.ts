@@ -583,15 +583,17 @@ export async function getEpisodeSources(
   // Try each strategy with timeout
   for (const strategy of strategies) {
     try {
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
       const result = await Promise.race([
         strategy.fn(animeId, episodeNumber, title),
-        new Promise<null>((resolve) =>
-          setTimeout(() => {
+        new Promise<null>((resolve) => {
+          timeoutId = setTimeout(() => {
             log('warn', `${strategy.name} strategy timeout`);
             resolve(null);
-          }, CONFIG.requestTimeout)
-        ),
+          }, CONFIG.requestTimeout);
+        }),
       ]);
+      if (timeoutId) clearTimeout(timeoutId);
 
       if (result && result.sources.length > 0) {
         log('info', `Success using ${strategy.name}`);

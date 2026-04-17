@@ -10,6 +10,29 @@ import type { Media } from "@/types/anilist";
 
 const JIKAN_API_BASE = "https://api.jikan.moe/v4";
 
+// Global rate limiter for Jikan API (v4 limits: 3 req/sec, 60/min)
+const jikanRateLimiter = {
+  timestamps: [] as number[],
+  maxPerSecond: 2,
+  maxPerMinute: 50,
+
+  async wait(): Promise<void> {
+    const now = Date.now();
+    // Clean old timestamps
+    this.timestamps = this.timestamps.filter(t => now - t < 60000);
+    if (this.timestamps.length >= this.maxPerMinute) {
+      const waitMs = 60000 - (now - this.timestamps[0]) + 100;
+      await new Promise(r => setTimeout(r, waitMs));
+    }
+    // Also check per-second limit
+    const recentSecond = this.timestamps.filter(t => now - t < 1000);
+    if (recentSecond.length >= this.maxPerSecond) {
+      await new Promise(r => setTimeout(r, 1100));
+    }
+    this.timestamps.push(Date.now());
+  }
+};
+
 // ============================================
 // Types
 // ============================================
@@ -95,6 +118,29 @@ interface JikanSingleResponse<T> {
 // Helper Functions
 // ============================================
 
+const JIKAN_FORMAT_MAP: Record<string, string> = {
+  'tv': 'TV',
+  'ova': 'OVA',
+  'movie': 'MOVIE',
+  'special': 'SPECIAL',
+  'music': 'MUSIC',
+  'ona': 'ONA',
+  'tv_short': 'TV_SHORT',
+};
+
+/**
+ * Parse Jikan duration string (e.g. "1 hr 34 min" or "24 min per ep") into total minutes
+ */
+function parseJikanDuration(duration: string | null): number | null {
+  if (!duration) return null;
+  let totalMinutes = 0;
+  const hrMatch = duration.match(/(\d+)\s*hr/);
+  const minMatch = duration.match(/(\d+)\s*min/);
+  if (hrMatch) totalMinutes += parseInt(hrMatch[1]) * 60;
+  if (minMatch) totalMinutes += parseInt(minMatch[1]);
+  return totalMinutes > 0 ? totalMinutes : null;
+}
+
 /**
  * Convert Jikan anime to our Media format
  */
@@ -108,12 +154,12 @@ function jikanToMedia(jikan: JikanAnime): Media {
       native: jikan.title_japanese || null,
       userPreferred: jikan.title_english || jikan.title,
     },
-    format: jikan.type.toUpperCase().replace("TV", "TV") as Media["format"],
+    format: (JIKAN_FORMAT_MAP[jikan.type?.toLowerCase()] || jikan.type?.toUpperCase() || 'TV') as Media["format"],
     type: "ANIME",
     status: jikan.status.toUpperCase().replace(" ", "_") as Media["status"],
     description: jikan.synopsis || null,
     episodes: jikan.episodes || null,
-    duration: jikan.duration ? parseInt(jikan.duration) : null,
+    duration: parseJikanDuration(jikan.duration ?? null),
     averageScore: jikan.score ? jikan.score * 10 : null,
     meanScore: null,
     popularity: jikan.popularity || 0,
@@ -174,6 +220,7 @@ function jikanToMedia(jikan: JikanAnime): Media {
  */
 async function fetchFromJikan<T>(endpoint: string, timeout = 10000): Promise<T | null> {
   try {
+    await jikanRateLimiter.wait();
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 

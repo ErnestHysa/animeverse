@@ -193,7 +193,10 @@ class DASHStreamManagerImpl {
 
     // Check if MP4 is supported
     const video = document.createElement("video");
-    if (video.canPlayType("application/dash+xml") !== "") {
+    const dashSupported = video.canPlayType("application/dash+xml") !== "";
+    video.remove();
+
+    if (dashSupported) {
       return true;
     }
 

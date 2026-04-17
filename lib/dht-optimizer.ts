@@ -193,6 +193,12 @@ class DHTOptimizerImpl {
     } else {
       // Add new node
       this.nodeCache.set(key, { ...node });
+
+      // Cap nodeCache size to prevent unbounded growth (M7)
+      if (this.nodeCache.size > 500) {
+        const firstKey = this.nodeCache.keys().next().value;
+        if (firstKey) this.nodeCache.delete(firstKey);
+      }
     }
 
     // Debounced saveNodeCache (M10) - only save every 30 seconds
@@ -254,6 +260,12 @@ class DHTOptimizerImpl {
         failureCount: 1,
         averageLatency: 0,
       });
+
+      // Cap nodeCache size to prevent unbounded growth (M7)
+      if (this.nodeCache.size > 500) {
+        const firstKey = this.nodeCache.keys().next().value;
+        if (firstKey) this.nodeCache.delete(firstKey);
+      }
     }
 
     // Update connection stats
@@ -342,14 +354,26 @@ class DHTOptimizerImpl {
     const startTime = Date.now();
 
     try {
-      // WebTorrent doesn't have direct DHT ping, but we can trigger
-      // DHT discovery by trying to find a popular torrent
-      // Use a well-known infohash for testing
+      // NOTE: Actual DHT ping requires sending a DHT query and waiting for a response.
+      // This is a simplified health check. Real implementation should use dht.lookup or
+      // the underlying WebTorrent DHT instance to send a proper ping and verify round-trip.
+      // Currently records success unconditionally — latency reflects only local overhead.
+      // TODO: Integrate with client.dht?.ping?.({ address, port }) when available.
 
-      // For now, we'll just record that we attempted connection
-      // Real DHT ping would be done by the underlying WebTorrent library
+      // Attempt a basic connectivity probe via WebTorrent's DHT if accessible
+      if (client?.dht && typeof client.dht.ping === 'function') {
+        await client.dht.ping({ host: node.address, port: node.port });
+        const latency = Date.now() - startTime;
+        this.recordSuccess(node.address, node.port, latency);
+        return true;
+      }
 
+      // Fallback: mark latency as unverified since no actual ping was performed
       const latency = Date.now() - startTime;
+      console.warn(
+        `[DHTOptimizer] pingNode: no DHT ping available for ${node.address}:${node.port}, ` +
+        `recording unverified latency (${latency}ms)`
+      );
       this.recordSuccess(node.address, node.port, latency);
 
       return true;

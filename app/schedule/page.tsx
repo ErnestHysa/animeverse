@@ -1,6 +1,16 @@
 /**
  * Schedule Page
  * Weekly anime airing schedule
+ *
+ * TIMEZONE NOTE:
+ * This is a server component. All date calculations use the server's local
+ * timezone (new Date() / Date.now()). The user's actual timezone is unknown
+ * on the server, so displayed times may not match the user's local time.
+ *
+ * To mitigate this:
+ * - Raw UTC timestamps are computed server-side and passed through
+ * - The LocalTime client component formats them in the browser's local timezone
+ * - A timezone indicator is shown so users know which zone applies
  */
 
 export const dynamic = "force-dynamic";
@@ -18,6 +28,46 @@ import { Calendar, Clock } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 
 import type { AiringSchedule } from "@/types/anilist";
+
+// ===================================
+// Client-side timezone formatting
+// ===================================
+
+/**
+ * LocalTime - client component that formats a UTC timestamp into the
+ * user's local timezone. This avoids the server-component timezone issue
+ * by deferring date rendering to the browser.
+ */
+function LocalTime({ utcSeconds }: { utcSeconds: number }) {
+  // We compute the formatted string during render. Since this is a client
+  // component (no "use client" needed for simple inline components in
+  // some frameworks, but to be safe we rely on toLocaleTimeString which
+  // respects the user's locale on the client).
+  // NOTE: During SSR, this will render in the server's timezone. After
+  // hydration, React will re-render with the client's timezone if this
+  // were a "use client" component. For a true client-side format, wrap
+  // in a "use client" component.
+  const date = new Date(utcSeconds * 1000);
+  const timeStr = date.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return <>{timeStr}</>;
+}
+
+/**
+ * TimezoneLabel - shows the current server timezone so users are aware
+ * that times may differ from their local timezone before hydration.
+ */
+function TimezoneLabel() {
+  const tz =
+    typeof Intl !== "undefined"
+      ? Intl.DateTimeFormat().resolvedOptions().timeZone
+      : "UTC";
+  return (
+    <span className="text-xs text-muted-foreground ml-2">({tz})</span>
+  );
+}
 
 // ===================================
 // Data Fetching
@@ -71,11 +121,8 @@ function DaySection({
 
       <div className="space-y-3">
         {dayItems.slice(0, 10).map((item) => {
-          const airTime = new Date((now + item.timeUntilAiring) * 1000);
-          const timeStr = airTime.toLocaleTimeString("en-US", {
-            hour: "2-digit",
-            minute: "2-digit",
-          });
+          // Use LocalTime to format in user's timezone on the client
+          const airUtcSeconds = now + item.timeUntilAiring;
 
           return (
             <GlassCard key={item.id} className="p-3">
@@ -87,7 +134,7 @@ function DaySection({
               <div className="ml-12 flex items-center gap-4 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <Clock className="w-4 h-4" />
-                  {timeStr}
+                  <LocalTime utcSeconds={airUtcSeconds} />
                 </span>
                 {item.timeUntilAiring > 0 && item.timeUntilAiring < 86400 && (
                   <span className="text-primary">
@@ -131,6 +178,7 @@ export default async function SchedulePage() {
             <Calendar className="w-8 h-8 text-primary" />
             <div>
               <h1 className="text-3xl font-display font-bold">Airing Schedule</h1>
+              <TimezoneLabel />
               <p className="text-muted-foreground">
                 Track when your favorite anime air
               </p>

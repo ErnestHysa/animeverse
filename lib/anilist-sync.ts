@@ -35,7 +35,11 @@ export function useAniListProgressSync() {
       // Push to AniList API if authenticated (fire-and-forget)
       if (!isAuthenticated || !anilistToken) return;
 
-      await anilist.saveMediaListEntry(anilistToken, mediaId, episodeWatched, status);
+      try {
+        await anilist.saveMediaListEntry(anilistToken, mediaId, episodeWatched, status);
+      } catch (error) {
+        console.error('Failed to sync progress to AniList:', error);
+      }
     },
     [anilistToken, isAuthenticated, updateAniListEntryLocally]
   );

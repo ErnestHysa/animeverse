@@ -234,6 +234,9 @@ export function EpisodeNotifications({ airingSchedule = [] }: EpisodeNotificatio
   const prefsRef = useRef(prefs);
   prefsRef.current = prefs;
 
+  // Deduplication set: prevents both useEffects from notifying for the same episode (Fix H9)
+  const notifiedEpisodesRef = useRef<Set<string>>(new Set());
+
   // Check for new episodes and send notifications
   useEffect(() => {
     if (permission !== "granted" || airingSchedule.length === 0) return;
@@ -243,6 +246,11 @@ export function EpisodeNotifications({ airingSchedule = [] }: EpisodeNotificatio
       airingSchedule.forEach((item) => {
         const pref = prefsRef.current.find((p) => p.mediaId === item.mediaId);
         if (pref?.enabled && item.nextEpisode > pref.episodeOffset) {
+          // Fix H9: guard against duplicate notifications
+          const dupKey = `${item.mediaId}-${item.nextEpisode}`;
+          if (notifiedEpisodesRef.current.has(dupKey)) return;
+          notifiedEpisodesRef.current.add(dupKey);
+
           // New episode detected!
           notificationManager.sendNotification(
             `${item.title} - Episode ${item.nextEpisode} is out!`,
@@ -287,12 +295,19 @@ export function EpisodeNotifications({ airingSchedule = [] }: EpisodeNotificatio
           }
         }`;
 
-        const response = await fetch('https://graphql.anilist.co', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query }),
-          signal: AbortSignal.timeout(8000),
-        });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        let response: Response;
+        try {
+          response = await fetch('https://graphql.anilist.co', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query }),
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timeoutId);
+        }
 
         if (!response.ok) return;
         const data = await response.json();
@@ -306,6 +321,11 @@ export function EpisodeNotifications({ airingSchedule = [] }: EpisodeNotificatio
           if (!trackedIds.has(schedule.media?.id)) continue;
           const key = `${schedule.media.id}-ep${schedule.episode}`;
           if (notified.includes(key)) continue;
+
+          // Fix H9: also check the in-memory dedup set to avoid duplicates from the other useEffect
+          const dupKey = `${schedule.media.id}-${schedule.episode}`;
+          if (notifiedEpisodesRef.current.has(dupKey)) continue;
+          notifiedEpisodesRef.current.add(dupKey);
 
           const title = schedule.media.title?.english || schedule.media.title?.romaji || 'Unknown';
           const minutesUntil = Math.round((schedule.airingAt - now) / 60);

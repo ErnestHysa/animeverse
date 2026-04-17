@@ -57,15 +57,18 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // Notifications
   showNotification: (title: string, body: string): Promise<void> => ipcRenderer.invoke("show-notification", title, body),
 
-  // Event listeners
+  // Event listeners (each returns an unsubscribe function)
   onTorrentStarted: (callback: (session: TorrentSession) => void) => {
     ipcRenderer.on("torrent-started", (_event, session) => callback(session));
+    return () => ipcRenderer.removeAllListeners("torrent-started");
   },
   onTorrentStopped: (callback: (data: { infoHash: string }) => void) => {
     ipcRenderer.on("torrent-stopped", (_event, data) => callback(data));
+    return () => ipcRenderer.removeAllListeners("torrent-stopped");
   },
   onOpenSettings: (callback: () => void) => {
     ipcRenderer.on("open-settings", () => callback());
+    return () => ipcRenderer.removeAllListeners("open-settings");
   },
 });
 
@@ -85,9 +88,9 @@ declare global {
       minimizeToTray: () => Promise<void>;
       quitApp: () => Promise<void>;
       showNotification: (title: string, body: string) => Promise<void>;
-      onTorrentStarted: (callback: (session: TorrentSession) => void) => void;
-      onTorrentStopped: (callback: (data: { infoHash: string }) => void) => void;
-      onOpenSettings: (callback: () => void) => void;
+      onTorrentStarted: (callback: (session: TorrentSession) => void) => () => void;
+      onTorrentStopped: (callback: (data: { infoHash: string }) => void) => () => void;
+      onOpenSettings: (callback: () => void) => () => void;
     };
   }
 }

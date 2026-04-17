@@ -101,7 +101,7 @@ export function findExternalSubtitleFiles(torrentFiles: any[]): SubtitleTrack[] 
     if (extension) {
       // Extract language from filename
       const languageMatch = fileName.match(/\[([a-z]{2,3})\]|\.(en|ja|es|fr|de|it|pt|ru|ar|ko|zh)\./i);
-      const language = languageMatch ? languageMatch[1] : "unknown";
+      const language = languageMatch ? (languageMatch[1] || languageMatch[2]) : "unknown";
 
       tracks.push({
         id: `external-${file.path}`,
@@ -277,6 +277,9 @@ function detectEncoding(buffer: Buffer): string {
   }
 }
 
+// Track the current blob URL so we can revoke it before creating a new one
+let currentBlobUrl: string | null = null;
+
 /**
  * Load subtitle file and create blob URL
  */
@@ -308,9 +311,12 @@ export async function loadSubtitleFile(file: any): Promise<string | null> {
       content = convertASStoVTT(content);
     }
 
-    // Create blob URL
+    // Revoke previous blob URL before creating a new one
+    if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
     const blob = new Blob([content], { type: "text/vtt" });
-    return URL.createObjectURL(blob);
+    const blobUrl = URL.createObjectURL(blob);
+    currentBlobUrl = blobUrl;
+    return blobUrl;
   } catch (error) {
     console.error("[Subtitle] Error loading subtitle file:", error);
     return null;

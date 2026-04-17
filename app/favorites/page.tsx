@@ -22,17 +22,24 @@ export default function FavoritesPage() {
   const { favorites } = useFavorites();
   const [anime, setAnime] = useState<Media[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadFavorites() {
-      if (favorites.length > 0) {
-        const result = await anilist.getByIds(favorites);
-        const fetchedAnime = result.data?.Page.media.filter((m: Media) =>
-          favorites.includes(m.id)
-        ) ?? [];
-        setAnime(fetchedAnime);
+      try {
+        if (favorites.length > 0) {
+          const result = await anilist.getByIds(favorites);
+          const fetchedAnime = result.data?.Page.media.filter((m: Media) =>
+            favorites.includes(m.id)
+          ) ?? [];
+          setAnime(fetchedAnime);
+        }
+      } catch (err) {
+        console.error('Failed to load favorites:', err);
+        setError('Failed to load favorites. Please try again.');
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }
 
     loadFavorites();
@@ -54,6 +61,8 @@ export default function FavoritesPage() {
               </p>
             </div>
           </div>
+
+          {error && <div className="text-center py-8 text-red-400">{error}</div>}
 
           {loading ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">

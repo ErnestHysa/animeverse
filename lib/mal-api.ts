@@ -138,20 +138,28 @@ export async function updateMALEntry(
     body.set("score", String(score));
   }
 
-  const response = await fetch(
-    `${MAL_API_BASE}/anime/${malId}/my_list_status`,
-    {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: body.toString(),
-    }
-  );
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-  if (!response.ok && response.status !== 404) {
-    throw new Error(`MAL update failed: ${response.status}`);
+  try {
+    const response = await fetch(
+      `${MAL_API_BASE}/anime/${malId}/my_list_status`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: body.toString(),
+        signal: controller.signal,
+      }
+    );
+
+    if (!response.ok && response.status !== 404) {
+      throw new Error(`MAL update failed: ${response.status}`);
+    }
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
@@ -159,15 +167,23 @@ export async function updateMALEntry(
  * Fetch the currently authenticated MAL user's profile.
  */
 export async function getMALUser(token: string): Promise<MALUser> {
-  const response = await fetch(
-    `${MAL_API_BASE}/users/@me?fields=id,name,picture,joined_at`,
-    {
-      headers: { Authorization: `Bearer ${token}` },
-    }
-  );
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-  if (!response.ok) throw new Error(`MAL user fetch failed: ${response.status}`);
-  return response.json();
+  try {
+    const response = await fetch(
+      `${MAL_API_BASE}/users/@me?fields=id,name,picture,joined_at`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
+      }
+    );
+
+    if (!response.ok) throw new Error(`MAL user fetch failed: ${response.status}`);
+    return response.json();
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 /**

@@ -65,6 +65,15 @@ export const AnimeCard = memo(function AnimeCard({
   const [showHoverPanel, setShowHoverPanel] = useState(false);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
+  // Clear hover timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, []);
+
   // Simulcast = currently airing this season or last season
   const isSimulcast = isSimulcastAnime(anime);
 

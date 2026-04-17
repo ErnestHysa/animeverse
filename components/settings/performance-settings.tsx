@@ -7,8 +7,11 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { usePreferences } from "@/store";
+import { updateBandwidthConfig } from "@/lib/bandwidth-manager";
+import { updatePreloaderConfig } from "@/lib/torrent-preloader";
+import { optimizeDHT } from "@/lib/dht-optimizer";
 import {
   Zap,
   Wifi,
@@ -82,6 +85,28 @@ export function PerformanceSettings({ className = "" }: PerformanceSettingsProps
     enablePreconnect: true,
     preferTrackers: true,
   };
+
+  // Propagate settings to lib singletons when preferences change
+  useEffect(() => {
+    try {
+      updateBandwidthConfig(bandwidthConfig);
+    } catch (e) {
+      console.warn("[PerformanceSettings] Failed to update bandwidth config:", e);
+    }
+    try {
+      updatePreloaderConfig(preloadConfig);
+    } catch (e) {
+      console.warn("[PerformanceSettings] Failed to update preloader config:", e);
+    }
+    try {
+      optimizeDHT({
+        enablePreconnect: dhtConfig.enablePreconnect,
+        preferTrackers: dhtConfig.preferTrackers,
+      });
+    } catch (e) {
+      console.warn("[PerformanceSettings] Failed to update DHT config:", e);
+    }
+  }, [bandwidthConfig, preloadConfig, dhtConfig]);
 
   // ===================================
   // Preloading Settings

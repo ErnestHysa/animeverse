@@ -291,6 +291,7 @@ export function analyzeTorrentQuality(magnet: MagnetLink): {
  * Format bytes to human readable
  */
 export function formatBytes(bytes: number): string {
+  if (bytes < 0) bytes = 0;
   if (bytes === 0) return "0 B";
 
   const k = 1024;

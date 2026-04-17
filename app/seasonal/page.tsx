@@ -40,35 +40,49 @@ async function getSeasonalAnime() {
 // ===================================
 
 export default async function SeasonalPage() {
-  const { anime, season, year } = await getSeasonalAnime();
+  try {
+    const { anime, season, year } = await getSeasonalAnime();
 
-  return (
-    <>
-      <Header />
-      <main className="min-h-screen">
-        <div className="container mx-auto px-4 pt-24 pb-12">
-          {/* Header */}
-          <div className="flex items-center gap-3 mb-8">
-            <Calendar className="w-8 h-8 text-primary" />
-            <div>
-              <h1 className="text-3xl font-display font-bold">
-                {season} {year} Anime
-              </h1>
-              <p className="text-muted-foreground">
-                Currently airing this season
-              </p>
+    return (
+      <>
+        <Header />
+        <main className="min-h-screen">
+          <div className="container mx-auto px-4 pt-24 pb-12">
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-8">
+              <Calendar className="w-8 h-8 text-primary" />
+              <div>
+                <h1 className="text-3xl font-display font-bold">
+                  {season} {year} Anime
+                </h1>
+                <p className="text-muted-foreground">
+                  Currently airing this season
+                </p>
+              </div>
             </div>
-          </div>
 
-          {/* Anime Grid */}
-          <Suspense fallback={<AnimeGridSkeleton count={24} />}>
-            <AnimeGrid anime={anime} priorityFirst />
-          </Suspense>
+            {/* Anime Grid */}
+            <Suspense fallback={<AnimeGridSkeleton count={24} />}>
+              <AnimeGrid anime={anime} priorityFirst />
+            </Suspense>
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  } catch (error) {
+    console.error('Failed to load seasonal anime:', error);
+    return (
+      <>
+        <Header />
+        <div className="container mx-auto px-4 py-8 text-center">
+          <h2 className="text-2xl font-bold text-red-400">Failed to load seasonal anime</h2>
+          <p className="text-gray-400 mt-2">Please try again later.</p>
         </div>
-      </main>
-      <Footer />
-    </>
-  );
+        <Footer />
+      </>
+    );
+  }
 }
 
 // ===================================

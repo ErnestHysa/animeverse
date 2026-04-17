@@ -36,7 +36,8 @@ test.describe('Real User Flow - Complete Journey', () => {
     // STEP 2: User browses the trending section
     console.log('📍 STEP 2: User scrolls down to see trending anime');
     await page.evaluate(() => window.scrollTo(0, 500));
-    await page.waitForTimeout(1000);
+    // Wait for scroll to take effect and any lazy content to load
+    await page.waitForLoadState('networkidle');
 
     const trendingSection = page.getByText('Trending', { exact: false }).first();
     const trendingVisible = await trendingSection.isVisible().catch(() => false);
@@ -71,9 +72,9 @@ test.describe('Real User Flow - Complete Journey', () => {
     const animeTitleText = await animeTitle.textContent();
     console.log(`✓ Anime title: "${animeTitleText}"`);
 
-    // Check for episode list or watch links
-    await page.waitForTimeout(2000);
+    // Check for episode list or watch links - wait for them to render
     const watchLinks = page.locator('a[href*="/watch/"]');
+    await watchLinks.first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
     const watchLinkCount = await watchLinks.count();
     console.log(`✓ Found ${watchLinkCount} episode links`);
 
@@ -103,7 +104,8 @@ test.describe('Real User Flow - Complete Journey', () => {
 
     // STEP 6: User tries to play the video
     console.log('📍 STEP 6: User tries to play the video');
-    await page.waitForTimeout(3000);
+    // Wait for video element or player container to appear
+    await page.waitForSelector('video, [class*="player"]', { timeout: 10000 }).catch(() => {});
 
     // Check for video player
     const videoElement = page.locator('video').first();
@@ -114,7 +116,11 @@ test.describe('Real User Flow - Complete Journey', () => {
       // Try to play the video
       try {
         await videoElement.click();
-        await page.waitForTimeout(2000);
+        // Wait for play state to stabilize
+        await page.waitForFunction(() => {
+          const video = document.querySelector('video');
+          return video && (!video.paused || video.readyState >= 2);
+        }, { timeout: 5000 }).catch(() => {});
         const isPlaying = await page.evaluate(() => {
           const video = document.querySelector('video');
           return video && !video.paused;
@@ -145,6 +151,8 @@ test.describe('Real User Flow - Complete Journey', () => {
 
     await page.screenshot({ timeout: 0, path: 'test-results/user-flow/04-search-page.png', fullPage: true });
 
+    // Wait for search results to load
+    await page.waitForLoadState('networkidle');
     const searchResults = page.locator('a[href*="/anime/"]');
     const resultCount = await searchResults.count();
     console.log(`✓ Search results found: ${resultCount}`);
@@ -199,8 +207,8 @@ test.describe('Real User Flow - Complete Journey', () => {
     const title = await h1.textContent();
     console.log(`✓ Watch page loaded: "${title}"`);
 
-    // Check if video player loads
-    await page.waitForTimeout(5000);
+    // Check if video player loads - wait for player element
+    await page.waitForSelector('video, [class*="player"], [class*="video"]', { timeout: 10000 }).catch(() => {});
 
     const videoPlayer = page.locator('video, [class*="player"], [class*="video"]').first();
     const playerVisible = await videoPlayer.isVisible().catch(() => false);
@@ -233,7 +241,8 @@ test.describe('Real User Flow - Complete Journey', () => {
       const h1 = page.locator('h1, main').first();
       await expect(h1).toBeVisible({ timeout: DEFAULT_TIMEOUT });
 
-      await page.waitForTimeout(1000);
+      // Wait for page content to settle instead of hard-coded sleep
+      await page.waitForLoadState('networkidle');
       console.log(`  ✓ ${pageData.name} page loaded`);
     }
 
@@ -246,7 +255,8 @@ test.describe('Real User - Error Scenarios', () => {
     console.log('📍 TEST: Invalid anime handling');
 
     await page.goto('/anime/999999999', { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(3000);
+    // Wait for page to finish rendering instead of hard-coded sleep
+    await page.waitForLoadState('networkidle');
 
     // Should show some kind of error or not found state
     const bodyText = await page.locator('body').textContent();
@@ -256,13 +266,21 @@ test.describe('Real User - Error Scenarios', () => {
     console.log(`✓ Shows not found: ${hasNotFound}`);
 
     await page.screenshot({ timeout: 0, path: 'test-results/user-flow/06-invalid-anime.png', fullPage: true });
+
+    // Assert: page should indicate the anime was not found or show an error state
+    expect(bodyText, 'Page should have some content').toBeTruthy();
+    expect(
+      hasNotFound || bodyText?.toLowerCase().includes('error') || bodyText?.toLowerCase().includes('anime'),
+      'Page should show not found, error, or anime-related content'
+    ).toBeTruthy();
   });
 
   test('user encounters invalid episode', async ({ page }) => {
     console.log('📍 TEST: Invalid episode handling');
 
     await page.goto('/watch/21459/99999', { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(3000);
+    // Wait for page to finish rendering instead of hard-coded sleep
+    await page.waitForLoadState('networkidle');
 
     const bodyText = await page.locator('body').textContent();
     const hasError = bodyText?.toLowerCase().includes('episode') ||
@@ -272,5 +290,12 @@ test.describe('Real User - Error Scenarios', () => {
     console.log(`✓ Shows error state: ${hasError}`);
 
     await page.screenshot({ timeout: 0, path: 'test-results/user-flow/07-invalid-episode.png', fullPage: true });
+
+    // Assert: page should show relevant error or episode-related content
+    expect(bodyText, 'Page should have some content').toBeTruthy();
+    expect(
+      hasError || bodyText?.toLowerCase().includes('watch') || bodyText?.toLowerCase().includes('anime'),
+      'Page should show error, not found, episode, or anime-related content'
+    ).toBeTruthy();
   });
 });

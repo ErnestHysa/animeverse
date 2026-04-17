@@ -88,6 +88,11 @@ export default function StatsPage() {
   const anilistMediaList = useStore((s) => s.anilistMediaList);
   const [currentTimestamp] = useState(() => Date.now());
 
+  // Compute stable dependency keys to avoid re-computation on unrelated state changes (M12)
+  const watchHistoryKey = watchHistory.map((h) => `${h.mediaId}:${h.episodeNumber}:${h.completed}:${h.timestamp}`).join('|');
+  const favoritesKey = favorites.length;
+  const mediaCacheKey = Object.keys(mediaCache).sort().join(',');
+
   // Calculate comprehensive statistics
   const stats = useMemo(() => {
     const totalEpisodes = watchHistory.length;
@@ -186,7 +191,7 @@ export default function StatsPage() {
       favoritesCount: favorites.length,
       maxGenreCount: sortedGenres[0]?.[1] || 1,
     };
-  }, [watchHistory, favorites, mediaCache, currentTimestamp]);
+  }, [watchHistoryKey, favoritesKey, mediaCacheKey, currentTimestamp]);
 
   const genreColors = [
     "#ef4444", "#f97316", "#f59e0b", "#84cc16", "#22c55e",

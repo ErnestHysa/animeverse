@@ -23,6 +23,15 @@ interface SubtitleSettingsProps {
   className?: string;
 }
 
+function sanitizeHexColor(value: string): string {
+  // Remove any non-hex characters
+  const cleaned = value.replace(/[^0-9a-fA-F#]/g, '');
+  // Ensure it starts with # and is valid hex
+  if (/^#[0-9a-fA-F]{3,8}$/.test(cleaned)) return cleaned;
+  if (/^[0-9a-fA-F]{3,8}$/.test(cleaned)) return `#${cleaned}`;
+  return '#ffffff'; // safe default
+}
+
 const FONT_FAMILIES = [
   { value: "Arial, sans-serif", label: "Arial" },
   { value: "Roboto, sans-serif", label: "Roboto" },
@@ -255,7 +264,7 @@ export function SubtitleSettings({ className = "" }: SubtitleSettingsProps) {
             <input
               type="text"
               value={subtitleStyle.fontColor}
-              onChange={(e) => updateStyle({ fontColor: e.target.value })}
+              onChange={(e) => updateStyle({ fontColor: sanitizeHexColor(e.target.value) })}
               className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 focus:border-primary focus:outline-none uppercase"
               maxLength={7}
             />
@@ -278,7 +287,7 @@ export function SubtitleSettings({ className = "" }: SubtitleSettingsProps) {
             <input
               type="text"
               value={subtitleStyle.backgroundColor}
-              onChange={(e) => updateStyle({ backgroundColor: e.target.value })}
+              onChange={(e) => updateStyle({ backgroundColor: sanitizeHexColor(e.target.value) })}
               className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 focus:border-primary focus:outline-none uppercase"
               maxLength={7}
             />

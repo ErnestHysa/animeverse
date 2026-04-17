@@ -33,7 +33,21 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const encodedUrl = searchParams.get("url");
     const type = searchParams.get("type") || "manifest";
-    const customReferer = searchParams.get("referer");
+    let customReferer = searchParams.get("referer");
+
+    // Validate customReferer: only allow http/https, reject private/internal IPs
+    if (customReferer) {
+      try {
+        const refererUrl = new URL(customReferer);
+        if (refererUrl.protocol !== 'http:' && refererUrl.protocol !== 'https:') {
+          customReferer = null;
+        } else if (!(await isUrlAllowed(customReferer))) {
+          customReferer = null;
+        }
+      } catch {
+        customReferer = null;
+      }
+    }
 
     if (!encodedUrl) {
       return NextResponse.json(

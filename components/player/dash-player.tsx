@@ -76,6 +76,9 @@ export const DASHPlayer = React.forwardRef<DASHPlayerRef, DASHPlayerProps>(
     const [duration, setDuration] = useState(0);
     const [playing, setPlaying] = useState(false);
 
+    // Store event handler references so they can be removed on re-init
+    const eventHandlersRef = useRef<Array<{ event: string; handler: (e: any) => void }>>([]);
+
     /**
      * Initialize DASH player
      */
@@ -85,6 +88,15 @@ export const DASHPlayer = React.forwardRef<DASHPlayerRef, DASHPlayerProps>(
       try {
         setLoading(true);
         setError(null);
+
+        // Remove previous event listeners if re-initializing
+        if (dashInstanceRef.current && eventHandlersRef.current.length > 0) {
+          for (const { event, handler } of eventHandlersRef.current) {
+            dashInstanceRef.current.off(event, handler);
+          }
+          eventHandlersRef.current = [];
+          dashInstanceRef.current.reset();
+        }
 
         // Dynamically import dash.js
         const dashjs = await import("dashjs");
@@ -120,12 +132,11 @@ export const DASHPlayer = React.forwardRef<DASHPlayerRef, DASHPlayerProps>(
         // Initialize with video element
         (dashInstance as any).initialize(videoRef.current, false);
 
-        // Attach event listeners
-        dashInstance.on((dashjs.MediaPlayer.events as any).STREAM_INITIALIZED, () => {
+        // Define named event handlers so they can be removed later
+        const streamInitializedHandler = () => {
           logger.info("Stream initialized");
-        });
-
-        dashInstance.on((dashjs.MediaPlayer.events as any).QUALITY_CHANGE_RENDERED, (e: any) => {
+        };
+        const qualityChangeHandler = (e: any) => {
           if (e.mediaType === "video") {
             const newQuality = {
               bitrate: e.newQuality.bitrate,
@@ -136,21 +147,35 @@ export const DASHPlayer = React.forwardRef<DASHPlayerRef, DASHPlayerProps>(
             setCurrentQuality(newQuality);
             onQualityChange?.(newQuality);
           }
-        });
-
-        dashInstance.on((dashjs.MediaPlayer.events as any).BUFFER_LOADED, () => {
+        };
+        const bufferLoadedHandler = () => {
           setLoading(false);
           logger.info("Buffer loaded");
-        });
-
-        dashInstance.on((dashjs.MediaPlayer.events as any).ERROR, (e: any) => {
+        };
+        const errorHandler = (e: any) => {
           logger.error("DASH error:", e);
           const errorMsg = `DASH error: ${e.error || "Unknown error"}`;
           setError(errorMsg);
           setLoading(false);
           onError?.(new Error(errorMsg));
           toast.error(errorMsg);
-        });
+        };
+
+        // Store references for cleanup
+        const events = Dash.MediaPlayer.events as any;
+        const handlers = [
+          { event: events.STREAM_INITIALIZED, handler: streamInitializedHandler },
+          { event: events.QUALITY_CHANGE_RENDERED, handler: qualityChangeHandler },
+          { event: events.BUFFER_LOADED, handler: bufferLoadedHandler },
+          { event: events.ERROR, handler: errorHandler },
+        ];
+        eventHandlersRef.current = handlers;
+
+        // Attach event listeners
+        dashInstance.on(events.STREAM_INITIALIZED, streamInitializedHandler);
+        dashInstance.on(events.QUALITY_CHANGE_RENDERED, qualityChangeHandler);
+        dashInstance.on(events.BUFFER_LOADED, bufferLoadedHandler);
+        dashInstance.on(events.ERROR, errorHandler);
 
         // Load manifest
         await dashInstance.attachSource(manifestUrl);
@@ -302,6 +327,11 @@ export const DASHPlayer = React.forwardRef<DASHPlayerRef, DASHPlayerProps>(
 
       return () => {
         if (dashInstanceRef.current) {
+          // Remove all registered event listeners
+          for (const { event, handler } of eventHandlersRef.current) {
+            dashInstanceRef.current.off(event, handler);
+          }
+          eventHandlersRef.current = [];
           dashInstanceRef.current.reset();
           dashInstanceRef.current = null;
         }
@@ -314,10 +344,9 @@ export const DASHPlayer = React.forwardRef<DASHPlayerRef, DASHPlayerProps>(
     useEffect(() => {
       if (!videoRef.current || !subtitles || subtitles.length === 0) return;
 
-      // Clear existing text tracks
-      while (videoRef.current.textTracks.length > 0) {
-        videoRef.current.textTracks[0].mode = "disabled";
-      }
+      // Remove old track elements
+      const existingTracks = videoRef.current.querySelectorAll('track');
+      existingTracks.forEach(track => track.remove());
 
       // Add new text tracks
       subtitles.forEach((sub, index) => {
@@ -384,27 +413,40 @@ export function isDASHSupported(): boolean {
 
 export function getDASHQualities(manifestUrl: string): Promise<DASHQuality[]> {
   return new Promise((resolve, reject) => {
+    let dashInstance: any = null;
+    let videoElement: HTMLVideoElement | null = null;
+
     import("dashjs")
       .then((dashjs) => {
-        const dashInstance: any = dashjs.MediaPlayer().create();
-        const videoElement = document.createElement("video");
+        dashInstance = dashjs.MediaPlayer().create();
+        videoElement = document.createElement("video");
 
-        dashInstance.initialize(videoElement, false);
-        (dashInstance as any).attachSource(manifestUrl).then(() => {
-          const qualities = (dashInstance as any).getBitrateInfoListFor("video") || [];
-          const result = qualities
-            .filter((q: any) => q.height > 0)
-            .map((q: any) => ({
-              bitrate: q.bitrate,
-              width: q.width,
-              height: q.height,
-              label: `${q.height}p`,
-            }))
-            .sort((a: DASHQuality, b: DASHQuality) => b.bitrate - a.bitrate);
+        try {
+          dashInstance.initialize(videoElement, false);
+          (dashInstance as any).attachSource(manifestUrl).then(() => {
+            const qualities = (dashInstance as any).getBitrateInfoListFor("video") || [];
+            const result = qualities
+              .filter((q: any) => q.height > 0)
+              .map((q: any) => ({
+                bitrate: q.bitrate,
+                width: q.width,
+                height: q.height,
+                label: `${q.height}p`,
+              }))
+              .sort((a: DASHQuality, b: DASHQuality) => b.bitrate - a.bitrate);
 
-          dashInstance.reset();
-          resolve(result);
-        }).catch(reject);
+            resolve(result);
+          }).catch((err: any) => {
+            reject(err);
+          }).finally(() => {
+            if (dashInstance) dashInstance.reset();
+            if (videoElement && videoElement.parentNode) videoElement.parentNode.removeChild(videoElement);
+          });
+        } catch (err) {
+          reject(err);
+          if (dashInstance) dashInstance.reset();
+          if (videoElement && videoElement.parentNode) videoElement.parentNode.removeChild(videoElement);
+        }
       })
       .catch(reject);
   });

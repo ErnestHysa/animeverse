@@ -109,8 +109,11 @@ export default function ProfilePage() {
   const totalFavorites = favorites.length;
   const totalWatchlist = watchlist.length;
 
-  // Compute watch time (assuming ~24 min per episode)
-  const estimatedHours = Math.round((totalEpisodesWatched * 24) / 60);
+  // Compute watch time using actual episode durations from mediaCache when available
+  const avgDuration = mediaCache && Object.keys(mediaCache).length > 0
+    ? Object.values(mediaCache).reduce((sum: number, m: any) => sum + (m.duration || 24), 0) / Object.keys(mediaCache).length
+    : 24;
+  const estimatedHours = Math.round((totalEpisodesWatched * avgDuration) / 60);
   const estimatedDays = Math.round(estimatedHours / 24);
 
   // Achievements count

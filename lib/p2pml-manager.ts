@@ -186,14 +186,16 @@ class P2PMLManagerImpl implements P2PMLManager {
     // Peer connect event
     this.p2pml.on("on-peer-connect", (peerId: unknown) => {
       logger.info(`Peer connected: ${peerId}`);
-      this.stats.peersCount++;
+      // Derive from engine to avoid counter drift from out-of-order events
+      this.stats.peersCount = this.p2pml?.getPeers()?.length ?? 0;
       this.config.onPeerConnect?.(String(peerId));
     });
 
     // Peer disconnect event
     this.p2pml.on("on-peer-disconnect", (peerId: unknown) => {
       logger.info(`Peer disconnected: ${peerId}`);
-      this.stats.peersCount = Math.max(0, this.stats.peersCount - 1);
+      // Derive from engine to avoid counter drift from out-of-order events
+      this.stats.peersCount = this.p2pml?.getPeers()?.length ?? 0;
       this.config.onPeerDisconnect?.(String(peerId));
     });
 

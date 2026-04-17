@@ -84,6 +84,7 @@ export const Header = memo(function Header() {
   const searchDebounceRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const discoverRef = useRef<HTMLDivElement>(null);
   const libraryRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const { theme, setTheme, resolvedTheme } = useTheme();
   const { anilistUser, isAuthenticated, clearAniListAuth } = useAniListAuth();
@@ -101,6 +102,15 @@ export const Header = memo(function Header() {
     },
     [searchQuery, router]
   );
+
+  // Clear search debounce on unmount
+  useEffect(() => {
+    return () => {
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current);
+      }
+    };
+  }, []);
 
   const handleSearchInput = useCallback((value: string) => {
     setSearchQuery(value);
@@ -140,7 +150,7 @@ export const Header = memo(function Header() {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
-      if (userMenuOpen && !document.querySelector(".user-menu-container")?.contains(target)) {
+      if (userMenuOpen && userMenuRef.current && !userMenuRef.current.contains(target)) {
         setUserMenuOpen(false);
       }
       if (discoverOpen && !discoverRef.current?.contains(target)) {
@@ -336,7 +346,7 @@ export const Header = memo(function Header() {
                   </button>
 
                   {userMenuOpen && (
-                    <div className="user-menu-container absolute right-0 top-full mt-2 w-52 bg-popover border border-white/10 rounded-lg shadow-xl overflow-hidden animate-fadeIn z-50">
+                    <div ref={userMenuRef} className="absolute right-0 top-full mt-2 w-52 bg-popover border border-white/10 rounded-lg shadow-xl overflow-hidden animate-fadeIn z-50">
                       <div className="p-2 border-b border-white/10" role="presentation">
                         <p className="text-xs text-muted-foreground px-2 py-1">
                           Signed in as

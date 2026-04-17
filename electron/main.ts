@@ -79,20 +79,35 @@ let localServerPort = 3001;
 // App Lifecycle
 // ===================================
 
-app.whenReady().then(() => {
-  console.log("[AnimeStreamDesktop] App ready");
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    // Focus the window if another instance is launched
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) {
+        mainWindow.restore();
+      }
+      mainWindow.focus();
+    }
+  });
 
-  loadConfig();
-  createWindow();
-  createTray();
-  startLocalServer();
-  setupIPCHandlers();
-  setAutoStart(config.autoStart);
+  app.whenReady().then(() => {
+    console.log("[AnimeStreamDesktop] App ready");
 
-  if (config.startInBackground) {
-    mainWindow?.hide();
-  }
-});
+    loadConfig();
+    createWindow();
+    createTray();
+    startLocalServer();
+    setupIPCHandlers();
+    setAutoStart(config.autoStart);
+
+    if (config.startInBackground) {
+      mainWindow?.hide();
+    }
+  });
+}
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
@@ -107,16 +122,6 @@ app.on("window-all-closed", () => {
 app.on("before-quit", () => {
   // Save active sessions
   saveSessions();
-});
-
-app.on("second-instance", () => {
-  // Focus the window if another instance is launched
-  if (mainWindow) {
-    if (mainWindow.isMinimized()) {
-      mainWindow.restore();
-    }
-    mainWindow.focus();
-  }
 });
 
 // ===================================
@@ -434,11 +439,25 @@ function showNotification(title: string, body: string): void {
 // ===================================
 
 function startLocalServer(): void {
+  const ALLOWED_ORIGIN = 'http://localhost:3000';
+
   const server = createServer((req, res) => {
+    // CORS: Set allowed origin header
+    res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
+    res.setHeader('Access-Control-Allow-Methods', 'GET');
+
+    // Reject requests from disallowed origins
+    const origin = req.headers.origin;
+    if (origin && origin !== ALLOWED_ORIGIN) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Forbidden' }));
+      return;
+    }
+
     // Proxy requests to the Next.js app
     // This allows the desktop app to access local resources
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ status: "ok" }));
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'ok' }));
   });
 
   server.listen(localServerPort, '127.0.0.1', () => {

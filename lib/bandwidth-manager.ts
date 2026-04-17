@@ -292,7 +292,8 @@ class BandwidthManagerImpl {
 
     // Get base speed from network quality
     const threshold = NETWORK_QUALITY_THRESHOLDS[quality];
-    const baseSpeed = (threshold.min + threshold.max) / 2;
+    const clampedMax = threshold.max === Infinity ? this.config.adaptiveMaxUpload : threshold.max;
+    const baseSpeed = (threshold.min + clampedMax) / 2;
 
     if (type === "upload") {
       // Upload is typically 1/4 to 1/2 of download speed

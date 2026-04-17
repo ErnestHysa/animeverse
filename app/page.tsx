@@ -364,14 +364,39 @@ async function AIRecommendationsSectionWrapper({ allAnime }: { allAnime: Media[]
 // ===================================
 
 export default async function HomePage() {
-  const [trendingAnime, popularAnime, seasonalAnime, airingAnime, mostViewedAnime, newReleasesAnime] = await Promise.all([
-    getTrendingAnime(),
-    getPopularAnime(),
-    getSeasonalAnime(),
-    getAiringAnime(),
-    getMostViewedAnime(),
-    getNewReleases(),
-  ]);
+  let trendingAnime: Media[] = [];
+  let popularAnime: Media[] = [];
+  let seasonalAnime: Media[] = [];
+  let airingAnime: AiringSchedule[] = [];
+  let mostViewedAnime: Media[] = [];
+  let newReleasesAnime: Media[] = [];
+
+  try {
+    const results = await Promise.allSettled([
+      getTrendingAnime(),
+      getPopularAnime(),
+      getSeasonalAnime(),
+      getAiringAnime(),
+      getMostViewedAnime(),
+      getNewReleases(),
+    ]);
+
+    if (results[0].status === 'fulfilled') trendingAnime = results[0].value;
+    if (results[1].status === 'fulfilled') popularAnime = results[1].value;
+    if (results[2].status === 'fulfilled') seasonalAnime = results[2].value;
+    if (results[3].status === 'fulfilled') airingAnime = results[3].value;
+    if (results[4].status === 'fulfilled') mostViewedAnime = results[4].value;
+    if (results[5].status === 'fulfilled') newReleasesAnime = results[5].value;
+
+    // Log any failures for debugging
+    results.forEach((result, i) => {
+      if (result.status === 'rejected') {
+        console.error(`Failed to load home page section ${i}:`, result.reason);
+      }
+    });
+  } catch (error) {
+    console.error('Failed to load home page data:', error);
+  }
 
   return (
     <>

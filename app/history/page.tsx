@@ -7,7 +7,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useStore } from "@/store";
 import { Clock, Play, Trash2, Film, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,17 @@ export default function HistoryPage() {
   const isAuthenticated = useStore((s) => s.isAuthenticated);
 
   const [confirmDialog, setConfirmDialog] = useState<{ msg: string; onConfirm: () => void } | null>(null);
+
+  // Escape key handler for confirm dialog accessibility (M16)
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setConfirmDialog(null);
+    };
+    if (confirmDialog) {
+      document.addEventListener('keydown', handleEscape);
+      return () => document.removeEventListener('keydown', handleEscape);
+    }
+  }, [confirmDialog]);
 
   // Get unique anime from watch history (most recent first)
   const uniqueHistory = [...watchHistory]
@@ -295,9 +306,14 @@ export default function HistoryPage() {
       </main>
       <Footer />
       {confirmDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-dialog-title"
+        >
           <div className="bg-gray-800 rounded-lg p-6 max-w-sm mx-4">
-            <p className="text-white mb-4">{confirmDialog.msg}</p>
+            <h2 id="confirm-dialog-title" className="text-white mb-4">{confirmDialog.msg}</h2>
             <div className="flex gap-3 justify-end">
               <button
                 onClick={() => setConfirmDialog(null)}

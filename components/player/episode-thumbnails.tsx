@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 
 interface Thumbnail {
   time: number;
@@ -16,15 +16,30 @@ interface EpisodeThumbnailsProps {
   duration: number;
   videoRef: React.RefObject<HTMLVideoElement>;
   thumbnails?: Thumbnail[];
+  isGeneratingThumbnail?: React.MutableRefObject<boolean>;
 }
 
-export function EpisodeThumbnails({ duration, videoRef, thumbnails }: EpisodeThumbnailsProps) {
+export function EpisodeThumbnails({ duration, videoRef, thumbnails, isGeneratingThumbnail }: EpisodeThumbnailsProps) {
   const [hoverTime, setHoverTime] = useState(0);
   const [isHovering, setIsHovering] = useState(false);
   const [thumbnail, setThumbnail] = useState<string>("");
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const generateThumbnail = async (time: number) => {
+  // Flag to suppress timeupdate events during thumbnail generation
+  const isGeneratingRef = useRef(false);
+  // Track in-progress generation to cancel stale requests
+  const generationIdRef = useRef(0);
+  // Track mount status to avoid setState after unmount
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const generateThumbnail = useCallback(async (time: number, generationId: number) => {
     const video = videoRef.current;
     if (!video) return null;
 
@@ -36,8 +51,12 @@ export function EpisodeThumbnails({ duration, videoRef, thumbnails }: EpisodeThu
     canvas.width = 160;
     canvas.height = 90;
 
+    // Suppress timeupdate propagation during thumbnail generation
+    isGeneratingRef.current = true;
+    if (isGeneratingThumbnail) isGeneratingThumbnail.current = true;
+
     // Seek to the time position
-    const currentTime = video.currentTime;
+    const originalTime = video.currentTime;
     video.currentTime = time;
 
     // Wait for seek to complete
@@ -55,6 +74,15 @@ export function EpisodeThumbnails({ duration, videoRef, thumbnails }: EpisodeThu
       }, 1000);
     });
 
+    // Check if this generation was superseded by a newer request
+    if (generationIdRef.current !== generationId) {
+      // Still need to restore position before bailing
+      video.currentTime = originalTime;
+      isGeneratingRef.current = false;
+      if (isGeneratingThumbnail) isGeneratingThumbnail.current = false;
+      return null;
+    }
+
     // Draw frame to canvas
     try {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -64,9 +92,14 @@ export function EpisodeThumbnails({ duration, videoRef, thumbnails }: EpisodeThu
       return null;
     } finally {
       // Restore original position
-      video.currentTime = currentTime;
+      video.currentTime = originalTime;
+      // Delay clearing the flag so the seek-back doesn't trigger visible timeupdate
+      setTimeout(() => {
+        isGeneratingRef.current = false;
+        if (isGeneratingThumbnail) isGeneratingThumbnail.current = false;
+      }, 100);
     }
-  };
+  }, [videoRef, isGeneratingThumbnail]);
 
   useEffect(() => {
     if (!isHovering || !videoRef.current) return;
@@ -78,15 +111,20 @@ export function EpisodeThumbnails({ duration, videoRef, thumbnails }: EpisodeThu
     if (existingThumbnail) {
       setThumbnail(existingThumbnail.url);
     } else {
+      // Increment generation ID to cancel any in-progress stale generation
+      const thisGenerationId = ++generationIdRef.current;
+
       // Generate thumbnail on the fly (debounced)
       const timeout = setTimeout(async () => {
-        const dataUrl = await generateThumbnail(time);
-        if (dataUrl) setThumbnail(dataUrl);
+        const dataUrl = await generateThumbnail(time, thisGenerationId);
+        if (dataUrl && isMountedRef.current) {
+          setThumbnail(dataUrl);
+        }
       }, 200);
 
       return () => clearTimeout(timeout);
     }
-  }, [isHovering, hoverTime, thumbnails, videoRef]);
+  }, [isHovering, hoverTime, thumbnails, videoRef, generateThumbnail]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);

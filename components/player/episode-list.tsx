@@ -5,10 +5,10 @@
 
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Play, Clock, CheckCircle, Filter, CornerDownRight } from "lucide-react";
+import { Play, Clock, CheckCircle, Filter, CornerDownRight, ChevronDown } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { useStore } from "@/store";
 
@@ -26,6 +26,7 @@ interface EpisodeListProps {
   currentEpisode: number;
   showFillers?: boolean;
   streamingEpisodes?: StreamingEpisodeData[];
+  defaultEpisodeDuration?: number; // minutes, defaults to 24
 }
 
 export function EpisodeList({
@@ -35,6 +36,7 @@ export function EpisodeList({
   currentEpisode,
   showFillers = true,
   streamingEpisodes,
+  defaultEpisodeDuration = 24,
 }: EpisodeListProps) {
   const router = useRouter();
   const watchHistory = useStore((state) => state.watchHistory);
@@ -43,6 +45,11 @@ export function EpisodeList({
   const [showOnlyUnwatched, setShowOnlyUnwatched] = useState(false);
   const [jumpToEp, setJumpToEp] = useState("");
   const currentRef = useRef<HTMLAnchorElement>(null);
+
+  // Windowing state for large episode lists
+  const CHUNK_SIZE = 50;
+  const [visibleCount, setVisibleCount] = useState(CHUNK_SIZE);
+  const listContainerRef = useRef<HTMLDivElement>(null);
 
   // Load filler data
   useEffect(() => {
@@ -67,6 +74,15 @@ export function EpisodeList({
       currentRef.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
   }, [currentEpisode]);
+
+  // Reset visible count when filter changes
+  useEffect(() => {
+    setVisibleCount(CHUNK_SIZE);
+  }, [showOnlyUnwatched]);
+
+  const loadMore = useCallback(() => {
+    setVisibleCount((prev) => prev + CHUNK_SIZE);
+  }, []);
 
   // Get watch history for this anime
   const episodeHistoryMap = new Map<number, { progress: number; completed: boolean }>();
@@ -174,14 +190,14 @@ export function EpisodeList({
         </form>
       )}
 
-      <div className="space-y-1 max-h-[60vh] overflow-y-auto pr-1 scrollbar-thin">
-        {filteredEpisodes.map((epNum) => {
+      <div className="space-y-1 max-h-[60vh] overflow-y-auto pr-1 scrollbar-thin" ref={listContainerRef}>
+        {filteredEpisodes.slice(0, visibleCount).map((epNum) => {
           const isCurrent = epNum === currentEpisode;
           const historyItem = episodeHistoryMap.get(epNum);
           const isWatched = historyItem?.completed ?? false;
           const inProgress = historyItem && !historyItem.completed && historyItem.progress > 0;
           const progressPercent = historyItem?.progress
-            ? Math.min(100, (historyItem.progress / (24 * 60)) * 100)
+            ? Math.min(100, (historyItem.progress / (defaultEpisodeDuration * 60)) * 100)
             : 0;
           const isFiller = fillerEpisodes.has(epNum);
 
@@ -261,6 +277,18 @@ export function EpisodeList({
             </Link>
           );
         })}
+
+        {/* Show More button for windowing */}
+        {filteredEpisodes.length > visibleCount && (
+          <button
+            onClick={loadMore}
+            className="w-full py-2.5 rounded-lg text-sm text-muted-foreground hover:text-white hover:bg-white/5 transition-colors flex items-center justify-center gap-1.5"
+          >
+            <span>Show More</span>
+            <span className="text-xs">({Math.min(visibleCount + CHUNK_SIZE, filteredEpisodes.length) - visibleCount} of {filteredEpisodes.length - visibleCount} remaining)</span>
+            <ChevronDown className="w-4 h-4" />
+          </button>
+        )}
 
         {filteredEpisodes.length === 0 && (
           <p className="text-center text-muted-foreground text-sm py-4">
