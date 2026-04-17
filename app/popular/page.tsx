@@ -33,7 +33,31 @@ async function getPopularAnime() {
 // ===================================
 
 export default async function PopularPage() {
-  const anime = await getPopularAnime();
+  let anime;
+  try {
+    anime = await getPopularAnime();
+  } catch (error) {
+    console.error('Failed to load popular anime:', error);
+    return (
+      <>
+        <Header />
+        <main className="min-h-screen">
+          <div className="container mx-auto px-4 pt-24 pb-12">
+            <div className="flex items-center gap-3 mb-8">
+              <Star className="w-8 h-8 text-primary" />
+              <div>
+                <h1 className="text-3xl font-display font-bold">All Time Popular</h1>
+              </div>
+            </div>
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <p className="text-lg text-muted-foreground">Failed to load popular anime. Please try again later.</p>
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
 
   return (
     <>

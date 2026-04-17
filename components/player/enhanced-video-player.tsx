@@ -495,6 +495,7 @@ export function EnhancedVideoPlayer({
     let innerCleanup: (() => void) | null = null;
     let loadingTimeoutId: ReturnType<typeof setTimeout> | null = null;
     let safetyTimeoutId: ReturnType<typeof setTimeout> | null = null;
+    let manifestFallbackTimeout: ReturnType<typeof setTimeout> | null = null;
 
     (async () => {
     logger.log("[VideoPlayer] Loading video source:", {
@@ -603,6 +604,7 @@ export function EnhancedVideoPlayer({
         if (!Hls.isSupported()) {
           // Fallback to native HLS (Safari)
           if (video.canPlayType("application/vnd.apple.mpegurl")) {
+            if (manifestFallbackTimeout) { clearTimeout(manifestFallbackTimeout); manifestFallbackTimeout = null; }
             const videoUrl = needsProxy ? createProxyUrl(source.url, "manifest") : source.url;
             video.src = videoUrl;
             const clearLoading = () => { clearTimeout(loadingTimeout); clearTimeout(safetyTimeout); setIsLoading(false); };
@@ -698,7 +700,7 @@ export function EnhancedVideoPlayer({
 
         // Clear loading after 12 seconds if manifest hasn't loaded
         // This is shorter than the main timeout to provide better UX
-        const manifestFallbackTimeout = setTimeout(() => {
+        manifestFallbackTimeout = setTimeout(() => {
           if (!manifestTimeoutCleared) {
             logger.warn("[HLS] Manifest loading timeout - clearing loading state after 12s");
             clearLoadingState();
@@ -747,7 +749,7 @@ export function EnhancedVideoPlayer({
           // CRITICAL FIX: Check if there are any playable levels
           if (data.levels.length === 0) {
             logger.error("[HLS] No playable levels in manifest");
-            clearTimeout(manifestFallbackTimeout);
+            if (manifestFallbackTimeout) clearTimeout(manifestFallbackTimeout);
             clearLoadingState();
             // Trigger error to notify parent component
             onError?.(new Error("No playable video quality levels found. Trying next server..."));
@@ -755,14 +757,14 @@ export function EnhancedVideoPlayer({
           }
           // CRITICAL FIX: Clear loading state on MANIFEST_LOADED, not just MANIFEST_PARSED
           // This prevents infinite loading when manifest has parseable content but no playable levels
-          clearTimeout(manifestFallbackTimeout);
+          if (manifestFallbackTimeout) clearTimeout(manifestFallbackTimeout);
           clearLoadingState();
         });
 
         hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
           logger.log("[HLS] Manifest parsed successfully:", data);
           // Clear any remaining timeouts since manifest is now fully parsed
-          clearTimeout(manifestFallbackTimeout);
+          if (manifestFallbackTimeout) clearTimeout(manifestFallbackTimeout);
           // Play if autoplay is enabled OR if user initiated playback
           // userInitiatedPlayRef is a ref so we always read the current value (no stale closure)
           if (preferences.autoplay || userInitiatedPlayRef.current) {
@@ -900,7 +902,7 @@ export function EnhancedVideoPlayer({
         innerCleanup = () => {
           clearTimeout(loadingTimeout);
           clearTimeout(safetyTimeout);
-          clearTimeout(manifestFallbackTimeout);
+          if (manifestFallbackTimeout) clearTimeout(manifestFallbackTimeout);
           if (parseCheckTimeout) clearTimeout(parseCheckTimeout);
           hls.destroy();
         };
@@ -932,6 +934,7 @@ export function EnhancedVideoPlayer({
         innerCleanup = () => {
           clearTimeout(loadingTimeout);
           clearTimeout(safetyTimeout);
+          if (manifestFallbackTimeout) { clearTimeout(manifestFallbackTimeout); manifestFallbackTimeout = null; }
           video.removeEventListener("loadeddata", clearLoading);
           video.removeEventListener("canplay", clearLoading);
           video.removeEventListener("canplaythrough", clearLoading);
@@ -966,6 +969,7 @@ export function EnhancedVideoPlayer({
       cancelled = true;
       if (loadingTimeoutId) clearTimeout(loadingTimeoutId);
       if (safetyTimeoutId) clearTimeout(safetyTimeoutId);
+      if (manifestFallbackTimeout) { clearTimeout(manifestFallbackTimeout); manifestFallbackTimeout = null; }
       if (innerCleanup) innerCleanup();
       if (hlsRef.current) {
         hlsRef.current.destroy();
@@ -2369,11 +2373,23 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
 
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      const isFS = !!(
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement
+      );
+      setIsFullscreen(isFS);
     };
 
     document.addEventListener("fullscreenchange", handleFullscreenChange);
-    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    document.addEventListener("mozfullscreenchange", handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+      document.removeEventListener("mozfullscreenchange", handleFullscreenChange);
+    };
   }, []);
 
   // ===================================

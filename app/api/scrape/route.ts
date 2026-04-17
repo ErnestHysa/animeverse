@@ -109,8 +109,21 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Fix H8: Validate query string length
+    if (query.length > 200) {
+      return NextResponse.json<ScrapeResponse>(
+        { success: false, error: "Query too long (max 200 characters)" },
+        { status: 400 }
+      );
+    }
+
+    // Fix H8: Cap maxResults to 25 for GET (public access)
+    const cappedMaxResults = Math.min(Math.max(maxResults, 1), 25);
+
+    // NOTE: This endpoint is rate-limited by middleware (10 req/min for /api/scrape)
+
     // Call scraper
-    const data = await callScraper(query, type, maxResults);
+    const data = await callScraper(query, type, cappedMaxResults);
 
     return NextResponse.json<ScrapeResponse>({
       success: true,

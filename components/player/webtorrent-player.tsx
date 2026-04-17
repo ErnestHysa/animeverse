@@ -226,11 +226,19 @@ export function WebTorrentPlayer({
       });
 
       torrent.on("upload", () => {
-        setProgress((prev) => ({
-          ...prev,
-          uploadSpeed: torrent.uploadSpeed,
-          uploaded: torrent.uploaded,
-        }));
+        const now = Date.now();
+        if (now - lastProgressUpdate >= PROGRESS_THROTTLE_MS) {
+          lastProgressUpdate = now;
+          setProgress({
+            progress: torrent.progress,
+            downloadSpeed: torrent.downloadSpeed,
+            uploadSpeed: torrent.uploadSpeed,
+            numPeers: torrent.numPeers,
+            timeRemaining: torrent.timeRemaining,
+            downloaded: torrent.downloaded,
+            uploaded: torrent.uploaded,
+          });
+        }
       });
 
       torrent.on("done", () => {
@@ -249,6 +257,9 @@ export function WebTorrentPlayer({
 
     return () => {
       clearTimeout(loadTimeout);
+      if (torrentRef.current) {
+        torrentRef.current.removeAllListeners();
+      }
     };
   }, [isClientReady, magnet, infoHash, onReady, onError]);
 

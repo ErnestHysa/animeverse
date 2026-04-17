@@ -14,6 +14,7 @@ import { Play, X, ExternalLink } from "lucide-react";
 export function MiniPlayer() {
   const miniPlayer = useStore((s) => s.miniPlayer);
   const clearMiniPlayer = useStore((s) => s.clearMiniPlayer);
+  const watchHistory = useStore((s) => s.watchHistory);
   const pathname = usePathname();
 
   // Hide on the watch page itself
@@ -21,6 +22,16 @@ export function MiniPlayer() {
   if (pathname.startsWith(`/watch/${miniPlayer.animeId}`)) return null;
 
   const watchUrl = `/watch/${miniPlayer.animeId}/${miniPlayer.episode}`;
+
+  // Look up progress from watch history
+  const historyItem = watchHistory.find(
+    (h) => h.mediaId === miniPlayer.animeId && h.episodeNumber === miniPlayer.episode
+  );
+  const progressPercent = historyItem
+    ? Math.min(100, historyItem.completed
+        ? 100
+        : Math.round((historyItem.progress / 1440) * 100)) // ~24min episode default
+    : 0;
 
   return (
     <div className="fixed bottom-4 right-4 z-50 flex items-center gap-3 bg-card/95 backdrop-blur-md border border-white/10 rounded-2xl shadow-2xl px-4 py-3 max-w-xs w-full sm:max-w-sm animate-slideInRight">
@@ -47,7 +58,7 @@ export function MiniPlayer() {
         <p className="text-xs text-muted-foreground">Episode {miniPlayer.episode}</p>
         {/* Mini progress bar (decorative — actual progress comes from history) */}
         <div className="mt-1.5 h-1 bg-white/10 rounded-full overflow-hidden">
-          <div className="h-full w-1/3 bg-primary rounded-full" />
+          <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${progressPercent}%` }} />
         </div>
       </div>
 

@@ -383,6 +383,9 @@ export function VideoSourceLoader({
   // Initial fetch and re-fetch when language changes
   useEffect(() => {
     fetchSources(currentLanguage);
+    return () => {
+      cancelStreamAttempt(`${animeId}-${episodeNumber}-${currentLanguage}`);
+    };
   }, [fetchSources, currentLanguage]);
 
   // Track current server index for automatic fallback

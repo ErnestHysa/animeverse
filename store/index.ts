@@ -992,7 +992,9 @@ export const useStore = create<StoreState>()(
 
         return state;
       },
-      // Only persist certain fields
+        // Only persist certain fields
+        // Fix H14: Remove OAuth tokens from localStorage — they are now in httpOnly cookies.
+        // Keep boolean flags for connection status instead of actual tokens.
         partialize: (state) => ({
           favorites: state.favorites,
           watchlist: state.watchlist,
@@ -1000,12 +1002,8 @@ export const useStore = create<StoreState>()(
           preferences: state.preferences,
           mediaCache: state.mediaCache,
           anilistUser: state.anilistUser,
-          anilistToken: state.anilistToken,
           isAuthenticated: state.isAuthenticated,
           anilistMediaList: state.anilistMediaList,
-          malToken: state.malToken,
-          malRefreshToken: state.malRefreshToken,
-          malTokenExpiresAt: state.malTokenExpiresAt,
           malUser: state.malUser,
           achievements: state.achievements,
           unlockedAchievements: state.unlockedAchievements,

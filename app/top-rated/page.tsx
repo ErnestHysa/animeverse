@@ -20,7 +20,33 @@ async function getTopRatedAnime() {
 }
 
 export default async function TopRatedPage() {
-  const anime = await getTopRatedAnime();
+  let anime;
+  try {
+    anime = await getTopRatedAnime();
+  } catch (error) {
+    console.error('Failed to load top rated anime:', error);
+    return (
+      <>
+        <Header />
+        <main className="min-h-screen">
+          <div className="container mx-auto px-4 pt-24 pb-12">
+            <div className="flex items-center gap-3 mb-8">
+              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-500 to-orange-500 flex items-center justify-center flex-shrink-0">
+                <Trophy className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-display font-bold">Top Rated</h1>
+              </div>
+            </div>
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <p className="text-lg text-muted-foreground">Failed to load top rated anime. Please try again later.</p>
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
 
   return (
     <>

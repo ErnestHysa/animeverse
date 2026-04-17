@@ -24,6 +24,52 @@ interface AnalyticsEvent {
 const analyticsEvents: AnalyticsEvent[] = [];
 const MAX_ANALYTICS_EVENTS = 10000; // Fix H3: Cap events array size
 
+// Fix C2: Whitelist of allowed event types
+const ALLOWED_EVENT_TYPES = new Set([
+  "playback_start",
+  "playback_end",
+  "fallback",
+  "buffering",
+  "torrent_stats",
+  "quality_change",
+]);
+
+// Fix C2: Whitelist of allowed event fields
+const ALLOWED_EVENT_FIELDS = new Set([
+  "eventType",
+  "timestamp",
+  "id",
+  "sessionId",
+  "animeId",
+  "animeTitle",
+  "episode",
+  "method",
+  "quality",
+  "sourceProvider",
+  "userAgent",
+  "connectionType",
+  "duration",
+  "completionRate",
+  "reasons",
+  "fromMethod",
+  "toMethod",
+  "reason",
+  "timeToFallback",
+  "bufferDuration",
+  "currentTime",
+  "seeders",
+  "leechers",
+  "downloadSpeed",
+  "uploadSpeed",
+  "progress",
+  "infoHash",
+  "fromQuality",
+  "toQuality",
+]);
+
+const MAX_EVENTS_PER_REQUEST = 20;
+const MAX_EVENT_SIZE_BYTES = 1024; // 1KB per event
+
 /**
  * POST /api/analytics/events
  * Receive analytics events from clients
@@ -74,8 +120,59 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Payload too large. Maximum 1MB per request." }, { status: 400 });
     }
 
-    // Add events to storage
-    analyticsEvents.push(...events);
+    // Fix C2: Validate and sanitize each event
+    const sanitizedEvents: AnalyticsEvent[] = [];
+    for (let i = 0; i < events.length; i++) {
+      const event = events[i];
+
+      // Validate event is an object
+      if (!event || typeof event !== "object" || Array.isArray(event)) {
+        return NextResponse.json(
+          { error: `Event at index ${i} must be an object` },
+          { status: 400 }
+        );
+      }
+
+      // Validate eventType
+      if (!event.eventType || typeof event.eventType !== "string") {
+        return NextResponse.json(
+          { error: `Event at index ${i} must have a string eventType` },
+          { status: 400 }
+        );
+      }
+      if (!ALLOWED_EVENT_TYPES.has(event.eventType)) {
+        return NextResponse.json(
+          { error: `Invalid eventType "${event.eventType}" at index ${i}. Allowed types: ${Array.from(ALLOWED_EVENT_TYPES).join(", ")}` },
+          { status: 400 }
+        );
+      }
+
+      // Check individual event size (max 1KB)
+      const eventSize = JSON.stringify(event).length;
+      if (eventSize > MAX_EVENT_SIZE_BYTES) {
+        return NextResponse.json(
+          { error: `Event at index ${i} exceeds maximum size of 1KB (${eventSize} bytes)` },
+          { status: 400 }
+        );
+      }
+
+      // Strip fields not in the whitelist
+      const sanitized: Record<string, unknown> = {};
+      for (const key of Object.keys(event)) {
+        if (ALLOWED_EVENT_FIELDS.has(key)) {
+          sanitized[key] = event[key];
+        }
+      }
+      // Ensure timestamp exists
+      if (typeof sanitized.timestamp !== "number") {
+        sanitized.timestamp = Date.now();
+      }
+
+      sanitizedEvents.push(sanitized as AnalyticsEvent);
+    }
+
+    // Add sanitized events to storage
+    analyticsEvents.push(...sanitizedEvents);
 
     // Fix H3: Cap the events array at MAX_ANALYTICS_EVENTS, remove oldest if exceeded
     if (analyticsEvents.length > MAX_ANALYTICS_EVENTS) {

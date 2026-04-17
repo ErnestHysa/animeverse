@@ -46,7 +46,16 @@ export function safeSetItem<T>(key: string, value: T): StorageResult<void> {
       return { success: false, error: 'Window not defined' };
     }
 
-    const serialized = JSON.stringify(value);
+    let serialized: string;
+    try {
+      serialized = JSON.stringify(value);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes('circular')) {
+        return { success: false, error: 'Cannot store circular references' };
+      }
+      return { success: false, error: `Serialization failed: ${msg}` };
+    }
     localStorage.setItem(key, serialized);
     return { success: true };
   } catch (error) {

@@ -599,7 +599,8 @@ if (require.main === module) {
           res.end(JSON.stringify({ error: "Server configuration error" }));
           return;
         }
-        verify(token, process.env.JWT_SECRET);
+        // H11: Specify algorithms to prevent algorithm confusion attacks
+        verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
       } catch {
         res.writeHead(401, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: "Invalid token" }));
@@ -617,6 +618,7 @@ if (require.main === module) {
     }
   });
 
+  // TODO: In production, restrict bind address to 127.0.0.1 instead of 0.0.0.0
   statusServer.listen(STATUS_PORT, () => {
     log("info", "Status server listening on port", STATUS_PORT);
     log("info", "Status available at http://localhost:" + STATUS_PORT + "/status");

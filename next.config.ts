@@ -80,7 +80,9 @@ const nextConfig = {
       },
       {
         key: "Content-Security-Policy",
-        value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://s4.anilist.co https://img.youtube.com https://googlevideo.com; connect-src 'self' https://graphql.anilist.co https://api.jikan.moe https://api.myanimelist.net wss: ws:; media-src 'self' blob: https://*.googlevideo.com; font-src 'self'; frame-src 'self'; worker-src 'self' blob:;",
+        // H9: Remove 'unsafe-eval' in production; keep for dev tools in development.
+        // TODO: migrate to nonce-based CSP and remove 'unsafe-inline' as well.
+        value: `default-src 'self'; script-src 'self' ${process.env.NODE_ENV === 'production' ? '' : "'unsafe-eval' "}'unsafe-inline' https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://s4.anilist.co https://img.youtube.com https://googlevideo.com; connect-src 'self' https://graphql.anilist.co https://api.jikan.moe https://api.myanimelist.net wss: ws:; media-src 'self' blob: https://*.googlevideo.com; font-src 'self'; frame-src 'self'; worker-src 'self' blob:;`,
       },
       {
         key: "Strict-Transport-Security",

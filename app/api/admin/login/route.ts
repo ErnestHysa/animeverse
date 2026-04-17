@@ -25,6 +25,16 @@ const ipLoginAttempts = new Map<string, { count: number; resetTime: number }>();
 const MAX_LOGIN_ATTEMPTS = 10;
 const LOCKOUT_DURATION = 60 * 1000; // 1 minute
 
+// Cleanup expired entries every 10 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, attempts] of ipLoginAttempts.entries()) {
+    if (now > attempts.resetTime) {
+      ipLoginAttempts.delete(key);
+    }
+  }
+}, 10 * 60 * 1000).unref();
+
 function isIpLocked(ip: string): boolean {
   const attempts = ipLoginAttempts.get(ip);
   if (!attempts) return false;

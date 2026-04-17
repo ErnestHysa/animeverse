@@ -45,6 +45,14 @@ const CACHE_TTL_MS = 60 * 1000; // 60 seconds
  */
 export async function GET(request: NextRequest) {
   try {
+    // Fix C1: Require admin auth to access analytics summary
+    if (!(await isAdminRequest(request))) {
+      return NextResponse.json(
+        { error: "Unauthorized - admin access required" },
+        { status: 401 }
+      );
+    }
+
     const searchParams = request.nextUrl.searchParams;
     const period = searchParams.get("period") || "day";
 

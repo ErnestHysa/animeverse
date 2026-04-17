@@ -32,10 +32,21 @@ class AnalyticsTracker {
   private flushInterval = 30000; // Flush every 30 seconds
   private flushTimer: NodeJS.Timeout | null = null;
   private isFlushing = false;
+  private enabled = true; // Fix H1: enabled flag for opt-out support
 
   constructor() {
     this.sessionId = generateId();
     this.startFlushTimer();
+  }
+
+  /**
+   * Fix H1: Enable or disable analytics tracking
+   */
+  setEnabled(enabled: boolean): void {
+    this.enabled = enabled;
+    if (!enabled) {
+      this.eventQueue = [];
+    }
   }
 
   private generateSessionId(): string {
@@ -233,6 +244,9 @@ class AnalyticsTracker {
    * Queue event for batch sending
    */
   private queueEvent(event: AnalyticsEvent): void {
+    // Fix H1: Respect enabled flag
+    if (!this.enabled) return;
+
     this.eventQueue.push(event);
 
     // Cap queue size to prevent unbounded memory growth (Fix H4)
@@ -249,7 +263,12 @@ class AnalyticsTracker {
    * Flush queued events to server
    */
   private async flush(): Promise<void> {
-    if (this.isFlushing || this.eventQueue.length === 0) {
+    // Fix H1: Respect enabled flag
+    if (!this.enabled || this.eventQueue.length === 0) {
+      return;
+    }
+
+    if (this.isFlushing) {
       return;
     }
 
@@ -345,4 +364,11 @@ export function destroyAnalyticsTracker(): void {
     trackerInstance.destroy();
     trackerInstance = null;
   }
+}
+
+/**
+ * Fix H1: Enable or disable analytics tracking globally
+ */
+export function setAnalyticsEnabled(enabled: boolean): void {
+  getAnalyticsTracker().setEnabled(enabled);
 }

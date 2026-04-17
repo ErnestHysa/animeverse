@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Info, Shield } from "lucide-react";
+import { setAnalyticsEnabled as setTrackerEnabled } from "@/lib/analytics-tracker";
 
 export function AnalyticsSettings() {
   const [analyticsEnabled, setAnalyticsEnabled] = useState(true);
@@ -24,6 +25,10 @@ export function AnalyticsSettings() {
       const settings = JSON.parse(stored);
       setAnalyticsEnabled(settings.analyticsEnabled ?? true);
       setDiagnosticsEnabled(settings.diagnosticsEnabled ?? false);
+      // Fix L8: Apply saved analytics preference on load
+      if (settings.analyticsEnabled === false) {
+        setTrackerEnabled(false);
+      }
     }
   }, []);
 
@@ -37,17 +42,8 @@ export function AnalyticsSettings() {
       })
     );
 
-    // Enable/disable analytics tracking
-    try {
-      const { enableAnalytics, disableAnalytics } = require("@/lib/hybrid-stream-manager");
-      if (enabled) {
-        enableAnalytics();
-      } else {
-        disableAnalytics();
-      }
-    } catch (error) {
-      console.error("Failed to toggle analytics:", error);
-    }
+    // Fix H2: Use setTrackerEnabled from analytics-tracker instead of require()
+    setTrackerEnabled(enabled);
   };
 
   const handleDiagnosticsChange = (enabled: boolean) => {

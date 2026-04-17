@@ -106,7 +106,14 @@ class AnimeTracker {
 
     // Start WebSocket tracker
     this.wsServer = new WebSocketServer({ port: Number(TRACKER_CONFIG.wsPort) });
-    this.wsServer.on("connection", (ws: any) => {
+    this.wsServer.on("connection", (ws: any, req: any) => {
+      // H12: Require passkey authentication on WS connections
+      const url = new URL(req.url || '', `http://${req.headers.host}`);
+      const passkey = url.searchParams.get('passkey');
+      if (!passkey || passkey !== process.env.TRACKER_PASSKEY) {
+        ws.close(4001, 'Authentication required');
+        return;
+      }
       this.handleWebSocketConnection(ws);
     });
 
@@ -119,7 +126,7 @@ class AnimeTracker {
   /**
    * Stop the tracker servers
    */
-  stop(): void {
+  async stop(): Promise<void> {
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
       this.cleanupInterval = null;
@@ -129,7 +136,17 @@ class AnimeTracker {
       this.statsInterval = null;
     }
     if (this.server) {
-      this.server.close();
+      // Force close after 5 seconds
+      const forceTimeout = setTimeout(() => {
+        this.server?.closeAllConnections?.();
+      }, 5000);
+
+      await new Promise<void>((resolve) => {
+        this.server!.close(() => {
+          clearTimeout(forceTimeout);
+          resolve();
+        });
+      });
       this.server = null;
     }
     if (this.wsServer) {
@@ -142,8 +159,9 @@ class AnimeTracker {
    * Handle HTTP announce requests
    */
   private handleHTTPRequest(req: http.IncomingMessage, res: http.ServerResponse): void {
-    // Add CORS headers to all responses (M18)
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    // H10: Restrict CORS to specific origins instead of wildcard
+    const allowedOrigin = process.env.ALLOWED_ORIGINS?.split(',')[0] || 'https://animeverse.stream';
+    res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST');
 
     const url = parseUrl(req.url || "", true);

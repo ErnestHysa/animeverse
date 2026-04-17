@@ -50,6 +50,12 @@ const RATE_LIMIT_RULES: RateLimitRule[] = [
   { pathPrefix: '/api/analytics', maxRequests: 60, windowMs: 60 * 1000 },
   { pathPrefix: '/api/admin/login', maxRequests: 10, windowMs: 60 * 1000 },
   { pathPrefix: '/api/search-suggestions', maxRequests: 30, windowMs: 60 * 1000 },
+  // Fix H7: Rate limit rules for previously unprotected routes
+  { pathPrefix: '/api/magnets', maxRequests: 30, windowMs: 60 * 1000 },
+  { pathPrefix: '/api/scrape', maxRequests: 10, windowMs: 60 * 1000 },
+  { pathPrefix: '/api/download-hls', maxRequests: 5, windowMs: 60 * 1000 },
+  { pathPrefix: '/api/video-sources', maxRequests: 30, windowMs: 60 * 1000 },
+  { pathPrefix: '/api/torrent-sources', maxRequests: 30, windowMs: 60 * 1000 },
 ];
 
 function getClientIp(request: NextRequest): string {

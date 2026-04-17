@@ -255,6 +255,35 @@ function extractQuality(title) {
 }
 
 // ===================================
+// File Locking (Write Queue)
+// ===================================
+
+let writeInProgress = false;
+const writeQueue = [];
+
+async function safeWriteJSON(filepath, data) {
+  return new Promise((resolve, reject) => {
+    writeQueue.push({ filepath, data, resolve, reject });
+    processWriteQueue();
+  });
+}
+
+async function processWriteQueue() {
+  if (writeInProgress || writeQueue.length === 0) return;
+  writeInProgress = true;
+  const { filepath, data, resolve, reject } = writeQueue.shift();
+  try {
+    await fs.writeFile(filepath, JSON.stringify(data, null, 2));
+    resolve();
+  } catch (err) {
+    reject(err);
+  } finally {
+    writeInProgress = false;
+    processWriteQueue();
+  }
+}
+
+// ===================================
 // Database Operations
 // ===================================
 
@@ -276,10 +305,7 @@ async function readMagnetsDatabase() {
  */
 async function writeMagnetsDatabase(data) {
   data.lastUpdated = Date.now();
-  await fs.writeFile(
-    CONFIG.magnetsDbPath,
-    JSON.stringify(data, null, 2)
-  );
+  await safeWriteJSON(CONFIG.magnetsDbPath, data);
 }
 
 /**
@@ -361,7 +387,7 @@ async function readScrapeLog() {
  * Write scrape log
  */
 async function writeScrapeLog(log) {
-  await fs.writeFile(CONFIG.scrapeLogPath, JSON.stringify(log, null, 2));
+  await safeWriteJSON(CONFIG.scrapeLogPath, log);
 }
 
 // ===================================

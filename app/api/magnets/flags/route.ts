@@ -10,9 +10,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { MagnetFlag } from "@/types/magnet-ratings";
 import { isAdminRequest } from "@/lib/auth";
+import { verifyToken, extractTokenFromHeader } from "@/lib/auth";
 
 // In-memory storage (replace with database in production)
 const flagsStore: Map<string, MagnetFlag[]> = new Map();
+
+// Fix L6: Max size limits for in-memory stores
+const MAX_STORE_SIZE = 10000;
+function evictIfNeeded<K, V>(map: Map<K, V>) {
+  if (map.size > MAX_STORE_SIZE) {
+    const keysToDelete = Array.from(map.keys()).slice(0, map.size - MAX_STORE_SIZE + 100);
+    keysToDelete.forEach(k => map.delete(k));
+  }
+}
 
 /**
  * POST /api/magnets/flags
@@ -20,6 +30,21 @@ const flagsStore: Map<string, MagnetFlag[]> = new Map();
  */
 export async function POST(request: NextRequest) {
   try {
+    // Fix H4: Require JWT authentication for POST
+    const authHeader = request.headers.get("authorization");
+    const token = extractTokenFromHeader(authHeader);
+    if (!token) {
+      return NextResponse.json({ error: "Authorization required" }, { status: 401 });
+    }
+    const payload = verifyToken(token);
+    if (!payload) {
+      return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
+    }
+    // Extract userId from verified token, not from request body
+    const authenticatedUserId = payload.userId;
+
+    // TODO: Add rate limiting per user for flag submissions to prevent abuse
+
     // Body size check
     const contentLength = request.headers.get('content-length');
     if (contentLength && parseInt(contentLength) > 1048576) {
@@ -27,10 +52,13 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { magnetHash, userId, username, reason, description } = body;
+    const { magnetHash, username, reason, description } = body;
 
-    // Validation
-    if (!magnetHash || !userId || !reason) {
+    // Use authenticated userId instead of body userId
+    const userId = authenticatedUserId;
+
+    // Validation — userId no longer required in body (comes from token)
+    if (!magnetHash || !reason) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
@@ -82,6 +110,7 @@ export async function POST(request: NextRequest) {
       flagsStore.set(magnetHash, []);
     }
     flagsStore.get(magnetHash)!.push(newFlag);
+    evictIfNeeded(flagsStore);
 
     return NextResponse.json({ flag: newFlag, message: "Flag submitted" }, { status: 201 });
   } catch (error) {

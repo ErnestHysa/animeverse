@@ -322,70 +322,47 @@ export default function SettingsPage() {
     const authStatus = params.get("auth");
 
     if (authStatus === "success") {
-      // Check URL hash for auth data (passed by callback route)
+      // Fix L5/H13: AniList tokens are now in httpOnly cookies, not URL hash.
+      // Read display user data from anilist_user_display cookie for UI purposes.
       let tokenFromHash = null;
       let userFromHash = null;
 
+      // Try to read display data from the non-httpOnly cookie
       try {
-        // FIX 7: Validate hash data and sanitize string values to prevent XSS
-        const rawHash = decodeURIComponent(window.location.hash.slice(1));
-        const hashData = JSON.parse(rawHash);
-        // Validate structure: must be a plain object with expected fields
-        if (hashData && typeof hashData === 'object' && !Array.isArray(hashData) && hashData.token && hashData.user) {
-          // Sanitize string values
-          const sanitize = (val: unknown): unknown => {
-            if (typeof val === 'string') return val.replace(/<[^>]*>/g, '');
-            if (typeof val === 'object' && val !== null) {
-              const clean: Record<string, unknown> = {};
-              for (const [k, v] of Object.entries(val)) { clean[k] = sanitize(v); }
-              return clean;
-            }
-            return val;
-          };
-          const cleanData = sanitize(hashData) as typeof hashData;
-          tokenFromHash = cleanData.token;
-          userFromHash = cleanData.user;
-          // Store in Zustand
-          setAniListAuth(cleanData.user, cleanData.token);
-          toast.success(`Welcome back, ${cleanData.user.name}!`);
-          fetchAniListData(cleanData.token);
+        const getCookieValue = (name: string): string | null => {
+          const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+          return match ? decodeURIComponent(match[1]) : null;
+        };
+        const displayCookie = getCookieValue("anilist_user_display");
+        if (displayCookie) {
+          const displayData = JSON.parse(displayCookie);
+          if (displayData && displayData.id && displayData.name) {
+            userFromHash = displayData;
+            // Note: token is only in httpOnly cookie, not accessible from client
+            // Store display user data in Zustand for UI
+            setAniListAuth(displayData as AniListUser, "");
+            tokenFromHash = "cookie-based"; // flag that we got data from cookies
+            toast.success(`Welcome back, ${displayData.name}!`);
+          }
         }
       } catch (e) {
-        // Hash parse failed, try Zustand state
+        // Cookie parse failed
       }
 
-      // Clean URL hash
+      // Clean URL
       window.history.replaceState({}, "", "/settings");
 
-      // If no hash data, check Zustand state
+      // If no cookie data, check Zustand state (for existing sessions)
       if (!tokenFromHash) {
         setTimeout(() => {
           if (isAuthenticated && anilistUser) {
             toast.success(`Welcome back, ${anilistUser.name}!`);
-            if (anilistToken) {
-              fetchAniListData(anilistToken);
-            }
-          } else {
-            // Fallback: try to get from localStorage directly
-            // FIX 3: Use safe storage utility
-            try {
-              const zustandResult = safeGetItem<{ state?: { anilistUser?: unknown; anilistToken?: string } }>("animeverse-stream-storage");
-              if (zustandResult.success && zustandResult.data) {
-                const parsed = zustandResult.data;
-                if (parsed.state?.anilistUser && parsed.state?.anilistToken) {
-                  setAniListAuth(parsed.state.anilistUser as AniListUser, parsed.state.anilistToken);
-                  toast.success(`Welcome back, ${(parsed.state.anilistUser as { name: string }).name}!`);
-                  fetchAniListData(parsed.state.anilistToken);
-                }
-              }
-            } catch (e) {
-              logger.error("Error parsing Zustand state:", e);
-            }
           }
+          // Note: We no longer read tokens from localStorage — they are in httpOnly cookies
         }, 100);
       }
 
-      // Clean URL
+      // Clean URL (duplicate guard)
       window.history.replaceState({}, "", "/settings");
     } else if (authStatus === "error") {
       const message = params.get("message");
@@ -410,26 +387,26 @@ export default function SettingsPage() {
     // Handle MAL OAuth callback
     const malAuthStatus = params.get("mal_auth");
     if (malAuthStatus === "success") {
+      // Fix C3: MAL tokens are now in httpOnly cookies, not URL hash.
+      // Read display user data from mal_user cookie for UI purposes only.
       try {
-        // FIX 7: Validate and sanitize MAL hash data
-        const rawHash = decodeURIComponent(window.location.hash.slice(1));
-        const hashData = JSON.parse(rawHash);
-        if (hashData && typeof hashData === 'object' && !Array.isArray(hashData) && hashData.token && hashData.user) {
-          const sanitize = (val: unknown): unknown => {
-            if (typeof val === 'string') return val.replace(/<[^>]*>/g, '');
-            if (typeof val === 'object' && val !== null) {
-              const clean: Record<string, unknown> = {};
-              for (const [k, v] of Object.entries(val)) { clean[k] = sanitize(v); }
-              return clean;
-            }
-            return val;
-          };
-          const cleanData = sanitize(hashData) as typeof hashData;
-          setMALAuth(cleanData.user, cleanData.token, cleanData.refresh_token ?? "", cleanData.expires_at ?? 0);
-          toast.success(`MAL connected: ${cleanData.user.name}!`);
+        const getCookieValue = (name: string): string | null => {
+          const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+          return match ? decodeURIComponent(match[1]) : null;
+        };
+        const malUserCookie = getCookieValue("mal_user");
+        if (malUserCookie) {
+          const malUserData = JSON.parse(malUserCookie);
+          if (malUserData && malUserData.name) {
+            // Store display-only user data in Zustand (no tokens — those are in httpOnly cookies)
+            setMALAuth(malUserData, "", "", 0);
+            toast.success(`MAL connected: ${malUserData.name}!`);
+          }
+        } else {
+          toast.success("MAL connected successfully!");
         }
       } catch {
-        // ignore hash parse error
+        toast.success("MAL connected successfully!");
       }
       window.history.replaceState({}, "", "/settings");
     } else if (malAuthStatus === "error") {

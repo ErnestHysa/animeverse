@@ -193,8 +193,23 @@ export async function GET(request: NextRequest) {
     });
 
     if (userData) {
+      // Fix H13: Full user data in httpOnly cookie (secure — contains sensitive options)
       response.cookies.set("anilist_user", JSON.stringify(userData), {
-        httpOnly: false, // Client needs to read user display data
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: tokenData.expires_in || 31536000,
+        path: "/",
+      });
+
+      // Fix H13: Minimal display data in non-httpOnly cookie for client UI
+      const displayData = {
+        id: userData.id,
+        name: userData.name,
+        avatar: userData.avatar,
+      };
+      response.cookies.set("anilist_user_display", JSON.stringify(displayData), {
+        httpOnly: false,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
         maxAge: tokenData.expires_in || 31536000,

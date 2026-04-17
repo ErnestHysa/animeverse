@@ -8,10 +8,20 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import type { MagnetRating, MagnetSourceStats } from "@/types/magnet-ratings";
+import { verifyToken, extractTokenFromHeader } from "@/lib/auth";
 
 // In-memory storage (replace with database in production)
 const ratingsStore: Map<string, MagnetRating[]> = new Map();
 const statsCache: Map<string, MagnetSourceStats> = new Map();
+
+// Fix L6: Max size limits for in-memory stores
+const MAX_STORE_SIZE = 10000;
+function evictIfNeeded<K, V>(map: Map<K, V>) {
+  if (map.size > MAX_STORE_SIZE) {
+    const keysToDelete = Array.from(map.keys()).slice(0, map.size - MAX_STORE_SIZE + 100);
+    keysToDelete.forEach(k => map.delete(k));
+  }
+}
 
 /**
  * POST /api/magnets/ratings
@@ -19,6 +29,19 @@ const statsCache: Map<string, MagnetSourceStats> = new Map();
  */
 export async function POST(request: NextRequest) {
   try {
+    // Fix H5: Require JWT authentication for POST
+    const authHeader = request.headers.get("authorization");
+    const token = extractTokenFromHeader(authHeader);
+    if (!token) {
+      return NextResponse.json({ error: "Authorization required" }, { status: 401 });
+    }
+    const payload = verifyToken(token);
+    if (!payload) {
+      return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
+    }
+    // Extract userId from verified token, not from request body
+    const authenticatedUserId = payload.userId;
+
     // Body size check
     const contentLength = request.headers.get('content-length');
     if (contentLength && parseInt(contentLength) > 1048576) {
@@ -30,7 +53,6 @@ export async function POST(request: NextRequest) {
       magnetHash,
       animeId,
       episodeNumber,
-      userId,
       username,
       rating,
       quality,
@@ -40,8 +62,11 @@ export async function POST(request: NextRequest) {
       playbackIssues,
     } = body;
 
-    // Validation
-    if (!magnetHash || !animeId || !episodeNumber || !userId || !rating) {
+    // Use authenticated userId instead of body userId
+    const userId = authenticatedUserId;
+
+    // Validation — userId comes from token, not required in body
+    if (!magnetHash || !animeId || !episodeNumber || !rating) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
@@ -146,6 +171,8 @@ export async function POST(request: NextRequest) {
 
     // Update stats
     updateStats(magnetHash);
+    evictIfNeeded(ratingsStore);
+    evictIfNeeded(statsCache);
 
     return NextResponse.json({ rating: newRating, message: "Rating submitted" }, { status: 201 });
   } catch (error) {

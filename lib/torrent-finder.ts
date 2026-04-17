@@ -66,16 +66,21 @@ export interface TorrentDatabaseSchema {
  * Decode HTML entities (e.g., &amp; -> &)
  */
 function decodeHtmlEntities(text: string): string {
-  const entities: Record<string, string> = {
-    "&amp;": "&",
-    "&lt;": "<",
-    "&gt;": ">",
-    "&quot;": '"',
-    "&#39;": "'",
-    "&apos;": "'",
-  };
-
-  return text.replace(/&[^;]+;/g, (entity) => entities[entity] || entity);
+  const textarea = typeof document !== 'undefined' ? document.createElement('textarea') : null;
+  if (textarea) {
+    textarea.innerHTML = text;
+    return textarea.value;
+  }
+  // Server-side fallback
+  return text
+    .replace(/&#x([0-9A-Fa-f]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)))
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'");
 }
 
 /**

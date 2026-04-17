@@ -35,7 +35,29 @@ interface CommentsState {
 const getCurrentUser = () => {
   if (typeof window === "undefined") return { id: "local", name: "You", avatar: undefined };
 
-  // Check if user is logged in with AniList
+  // Fix H13: Read from anilist_user_display cookie (non-httpOnly) instead of localStorage
+  const getCookieValue = (name: string): string | null => {
+    const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+    return match ? decodeURIComponent(match[1]) : null;
+  };
+
+  const displayCookie = getCookieValue("anilist_user_display");
+  if (displayCookie) {
+    try {
+      const userData = JSON.parse(displayCookie);
+      if (userData && userData.id && userData.name) {
+        return {
+          id: userData.id.toString(),
+          name: userData.name,
+          avatar: userData.avatar?.large || userData.avatar?.medium,
+        };
+      }
+    } catch (e) {
+      // Ignore parse errors
+    }
+  }
+
+  // Fallback: try Zustand localStorage (for legacy sessions)
   const storage = localStorage.getItem("animeverse-stream-storage");
   if (storage) {
     try {

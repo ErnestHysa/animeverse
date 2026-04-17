@@ -197,7 +197,7 @@ export function validateMagnet(magnet: string): { valid: boolean; error?: string
   }
 
   // Extract infoHash
-  const xtMatch = magnet.match(/xt=urn:btih:([a-fA-F0-9]{40})/);
+  const xtMatch = magnet.match(/xt=urn:btih:([a-fA-F0-9]{40}|[A-Z2-7]{32})/i);
   if (!xtMatch) {
     return { valid: false, error: "No valid infoHash found in magnet link" };
   }

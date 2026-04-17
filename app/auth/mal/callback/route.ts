@@ -3,7 +3,8 @@
  * GET /auth/mal/callback?code=XXX
  *
  * Exchanges the authorization code for a token using PKCE verifier stored in cookie.
- * Redirects back to /settings with token and user data in URL hash.
+ * Fix C3: Tokens stored ONLY in httpOnly cookies — no longer exposed in URL hash.
+ * Redirects back to /settings with success status; client reads auth from cookies.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -91,15 +92,9 @@ export async function GET(request: NextRequest) {
       console.error("MAL user fetch error:", err);
     }
 
-    // Redirect with token in hash (client-side reads it)
+    // Fix C3: Token is NO LONGER placed in the URL hash.
+    // Only stored in httpOnly cookies to prevent Referer header leakage.
     settingsUrl.searchParams.set("mal_auth", "success");
-    const hashData = {
-      token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token,
-      expires_at: Date.now() + (tokenData.expires_in ?? 2592000) * 1000,
-      user: userData,
-    };
-    settingsUrl.hash = encodeURIComponent(JSON.stringify(hashData));
 
     const response = NextResponse.redirect(settingsUrl);
 
@@ -112,7 +107,7 @@ export async function GET(request: NextRequest) {
       sameSite: "lax",
     });
 
-    // Store token in httpOnly cookie as well
+    // Store MAL access token in httpOnly cookie
     response.cookies.set("mal_token", tokenData.access_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -120,6 +115,43 @@ export async function GET(request: NextRequest) {
       maxAge: tokenData.expires_in ?? 2592000,
       path: "/",
     });
+
+    // Store MAL refresh token in httpOnly cookie
+    if (tokenData.refresh_token) {
+      response.cookies.set("mal_refresh_token", tokenData.refresh_token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 30 * 24 * 60 * 60, // 30 days
+        path: "/",
+      });
+    }
+
+    // Store MAL token expiry in httpOnly cookie
+    const expiresAt = Date.now() + (tokenData.expires_in ?? 2592000) * 1000;
+    response.cookies.set("mal_token_expires", String(expiresAt), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: tokenData.expires_in ?? 2592000,
+      path: "/",
+    });
+
+    // Store MAL user display data in a non-httpOnly cookie for client UI
+    if (userData) {
+      const displayData = {
+        id: userData.id,
+        name: userData.name,
+        picture: userData.picture,
+      };
+      response.cookies.set("mal_user", JSON.stringify(displayData), {
+        httpOnly: false,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: tokenData.expires_in ?? 2592000,
+        path: "/",
+      });
+    }
 
     return response;
   } catch (err) {

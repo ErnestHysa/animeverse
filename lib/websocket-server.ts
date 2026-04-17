@@ -8,6 +8,7 @@
 import { Server as HTTPServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import crypto from 'crypto';
+import { verifyToken } from '@/lib/auth';
 
 // ===================================
 // Types
@@ -86,6 +87,7 @@ class WatchPartyRoomManager {
   constructor() {
     // Clean up inactive rooms every 5 minutes
     this.cleanupInterval = setInterval(() => this.cleanupInactiveRooms(), 5 * 60 * 1000);
+    this.cleanupInterval.unref();
   }
 
   /**
@@ -105,6 +107,28 @@ class WatchPartyRoomManager {
       },
       pingTimeout: 60000,
       pingInterval: 25000,
+    });
+
+    // Socket.IO authentication middleware
+    this.io.use((socket, next) => {
+      const token = socket.handshake.auth.token || socket.handshake.query.token;
+      if (!token) {
+        // Allow anonymous connections with limited capabilities
+        socket.data.authenticated = false;
+        return next();
+      }
+      try {
+        const decoded = verifyToken(token);
+        if (decoded) {
+          socket.data.authenticated = true;
+          socket.data.userId = decoded.userId;
+        } else {
+          socket.data.authenticated = false;
+        }
+        next();
+      } catch {
+        next(new Error('Authentication failed'));
+      }
     });
 
     this.setupEventHandlers();
@@ -246,6 +270,15 @@ class WatchPartyRoomManager {
     }
 
     // Check for duplicate username in the room
+    // Allow rejoin if existing viewer with same name is disconnected
+    const existingDisconnectedIndex = Array.from(room.viewers.entries())
+      .findIndex(([_, v]) => v.username === username && (v as any).disconnected);
+    if (existingDisconnectedIndex !== -1) {
+      const [[socketIdToRemove]] = Array.from(room.viewers.entries())
+        .filter(([_, v]) => v.username === username && (v as any).disconnected);
+      room.viewers.delete(socketIdToRemove);
+    }
+
     const existingUsername = Array.from(room.viewers.values())
       .find(v => v.username === username);
     if (existingUsername) {
@@ -646,7 +679,7 @@ class WatchPartyRoomManager {
   private generateRoomId(): string {
     let id: string;
     do {
-      id = Math.random().toString(36).substring(2, 8).toUpperCase();
+      id = crypto.randomBytes(8).toString('hex').toUpperCase();
     } while (this.rooms.has(id));
     return id;
   }
