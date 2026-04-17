@@ -13,6 +13,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { toast } from "react-hot-toast";
+import { formatBytes } from "@/lib/downloads";
 import { Play, Pause, Download, Users, AlertCircle, CheckCircle } from "lucide-react";
 
 // WebTorrent is only available in the browser
@@ -65,15 +66,6 @@ export function WebTorrentPlayer({
     downloaded: 0,
     uploaded: 0,
   });
-
-  // Format bytes to human readable
-  const formatBytes = useCallback((bytes: number): string => {
-    if (bytes === 0) return "0 B";
-    const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB", "TB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
-  }, []);
 
   // Format seconds to human readable
   const formatTime = useCallback((seconds: number): string => {

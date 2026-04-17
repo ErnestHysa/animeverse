@@ -893,15 +893,15 @@ export const useStore = create<StoreState>()(
               try {
                 const parsed = typeof value === "string" ? JSON.parse(value) : value;
                 if (parsed?.state?.mediaCache) {
-                  const cacheKeys = Object.keys(parsed.state.mediaCache);
-                  if (cacheKeys.length > 100) {
-                    // Keep only the newest 100 entries
-                    const keepKeys = cacheKeys.slice(cacheKeys.length - 100);
-                    const reducedCache: Record<string, unknown> = {};
-                    for (const key of keepKeys) {
-                      reducedCache[key] = parsed.state.mediaCache[key];
+                  const entries = Object.entries(parsed.state.mediaCache) as [string, any][];
+                  if (entries.length > 100) {
+                    // Sort by _lastAccessed ascending (oldest first) so we evict least-recently-used
+                    entries.sort((a, b) => (a[1]._lastAccessed || 0) - (b[1]._lastAccessed || 0));
+                    // Keep only the 100 most recently accessed entries
+                    const toRemove = entries.slice(0, entries.length - 100);
+                    for (const [key] of toRemove) {
+                      delete parsed.state.mediaCache[key];
                     }
-                    parsed.state.mediaCache = reducedCache;
                     localStorage.setItem(name, JSON.stringify(parsed));
                   }
                 }

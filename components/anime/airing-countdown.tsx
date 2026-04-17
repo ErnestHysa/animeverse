@@ -25,12 +25,16 @@ export function AiringCountdown({ episode, airingAt }: AiringCountdownProps) {
   );
 
   useEffect(() => {
+    let id: ReturnType<typeof setInterval>;
     const tick = () => {
       const remaining = Math.max(0, Math.floor(airingAt - Date.now() / 1000));
       setSecondsLeft(remaining);
+      if (remaining <= 0) {
+        clearInterval(id);
+      }
     };
     tick();
-    const id = setInterval(tick, 1000);
+    id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [airingAt]);
 

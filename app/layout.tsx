@@ -3,6 +3,7 @@ import "./globals.css";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { GlobalComponents } from "@/components/layout/global-components";
+import { ErrorBoundary } from "@/components/error/error-boundary";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://animeverse.stream"),
@@ -72,7 +73,9 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <ThemeProvider>
-          {children}
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
           <ServiceWorkerRegister />
           <GlobalComponents />
         </ThemeProvider>

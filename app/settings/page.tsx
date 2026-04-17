@@ -56,7 +56,7 @@ import {
 import { useStore, type AniListMediaEntry } from "@/store";
 import { Clock, Flame, TrendingUp, BarChart3, Award, Keyboard } from "lucide-react";
 import { DEFAULT_SHORTCUTS } from "@/lib/keyboard-shortcuts";
-import { safeGetItem, safeRemoveItem } from "@/lib/storage";
+import { safeGetItem, safeRemoveItem, getCookie } from "@/lib/storage";
 
 // FIX 1: Extracted reusable toggle setting component
 function ToggleSetting({ label, description, checked, onChange }: { label: string; description?: string; checked: boolean; onChange: (val: boolean) => void }) {
@@ -118,6 +118,9 @@ export default function SettingsPage() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [anilistFilter, setAnilistFilter] = useState<'all' | 'watching' | 'completed' | 'planning' | 'paused' | 'dropped'>('all');
 
+  // FIX H2: Track AniList connection status from server-side cookie
+  const [anilistConnected, setAnilistConnected] = useState(false);
+
   // FIX 4: State-based confirmation dialog instead of window.confirm
   const [pendingConfirm, setPendingConfirm] = useState<null | (() => void)>(null);
 
@@ -159,6 +162,24 @@ export default function SettingsPage() {
     setHistoryCount(watchHistory.length);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchHistory, mediaCache]);
+
+  // FIX H2: On mount, check if AniList token exists in httpOnly cookie via API
+  // This restores connection status after page refresh when Zustand store is empty
+  useEffect(() => {
+    fetch('/api/anilist/status')
+      .then(r => r.json())
+      .then(data => {
+        if (data.connected) {
+          setAnilistConnected(true);
+          // Restore user data in Zustand from the server-provided user info
+          if (data.user && data.user.id && data.user.name && !anilistUser) {
+            setAniListAuth(data.user as AniListUser, "");
+          }
+        }
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSavePreference = async (key: string, value: unknown) => {
     updatePreferences({ [key]: value });
@@ -312,6 +333,35 @@ export default function SettingsPage() {
     }
   }, [anilistUser?.id, syncAniListData, migrateAniListData, calculateAndSetStats]);
 
+  // FIX H2: Server-side AniList sync using httpOnly cookie token
+  // Falls back to client-side sync if server route is unavailable
+  const handleServerSync = useCallback(async () => {
+    setIsSyncing(true);
+    try {
+      const response = await fetch('/api/anilist/sync', { method: 'POST' });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Sync failed' }));
+        throw new Error(errorData.error || 'Sync failed');
+      }
+      const data = await response.json();
+      const allEntries = data.entries || [];
+
+      // Sync the AniList data (synchronous Zustand set)
+      syncAniListData(allEntries);
+
+      // Read updated state and migrate
+      const currentState = useStore.getState().anilistMediaList;
+      migrateAniListData(currentState);
+      calculateAndSetStats();
+      toast.success(`Synced ${allEntries.length} anime from AniList! Data migrated successfully.`);
+    } catch (error) {
+      logger.error('AniList server sync error:', error);
+      toast.error('Failed to sync AniList data. Please try again.');
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [syncAniListData, migrateAniListData, calculateAndSetStats]);
+
   // Handle OAuth callback from URL hash
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -329,11 +379,8 @@ export default function SettingsPage() {
 
       // Try to read display data from the non-httpOnly cookie
       try {
-        const getCookieValue = (name: string): string | null => {
-          const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
-          return match ? decodeURIComponent(match[1]) : null;
-        };
-        const displayCookie = getCookieValue("anilist_user_display");
+        // Fix L2: Use secure getCookie helper from lib/storage instead of inline regex
+        const displayCookie = getCookie("anilist_user_display");
         if (displayCookie) {
           const displayData = JSON.parse(displayCookie);
           if (displayData && displayData.id && displayData.name) {
@@ -341,6 +388,7 @@ export default function SettingsPage() {
             // Note: token is only in httpOnly cookie, not accessible from client
             // Store display user data in Zustand for UI
             setAniListAuth(displayData as AniListUser, "");
+            setAnilistConnected(true); // FIX H2: Mark connected when OAuth succeeds
             tokenFromHash = "cookie-based"; // flag that we got data from cookies
             toast.success(`Welcome back, ${displayData.name}!`);
           }
@@ -390,11 +438,8 @@ export default function SettingsPage() {
       // Fix C3: MAL tokens are now in httpOnly cookies, not URL hash.
       // Read display user data from mal_user cookie for UI purposes only.
       try {
-        const getCookieValue = (name: string): string | null => {
-          const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
-          return match ? decodeURIComponent(match[1]) : null;
-        };
-        const malUserCookie = getCookieValue("mal_user");
+        // Fix L2: Use secure getCookie helper from lib/storage instead of inline regex
+        const malUserCookie = getCookie("mal_user");
         if (malUserCookie) {
           const malUserData = JSON.parse(malUserCookie);
           if (malUserData && malUserData.name) {
@@ -473,6 +518,7 @@ export default function SettingsPage() {
       }
 
       setAniListAuth(userData, accessToken.trim());
+      setAnilistConnected(true); // FIX H2: Mark connected when manual token works
       toast.success(`Welcome back, ${userData.name}!`);
       setShowTokenInput(false);
       setAccessToken('');
@@ -489,6 +535,7 @@ export default function SettingsPage() {
   // Logout from AniList
   const handleAniListLogout = () => {
     clearAniListAuth();
+    setAnilistConnected(false); // FIX H2: Clear connection state on logout
     toast.success("Logged out from AniList");
   };
 
@@ -821,8 +868,8 @@ export default function SettingsPage() {
                   {/* Sync Options */}
                   <div className="grid grid-cols-2 gap-3">
                     <button
-                      onClick={() => anilistToken && fetchAniListData(anilistToken)}
-                      disabled={!anilistToken || isSyncing}
+                      onClick={handleServerSync}
+                      disabled={!anilistConnected || isSyncing}
                       className="px-4 py-3 bg-white/5 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg flex items-center justify-center gap-2 transition-colors"
                     >
                       <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />

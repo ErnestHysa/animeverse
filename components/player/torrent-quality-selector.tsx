@@ -11,7 +11,7 @@
 
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { ChevronDown, Check, Users, Download, Upload, AlertCircle } from "lucide-react";
 import type { MagnetLink } from "@/lib/torrent-finder";
 import {
@@ -46,6 +46,7 @@ export function TorrentQualitySelector({
   const [isOpen, setIsOpen] = useState(false);
   const [selectedQuality, setSelectedQuality] = useState<string>("");
   const [showDetails, setShowDetails] = useState<string | null>(null);
+  const [activeIndex, setActiveIndex] = useState(-1);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown on click outside
@@ -151,13 +152,48 @@ export function TorrentQualitySelector({
     onQualityChange(option.bestTorrent);
     setSelectedQuality(option.quality);
     setIsOpen(false);
+    setActiveIndex(-1);
   };
+
+  // Keyboard navigation handler
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (!isOpen) {
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        setIsOpen(true);
+        setActiveIndex(0);
+      }
+      return;
+    }
+    switch (e.key) {
+      case 'Escape':
+        setIsOpen(false);
+        setActiveIndex(-1);
+        break;
+      case 'ArrowDown':
+        e.preventDefault();
+        setActiveIndex(prev => Math.min(prev + 1, qualityGroups.length - 1));
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setActiveIndex(prev => Math.max(prev - 1, 0));
+        break;
+      case 'Enter':
+        if (activeIndex >= 0 && activeIndex < qualityGroups.length) {
+          handleQualitySelect(qualityGroups[activeIndex]);
+        }
+        break;
+    }
+  }, [isOpen, activeIndex, qualityGroups, handleQualitySelect]);
 
   return (
     <div ref={dropdownRef} className={`torrent-quality-selector ${className}`}>
       {/* Selected Quality Display */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => { setIsOpen(!isOpen); setActiveIndex(-1); }}
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
+        onKeyDown={handleKeyDown}
         className="w-full flex items-center justify-between bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg px-4 py-3 transition-colors"
       >
         <div className="flex items-center gap-3">
@@ -193,14 +229,16 @@ export function TorrentQualitySelector({
 
       {/* Quality Dropdown */}
       {isOpen && (
-        <div className="absolute z-50 mt-2 w-full bg-gray-900/95 backdrop-blur-md border border-gray-700 rounded-lg shadow-xl overflow-hidden">
+        <div role="listbox" aria-label="Video quality" className="absolute z-50 mt-2 w-full bg-gray-900/95 backdrop-blur-md border border-gray-700 rounded-lg shadow-xl overflow-hidden">
           <div className="max-h-96 overflow-y-auto">
-            {qualityGroups.map((option) => (
+            {qualityGroups.map((option, index) => (
               <div key={option.quality} className="border-b border-gray-700 last:border-b-0">
                 {/* Quality Header */}
                 <button
                   onClick={() => handleQualitySelect(option)}
-                  className="w-full px-4 py-3 hover:bg-white/10 transition-colors"
+                  role="option"
+                  aria-selected={selectedQuality === option.quality}
+                  className={`w-full px-4 py-3 hover:bg-white/10 transition-colors ${activeIndex === index ? 'bg-white/15 ring-1 ring-blue-400/50' : ''}`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">

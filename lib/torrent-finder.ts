@@ -15,6 +15,36 @@ import parseTorrent from "parse-torrent";
 const SCRAPER_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
 // ===================================
+// Rate Limiter
+// ===================================
+
+const domainRequests: Map<string, number[]> = new Map();
+const MIN_INTERVAL_MS = 2000; // 2 seconds between requests to same domain
+const MAX_PER_MINUTE = 10;
+
+async function rateLimitedFetch(url: string, options?: RequestInit): Promise<Response> {
+  const domain = new URL(url).hostname;
+  const now = Date.now();
+  const timestamps = domainRequests.get(domain) || [];
+  // Clean old timestamps
+  const recent = timestamps.filter(t => now - t < 60000);
+  if (recent.length >= MAX_PER_MINUTE) {
+    const waitMs = 60000 - (now - recent[0]) + 100;
+    await new Promise(r => setTimeout(r, waitMs));
+  }
+  // Check per-request interval
+  if (recent.length > 0) {
+    const elapsed = now - recent[recent.length - 1];
+    if (elapsed < MIN_INTERVAL_MS) {
+      await new Promise(r => setTimeout(r, MIN_INTERVAL_MS - elapsed));
+    }
+  }
+  recent.push(Date.now());
+  domainRequests.set(domain, recent);
+  return fetch(url, options);
+}
+
+// ===================================
 // Types
 // ===================================
 
@@ -62,16 +92,21 @@ export interface TorrentDatabaseSchema {
 // Helper Functions
 // ===================================
 
+// Cached textarea for decoding HTML entities (avoids creating DOM element on every call)
+let _decodeTextarea: HTMLTextAreaElement | null = null;
+
 /**
  * Decode HTML entities (e.g., &amp; -> &)
  */
 function decodeHtmlEntities(text: string): string {
-  const textarea = typeof document !== 'undefined' ? document.createElement('textarea') : null;
-  if (textarea) {
-    textarea.innerHTML = text;
-    return textarea.value;
+  if (typeof document !== 'undefined') {
+    if (!_decodeTextarea) {
+      _decodeTextarea = document.createElement('textarea');
+    }
+    _decodeTextarea.innerHTML = text;
+    return _decodeTextarea.value;
   }
-  // Server-side fallback
+  // Server-side regex fallback
   return text
     .replace(/&#x([0-9A-Fa-f]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
     .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)))
@@ -267,7 +302,7 @@ export async function scrapeNyaa(
     const timeoutId = setTimeout(() => controller.abort(), 15000);
     let response: Response;
     try {
-      response = await fetch(searchUrl, {
+      response = await rateLimitedFetch(searchUrl, {
         headers: {
           "User-Agent": SCRAPER_USER_AGENT,
         },
@@ -390,7 +425,7 @@ export async function scrapeNyaaLand(
     const nyaaLandTimeoutId = setTimeout(() => nyaaLandController.abort(), 15000);
     let response: Response;
     try {
-      response = await fetch(searchUrl, {
+      response = await rateLimitedFetch(searchUrl, {
         headers: {
           "User-Agent": SCRAPER_USER_AGENT,
         },
@@ -505,7 +540,7 @@ export async function scrapeAniDex(
     const anidexTimeoutId = setTimeout(() => anidexController.abort(), 15000);
     let response: Response;
     try {
-      response = await fetch(searchUrl, {
+      response = await rateLimitedFetch(searchUrl, {
         headers: {
           "User-Agent": SCRAPER_USER_AGENT,
         },

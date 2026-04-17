@@ -1,9 +1,23 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { Share2, Download, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "react-hot-toast";
+
+// Polyfill roundRect at module level so it only runs once
+if (typeof CanvasRenderingContext2D !== "undefined" && !CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function (x: number, y: number, w: number, h: number, radii: number | number[]) {
+    const r = typeof radii === "number" ? radii : Array.isArray(radii) ? radii[0] : 0;
+    this.moveTo(x + r, y);
+    this.arcTo(x + w, y, x + w, y + h, r);
+    this.arcTo(x + w, y + h, x, y + h, r);
+    this.arcTo(x, y + h, x, y, r);
+    this.arcTo(x, y, x + w, y, r);
+    this.closePath();
+    return this;
+  };
+}
 
 interface ShareStatsCardProps {
   totalEpisodes: number;
@@ -29,25 +43,19 @@ export function ShareStatsCard({
   const [copied, setCopied] = useState(false);
   const [open, setOpen] = useState(false);
 
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  function getCanvas(): HTMLCanvasElement {
+    if (!canvasRef.current) {
+      canvasRef.current = document.createElement("canvas");
+    }
+    return canvasRef.current;
+  }
+
   const generateCard = useCallback((): string => {
-    const canvas = document.createElement("canvas");
+    const canvas = getCanvas();
     canvas.width = 600;
     canvas.height = 360;
     const ctx = canvas.getContext("2d")!;
-
-    // Polyfill roundRect for older browsers
-    if (!CanvasRenderingContext2D.prototype.roundRect) {
-      CanvasRenderingContext2D.prototype.roundRect = function (x: number, y: number, w: number, h: number, radii: number | number[]) {
-        const r = typeof radii === 'number' ? radii : Array.isArray(radii) ? radii[0] : 0;
-        this.moveTo(x + r, y);
-        this.arcTo(x + w, y, x + w, y + h, r);
-        this.arcTo(x + w, y + h, x, y + h, r);
-        this.arcTo(x, y + h, x, y, r);
-        this.arcTo(x, y, x + w, y, r);
-        this.closePath();
-        return this;
-      };
-    }
 
     // Background gradient
     const grad = ctx.createLinearGradient(0, 0, 600, 360);

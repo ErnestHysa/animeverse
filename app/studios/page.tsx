@@ -26,7 +26,7 @@ export const metadata = {
 
 async function getStudios() {
   const result = await anilist.getStudios(1, 50);
-  return result.data?.Page.studios.nodes ?? [];
+  return result.data?.Page.studios ?? [];
 }
 
 export default async function StudiosPage() {

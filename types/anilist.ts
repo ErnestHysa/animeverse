@@ -294,9 +294,7 @@ export interface Studio {
 
 export interface StudioListResponse {
   Page: {
-    studios: {
-      nodes: Studio[];
-    };
+    studios: Studio[];
   };
 }
 

@@ -107,3 +107,21 @@ export function getItemWithFallback<T>(key: string, fallback: T): T {
   const result = safeGetItem<T>(key);
   return result.success ? (result.data ?? fallback) : fallback;
 }
+
+/**
+ * Safely read a cookie value by name.
+ * Uses string splitting instead of RegExp to avoid regex injection
+ * when cookie names contain special characters.
+ */
+export function getCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const encodedName = encodeURIComponent(name);
+  const pairs = document.cookie.split(';');
+  for (const pair of pairs) {
+    const [key, value] = pair.trim().split('=');
+    if (key === encodedName || key === name) {
+      return decodeURIComponent(value || '');
+    }
+  }
+  return null;
+}

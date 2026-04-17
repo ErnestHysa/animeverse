@@ -44,7 +44,7 @@ const QUERIES = {
 
   byIds: `query GetByIds($ids: [Int]) { Page(page: 1, perPage: 50) { pageInfo { total } media(id_in: $ids, type: ANIME) { ${MEDIA_MINIMAL_FRAGMENT} } } }`,
 
-  studios: `query Studios($page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { studios(sort: FAVOURITES_DESC) { nodes { id name isAnimationStudio media(first: 10, sort: POPULARITY_DESC) { nodes { id title { romaji english native userPreferred } coverImage { large medium } averageScore format } } } } } }`,
+  studios: `query Studios($page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { studios(sort: FAVOURITES_DESC) { id name isAnimationStudio media(first: 10, sort: POPULARITY_DESC) { nodes { id title { romaji english native userPreferred } coverImage { large medium } averageScore format } } } } }`,
 
   byStudio: `query ByStudio($studioId: Int, $page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME, studios: [$studioId], sort: POPULARITY_DESC) { ${MEDIA_MINIMAL_FRAGMENT} } } }`,
 

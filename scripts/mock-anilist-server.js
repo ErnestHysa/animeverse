@@ -118,22 +118,20 @@ function buildResponse(query = '') {
     return {
       data: {
         Page: {
-          studios: {
-            nodes: Array.from({ length: 10 }, (_, i) => ({
-              id: i + 1,
-              name: `Studio ${i + 1}`,
-              isAnimationStudio: true,
-              media: {
-                nodes: mediaList.slice(i * 4, (i + 1) * 4).map(m => ({
-                  id: m.id,
-                  title: m.title,
-                  coverImage: m.coverImage,
-                  averageScore: m.averageScore,
-                  format: m.format,
-                }))
-              }
-            }))
-          }
+          studios: Array.from({ length: 10 }, (_, i) => ({
+            id: i + 1,
+            name: `Studio ${i + 1}`,
+            isAnimationStudio: true,
+            media: {
+              nodes: mediaList.slice(i * 4, (i + 1) * 4).map(m => ({
+                id: m.id,
+                title: m.title,
+                coverImage: m.coverImage,
+                averageScore: m.averageScore,
+                format: m.format,
+              }))
+            }
+          }))
         }
       }
     };

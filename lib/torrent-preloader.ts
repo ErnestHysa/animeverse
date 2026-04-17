@@ -11,6 +11,8 @@
  * - Automatic cleanup of unused preload data
  */
 
+import { formatBytes as formatBytesUtil } from '@/lib/downloads';
+
 // ===================================
 // Types
 // ===================================
@@ -473,7 +475,9 @@ class TorrentPreloaderImpl {
   private findTask(animeId: number, episodeNumber: number): string | null {
     for (const [taskId, task] of this.tasks.entries()) {
       if (task.animeId === animeId && task.episodeNumber === episodeNumber) {
-        return taskId;
+        if (task.status === 'pending' || task.status === 'downloading') {
+          return taskId;
+        }
       }
     }
     return null;
@@ -627,14 +631,7 @@ class TorrentPreloaderImpl {
    * Format bytes to human readable
    */
   formatBytes(bytes: number): string {
-    if (bytes < 0) bytes = 0;
-    if (bytes === 0) return "0 B";
-
-    const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-    return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
+    return formatBytesUtil(bytes);
   }
 
   /**

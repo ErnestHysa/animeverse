@@ -291,7 +291,7 @@ export function SeedTrackingSettings() {
       {/* View Detailed Stats Button */}
       <button
         onClick={() => {
-          window.open("/stats", "_blank");
+          window.open("/stats", "_blank", "noopener,noreferrer");
         }}
         className="w-full px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors flex items-center justify-center gap-2"
       >

@@ -41,6 +41,8 @@ export function useFeatureFlag(featureKey: FeatureKey): UseFeatureFlagResult {
   });
 
   useEffect(() => {
+    const controller = new AbortController();
+
     const checkFeatureFlag = async () => {
       try {
         // WARNING: Reading role from localStorage is NOT secure — an attacker can
@@ -61,6 +63,7 @@ export function useFeatureFlag(featureKey: FeatureKey): UseFeatureFlagResult {
         const response = await fetch(
           `/api/feature-flags?feature=${featureKey}`,
           {
+            signal: controller.signal,
             headers: {
               // Client-claimed identity — NOT authoritative. Server must validate via session/token.
               'x-client-claimed-user-id': userId || '',
@@ -83,6 +86,8 @@ export function useFeatureFlag(featureKey: FeatureKey): UseFeatureFlagResult {
           phase: data.phase,
         });
       } catch (error) {
+        // Ignore AbortError — it means the effect was cleaned up (unmount or featureKey changed)
+        if ((error as Error).name === 'AbortError') return;
         console.error('[useFeatureFlag] Error:', error);
         setState({
           isEnabled: false,
@@ -93,6 +98,8 @@ export function useFeatureFlag(featureKey: FeatureKey): UseFeatureFlagResult {
     };
 
     checkFeatureFlag();
+
+    return () => controller.abort();
   }, [featureKey]);
 
   return state;

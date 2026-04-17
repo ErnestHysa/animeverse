@@ -7,7 +7,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { usePreferences } from "@/store";
 import { updateBandwidthConfig } from "@/lib/bandwidth-manager";
 import { updatePreloaderConfig } from "@/lib/torrent-preloader";
@@ -65,26 +65,40 @@ const PRELOAD_SIZE_OPTIONS = [
 export function PerformanceSettings({ className = "" }: PerformanceSettingsProps) {
   const { preferences, updatePreferences } = usePreferences();
 
-  // Get current values with defaults
-  const preloadConfig = preferences?.preloadConfig || {
-    enabled: true,
-    preloadThreshold: 120,
-    targetBytes: 100 * 1024 * 1024,
-    wifiOnly: true,
-  };
+  // Get current values with defaults (memoized to stabilize useEffect deps)
+  const preloadConfig = useMemo(() => ({
+    enabled: preferences?.preloadConfig?.enabled ?? true,
+    preloadThreshold: preferences?.preloadConfig?.preloadThreshold ?? 120,
+    targetBytes: preferences?.preloadConfig?.targetBytes ?? 100 * 1024 * 1024,
+    wifiOnly: preferences?.preloadConfig?.wifiOnly ?? true,
+  }), [
+    preferences?.preloadConfig?.enabled,
+    preferences?.preloadConfig?.preloadThreshold,
+    preferences?.preloadConfig?.targetBytes,
+    preferences?.preloadConfig?.wifiOnly,
+  ]);
 
-  const bandwidthConfig = preferences?.bandwidthConfig || {
-    uploadLimit: 0,
-    downloadLimit: 0,
-    mode: "unlimited",
-    adaptiveEnabled: false,
-    wifiOnly: false,
-  };
+  const bandwidthConfig = useMemo(() => ({
+    uploadLimit: preferences?.bandwidthConfig?.uploadLimit ?? 0,
+    downloadLimit: preferences?.bandwidthConfig?.downloadLimit ?? 0,
+    mode: preferences?.bandwidthConfig?.mode ?? "unlimited",
+    adaptiveEnabled: preferences?.bandwidthConfig?.adaptiveEnabled ?? false,
+    wifiOnly: preferences?.bandwidthConfig?.wifiOnly ?? false,
+  }), [
+    preferences?.bandwidthConfig?.uploadLimit,
+    preferences?.bandwidthConfig?.downloadLimit,
+    preferences?.bandwidthConfig?.mode,
+    preferences?.bandwidthConfig?.adaptiveEnabled,
+    preferences?.bandwidthConfig?.wifiOnly,
+  ]);
 
-  const dhtConfig = preferences?.dhtConfig || {
-    enablePreconnect: true,
-    preferTrackers: true,
-  };
+  const dhtConfig = useMemo(() => ({
+    enablePreconnect: preferences?.dhtConfig?.enablePreconnect ?? true,
+    preferTrackers: preferences?.dhtConfig?.preferTrackers ?? true,
+  }), [
+    preferences?.dhtConfig?.enablePreconnect,
+    preferences?.dhtConfig?.preferTrackers,
+  ]);
 
   // Propagate settings to lib singletons when preferences change
   useEffect(() => {
@@ -191,6 +205,7 @@ export function PerformanceSettings({ className = "" }: PerformanceSettingsProps
   // ===================================
 
   const formatBytes = (bytes: number): string => {
+    if (bytes < 0) bytes = 0;
     if (bytes === 0) return "0 B";
     const k = 1024;
     const sizes = ["B", "KB", "MB", "GB"];

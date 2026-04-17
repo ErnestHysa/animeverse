@@ -5,6 +5,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { getCookie } from "@/lib/storage";
 
 export interface EpisodeComment {
   id: string;
@@ -35,13 +36,8 @@ interface CommentsState {
 const getCurrentUser = () => {
   if (typeof window === "undefined") return { id: "local", name: "You", avatar: undefined };
 
-  // Fix H13: Read from anilist_user_display cookie (non-httpOnly) instead of localStorage
-  const getCookieValue = (name: string): string | null => {
-    const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
-    return match ? decodeURIComponent(match[1]) : null;
-  };
-
-  const displayCookie = getCookieValue("anilist_user_display");
+  // Fix L2: Use secure getCookie helper from lib/storage instead of inline regex
+  const displayCookie = getCookie("anilist_user_display");
   if (displayCookie) {
     try {
       const userData = JSON.parse(displayCookie);

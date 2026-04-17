@@ -77,7 +77,8 @@ test.describe('WebTorrent Player E2E - Smoke Tests', () => {
     const videoElement = page.locator('video').first();
 
     // Either loading text appears or a video element is present
-    await page.waitForTimeout(2000);
+    // Wait for player to render (video element or loading state)
+    await page.waitForSelector('video, [class*="player"]', { timeout: 5000 }).catch(() => {});
     const hasLoading = await loadingText.isVisible().catch(() => false);
     const hasVideo = await videoElement.isVisible().catch(() => false);
 
@@ -89,7 +90,7 @@ test.describe('WebTorrent Player E2E - Smoke Tests', () => {
 
     // Wait for potential error state to appear
     // The WebTorrentPlayer shows "Torrent Error" in an h3 when it fails
-    await page.waitForTimeout(5000);
+    await page.waitForLoadState('networkidle').catch(() => {});
 
     // Check for error-related content
     const errorOverlay = page.locator('text=/torrent error|error|failed|could not load/i').first();
@@ -100,7 +101,7 @@ test.describe('WebTorrent Player E2E - Smoke Tests', () => {
     const hasVideo = await videoElement.isVisible().catch(() => false);
 
     // Either we get an error state or the video loads - both are valid outcomes
-    expect(hasError || hasVideo || true).toBeTruthy();
+    expect(hasError || hasVideo).toBeTruthy();
   });
 });
 
@@ -139,7 +140,8 @@ test.describe('WebTorrent Player E2E - Navigation', () => {
 
     // The WebTorrentPlayer stats overlay shows peer count and download speed
     // when not loading and no error - look for "peers" text
-    await page.waitForTimeout(3000);
+    // Wait for WebTorrent to potentially connect and show stats
+    await page.waitForLoadState('networkidle').catch(() => {});
 
     const peersText = page.locator('text=/\\d+ peers/i').first();
     const hasPeers = await peersText.isVisible().catch(() => false);
@@ -197,8 +199,8 @@ test.describe('Fallback System Integration', () => {
     // Navigate directly to a watch page
     await page.goto('http://localhost:3000/watch/21459/1', { waitUntil: 'domcontentloaded' });
 
-    // Wait for player initialization (30s WebTorrent timeout potential)
-    await page.waitForTimeout(5000);
+    // Wait for player initialization
+    await page.waitForSelector('video', { timeout: 10000 }).catch(() => {});
 
     // The player should be visible either via WebTorrent or HLS fallback
     // Look for the video element which both paths render

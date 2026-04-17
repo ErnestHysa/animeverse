@@ -343,6 +343,16 @@ export function getRankProgress(stats: SeedStats): {
   const next = SEED_RANKS[currentIndex + 1];
   const currentUpload = stats.totalUploaded;
   const required = next.requirement.value;
+
+  if (currentUpload >= required) {
+    return {
+      current,
+      next,
+      progress: 100,
+      remaining: "Rank achieved!",
+    };
+  }
+
   const progress = Math.min(100, (currentUpload / required) * 100);
   const remaining = formatBytes(required - currentUpload);
 

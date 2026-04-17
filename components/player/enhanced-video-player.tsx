@@ -7,6 +7,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { formatBytes } from "@/lib/downloads";
 import {
   Play,
   Pause,
@@ -329,7 +330,7 @@ export function EnhancedVideoPlayer({
   const router = useRouter();
 
   // Store for watch history
-  const { addToWatchHistory } = useStore();
+  const addToWatchHistory = useStore(s => s.addToWatchHistory);
 
 
   // Dynamic intro/outro timestamps from AniSkip API
@@ -1005,6 +1006,8 @@ export function EnhancedVideoPlayer({
 
     if (!effectiveMalId) return;
 
+    let cancelled = false;
+
     const fetchTimestamps = async () => {
       try {
         // Store MAL ID for future use
@@ -1019,6 +1022,8 @@ export function EnhancedVideoPlayer({
           animeId
         );
 
+        if (cancelled) return;
+
         // If we got timestamps, use them
         if (timestamps.intro || timestamps.outro) {
           setSkipTimestamps(timestamps);
@@ -1029,6 +1034,8 @@ export function EnhancedVideoPlayer({
           setSkipTimestamps(estimated);
         }
       } catch (error) {
+        if (cancelled) return;
+
         // Silently fall back to estimated timestamps
         const video = videoRef.current;
         const estimated = getEstimatedTimestamps(video?.duration);
@@ -1037,6 +1044,8 @@ export function EnhancedVideoPlayer({
     };
 
     fetchTimestamps();
+
+    return () => { cancelled = true; };
   }, [malId, animeId, episodeNumber]);
 
   // ===================================
@@ -1493,7 +1502,9 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
     const handlePause = () => setIsPlaying(false);
     const handleProgress = () => {
       if (video.buffered.length > 0) {
-        const buffered = video.buffered.end(0);
+        const buffered = video.buffered.length > 0
+          ? video.buffered.end(video.buffered.length - 1)
+          : 0;
         setBufferProgress((buffered / video.duration) * 100);
       }
     };
@@ -1907,17 +1918,6 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
   }, [showSettings, showSubtitleSettings]);
 
   // ===================================
-  // Helper Functions
-  // ===================================
-
-  const formatBytes = (bytes: number): string => {
-    if (bytes === 0) return "0 B";
-    const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
-  };
-
   // ===================================
   // Player Controls
   // ===================================
@@ -2176,6 +2176,12 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
 
     const currentTime = video.currentTime;
     const wasPlaying = !video.paused;
+
+    // Destroy existing HLS instance before switching source
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
 
     video.src = qualityUrl;
     video.currentTime = currentTime;

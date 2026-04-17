@@ -12,16 +12,23 @@ export interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
 export function Skeleton({ className, variant = "rectangular", ...props }: SkeletonProps) {
   return (
     <div
-      className={cn(
-        "animate-shimmer rounded-md bg-muted",
-        {
-          "rounded-full": variant === "circular",
-          "h-4 w-full": variant === "text",
-        },
-        className
-      )}
-      {...props}
-    />
+      role="status"
+      aria-busy="true"
+      aria-label="Loading..."
+    >
+      <div
+        className={cn(
+          "animate-shimmer rounded-md bg-muted",
+          {
+            "rounded-full": variant === "circular",
+            "h-4 w-full": variant === "text",
+          },
+          className
+        )}
+        aria-hidden="true"
+        {...props}
+      />
+    </div>
   );
 }
 

@@ -96,10 +96,16 @@ export default async function GenreDetailPage({ params, searchParams }: GenrePag
   } catch (error) {
     console.error('Failed to load genre page:', error);
     return (
-      <div className="container mx-auto px-4 py-8 text-center">
-        <h2 className="text-2xl font-bold text-red-400">Failed to load content</h2>
-        <p className="text-gray-400 mt-2">Please try again later.</p>
-      </div>
+      <>
+        <Header />
+        <main className="min-h-screen flex items-center justify-center">
+          <div className="container mx-auto px-4 py-8 text-center">
+            <h2 className="text-2xl font-bold text-red-400">Failed to load content</h2>
+            <p className="text-gray-400 mt-2">Please try again later.</p>
+          </div>
+        </main>
+        <Footer />
+      </>
     );
   }
 
@@ -172,8 +178,17 @@ export default async function GenreDetailPage({ params, searchParams }: GenrePag
           <AnimeGrid anime={anime} />
 
           {/* Pagination */}
-          {hasNextPage && (
-            <div className="flex justify-center mt-8">
+          <div className="flex justify-center gap-4 mt-8">
+            {page > 1 && (
+              <Link
+                href={page === 2 ? `/genre/${genre}` : `/genre/${genre}?page=${page - 1}`}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-white/10 text-foreground rounded-lg hover:bg-white/20 transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Previous
+              </Link>
+            )}
+            {hasNextPage && (
               <Link
                 href={`/genre/${genre}?page=${page + 1}`}
                 className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
@@ -181,8 +196,8 @@ export default async function GenreDetailPage({ params, searchParams }: GenrePag
                 Load More
                 <ArrowLeft className="w-4 h-4 rotate-180" />
               </Link>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </main>
       <Footer />

@@ -520,16 +520,25 @@ export function getAllowedOrigin(request: NextRequest): string | null {
     return origin;
   }
 
-  // Also allow the origin if its hostname matches a whitelisted hostname
-  // (useful when ports vary in dev)
+  // Also allow the origin if its hostname AND port match a whitelisted origin
+  // (hostname-only matching allowed bypass via different ports)
   try {
     const originUrl = new URL(origin);
     const originHostname = originUrl.hostname.toLowerCase();
+    const originPort = originUrl.port;
     for (const allowed of allowedOrigins) {
       try {
         const allowedUrl = new URL(allowed);
         if (allowedUrl.hostname.toLowerCase() === originHostname) {
-          return origin;
+          // Require port to match as well (handle default ports for http/https)
+          const portsMatch =
+            allowedUrl.port === originPort ||
+            (!allowedUrl.port && !originPort) ||
+            (allowedUrl.protocol === 'https:' && (allowedUrl.port === '443' || !allowedUrl.port) && (!originPort || originUrl.port === '443')) ||
+            (allowedUrl.protocol === 'http:' && (allowedUrl.port === '80' || !allowedUrl.port) && (!originPort || originUrl.port === '80'));
+          if (portsMatch) {
+            return origin;
+          }
         }
       } catch {
         // skip malformed allowed origins

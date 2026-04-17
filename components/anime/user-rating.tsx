@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Star, X, Check, Edit2 } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ export function UserRating({ animeId, animeTitle, compact = false }: UserRatingP
   const [editMode, setEditMode] = useState(false);
   const [reviewText, setReviewText] = useState("");
   const [pendingScore, setPendingScore] = useState<number | null>(null);
+  const isSubmittingRef = useRef(false);
 
   useEffect(() => {
     const saved = getRating(animeId);
@@ -35,11 +36,13 @@ export function UserRating({ animeId, animeTitle, compact = false }: UserRatingP
   }, [animeId]);
 
   const handleScoreClick = useCallback((score: number) => {
+    if (isSubmittingRef.current) return;
     if (!editMode && !rating) {
-      // Quick rate without review
+      isSubmittingRef.current = true;
       const saved = setRating(animeId, score);
       setRatingState(saved);
       toast.success(`Rated ${score}/10 ⭐`);
+      setTimeout(() => { isSubmittingRef.current = false; }, 300);
     } else {
       setPendingScore(score);
     }

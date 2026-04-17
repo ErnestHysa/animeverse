@@ -132,7 +132,7 @@ export function Dialog({
         )}
 
         {/* Content */}
-        <div className={title ? "p-6" : "p-6 pt-0"}>
+        <div className={title ? "p-6 pt-0" : "p-6"}>
           {children}
         </div>
       </div>

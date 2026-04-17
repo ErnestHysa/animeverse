@@ -75,7 +75,7 @@ export function ShareDialog({ isOpen, onClose, title, url, episode }: ShareDialo
     }
 
     const platformUrl = platform.getShareUrl(shareUrl, title);
-    window.open(platformUrl, "_blank", "width=600,height=400");
+    window.open(platformUrl, "_blank", "width=600,height=400,noopener,noreferrer");
   };
 
   const handleNativeShare = async () => {
