@@ -149,8 +149,9 @@ export async function GET(request: NextRequest) {
 
     if (!response.ok) {
       logger.error(`HLS proxy error: ${response.status} ${response.statusText} for ${targetUrl}`);
+      console.error('[proxy-hls] Upstream error:', response.status, response.statusText);
       return NextResponse.json(
-        { error: `Failed to fetch: ${response.statusText}` },
+        { error: 'Failed to fetch video source' },
         { status: response.status }
       );
     }

@@ -201,47 +201,56 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const infoHash = infoHashMatch[1].toLowerCase();
     const now = Date.now();
 
-    const db = await readDatabase();
+    // Fix C1: Move readDatabase inside writeQueue to prevent TOCTOU race
+    let result: { success: boolean; magnet?: MagnetEntry; error?: string; status?: number };
 
-    // Check for duplicate infoHash
-    const existing = db.magnets.find((m) => m.infoHash === infoHash);
-    if (existing) {
-      return NextResponse.json(
-        { error: "Magnet link with this infoHash already exists", existing },
-        { status: 409 }
-      );
-    }
-
-    // Create new magnet entry
-    const newMagnet: MagnetEntry = {
-      id: `${animeId}-${episode}-${infoHash.substring(0, 8)}`,
-      animeId: parseInt(animeId),
-      animeTitle: animeTitle || `Anime ${animeId}`,
-      episode: parseInt(episode),
-      magnet,
-      infoHash,
-      quality: quality || "unknown",
-      seeders: 0,
-      leechers: 0,
-      provider,
-      status: "pending",
-      lastChecked: now,
-      createdAt: now,
-      updatedAt: now,
-      submittedBy,
-      notes,
-    };
-
-    db.magnets.push(newMagnet);
     writeQueue = writeQueue.then(async () => {
+      const db = await readDatabase();
+
+      // Check for duplicate infoHash
+      const existing = db.magnets.find((m) => m.infoHash === infoHash);
+      if (existing) {
+        result = { success: false, error: "Magnet link with this infoHash already exists", status: 409 };
+        return;
+      }
+
+      // Create new magnet entry
+      const newMagnet: MagnetEntry = {
+        id: `${animeId}-${episode}-${infoHash.substring(0, 8)}`,
+        animeId: parseInt(animeId),
+        animeTitle: animeTitle || `Anime ${animeId}`,
+        episode: parseInt(episode),
+        magnet,
+        infoHash,
+        quality: quality || "unknown",
+        seeders: 0,
+        leechers: 0,
+        provider,
+        status: "pending",
+        lastChecked: now,
+        createdAt: now,
+        updatedAt: now,
+        submittedBy,
+        notes,
+      };
+
+      db.magnets.push(newMagnet);
       await writeDatabase(db);
+      result = { success: true, magnet: newMagnet };
     });
     await writeQueue;
+
+    if (!result!.success) {
+      return NextResponse.json(
+        { error: result!.error },
+        { status: result!.status || 500 }
+      );
+    }
 
     return NextResponse.json(
       {
         success: true,
-        magnet: newMagnet,
+        magnet: result!.magnet,
         message: "Magnet link added successfully",
       },
       { status: 201 }
@@ -258,6 +267,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 /**
  * PUT - Update magnet link
  */
+const VALID_STATUSES = ["active", "dead", "pending", "verified"];
+const VALID_QUALITIES = ["1080p", "720p", "480p", "360p", "unknown"];
+
 export async function PUT(request: NextRequest): Promise<NextResponse> {
   try {
     // Auth check
@@ -281,36 +293,53 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const db = await readDatabase();
-    const magnetIndex = db.magnets.findIndex((m) => m.id === id);
-
-    if (magnetIndex === -1) {
-      return NextResponse.json(
-        { error: "Magnet link not found" },
-        { status: 404 }
-      );
+    // Fix C4: Validate status and quality values
+    if (status && !VALID_STATUSES.includes(status)) {
+      return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+    }
+    if (quality && !VALID_QUALITIES.includes(quality)) {
+      return NextResponse.json({ error: "Invalid quality" }, { status: 400 });
     }
 
-    // Update fields
-    if (status) {
-      db.magnets[magnetIndex].status = status;
-    }
-    if (notes !== undefined) {
-      db.magnets[magnetIndex].notes = notes;
-    }
-    if (quality) {
-      db.magnets[magnetIndex].quality = quality;
-    }
-    db.magnets[magnetIndex].updatedAt = Date.now();
+    // Fix C1: Move readDatabase inside writeQueue to prevent TOCTOU race
+    let result: { success: boolean; magnet?: MagnetEntry; error?: string; status?: number };
 
     writeQueue = writeQueue.then(async () => {
+      const db = await readDatabase();
+      const magnetIndex = db.magnets.findIndex((m) => m.id === id);
+
+      if (magnetIndex === -1) {
+        result = { success: false, error: "Magnet link not found", status: 404 };
+        return;
+      }
+
+      // Update fields
+      if (status) {
+        db.magnets[magnetIndex].status = status;
+      }
+      if (notes !== undefined) {
+        db.magnets[magnetIndex].notes = notes;
+      }
+      if (quality) {
+        db.magnets[magnetIndex].quality = quality;
+      }
+      db.magnets[magnetIndex].updatedAt = Date.now();
+
       await writeDatabase(db);
+      result = { success: true, magnet: db.magnets[magnetIndex] };
     });
     await writeQueue;
 
+    if (!result!.success) {
+      return NextResponse.json(
+        { error: result!.error },
+        { status: result!.status || 500 }
+      );
+    }
+
     return NextResponse.json({
       success: true,
-      magnet: db.magnets[magnetIndex],
+      magnet: result!.magnet,
       message: "Magnet link updated successfully",
     });
   } catch (error) {
@@ -342,22 +371,31 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const db = await readDatabase();
-    const magnetIndex = db.magnets.findIndex((m) => m.id === id);
+    // Fix C1: Move readDatabase inside writeQueue to prevent TOCTOU race
+    let result: { success: boolean; error?: string; status?: number };
 
-    if (magnetIndex === -1) {
-      return NextResponse.json(
-        { error: "Magnet link not found" },
-        { status: 404 }
-      );
-    }
-
-    // Remove magnet
-    db.magnets.splice(magnetIndex, 1);
     writeQueue = writeQueue.then(async () => {
+      const db = await readDatabase();
+      const magnetIndex = db.magnets.findIndex((m) => m.id === id);
+
+      if (magnetIndex === -1) {
+        result = { success: false, error: "Magnet link not found", status: 404 };
+        return;
+      }
+
+      // Remove magnet
+      db.magnets.splice(magnetIndex, 1);
       await writeDatabase(db);
+      result = { success: true };
     });
     await writeQueue;
+
+    if (!result!.success) {
+      return NextResponse.json(
+        { error: result!.error },
+        { status: result!.status || 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,

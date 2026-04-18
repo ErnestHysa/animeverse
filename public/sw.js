@@ -10,6 +10,22 @@ const CACHE_VERSION = "2026-04-15";
 const STATIC_CACHE = "animeverse-static-v" + CACHE_VERSION;
 const DYNAMIC_CACHE = "animeverse-dynamic-v" + CACHE_VERSION;
 
+// Fix H5: Max entries cap for dynamic cache
+const MAX_DYNAMIC_CACHE_ENTRIES = 200;
+
+/**
+ * Trim cache to maxEntries by removing oldest entries (FIFO)
+ */
+async function trimCache(cacheName, maxEntries) {
+  const cache = await caches.open(cacheName);
+  const keys = await cache.keys();
+  if (keys.length > maxEntries) {
+    for (let i = 0; i < keys.length - maxEntries; i++) {
+      await cache.delete(keys[i]);
+    }
+  }
+}
+
 // Assets to cache immediately
 const STATIC_ASSETS = [
   "/",
@@ -120,7 +136,7 @@ self.addEventListener("fetch", (event) => {
           if (response && response.status === 200 && response.type === "basic") {
             const responseToCache = response.clone();
             caches.open(DYNAMIC_CACHE).then((cache) => {
-              cache.put(request, responseToCache);
+              cache.put(request, responseToCache).then(() => trimCache(DYNAMIC_CACHE, MAX_DYNAMIC_CACHE_ENTRIES));
             }).catch(() => {});
           }
           return response;
@@ -145,7 +161,7 @@ self.addEventListener("fetch", (event) => {
         const fetchPromise = fetch(request).then(response => {
           if (response.ok) {
             const clone = response.clone();
-            caches.open(DYNAMIC_CACHE).then(cache => cache.put(request, clone));
+            caches.open(DYNAMIC_CACHE).then(cache => cache.put(request, clone).then(() => trimCache(DYNAMIC_CACHE, MAX_DYNAMIC_CACHE_ENTRIES)));
           }
           return response;
         }).catch(() => cached);
@@ -174,7 +190,7 @@ self.addEventListener("fetch", (event) => {
 
         // Cache the response
         caches.open(DYNAMIC_CACHE).then((cache) => {
-          cache.put(request, responseToCache);
+          cache.put(request, responseToCache).then(() => trimCache(DYNAMIC_CACHE, MAX_DYNAMIC_CACHE_ENTRIES));
         }).catch(() => {
           // Silently fail - cache errors shouldn't break the app
         });

@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
         let hash = 0;
         for (let i = 0; i < payload.userId.length; i++) {
           hash = ((hash << 5) - hash) + payload.userId.charCodeAt(i);
-          hash = hash | 0;
+          hash = hash >>> 0;
         }
         return hash;
       })(),

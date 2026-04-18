@@ -11,13 +11,9 @@ import { Footer } from "@/components/layout/footer";
 
 import { AnimeGrid } from "@/components/anime/anime-grid";
 
-import { AnimeGridSkeleton } from "@/components/ui/skeleton";
-
 import { anilist } from "@/lib/anilist";
 
 import { Star } from "lucide-react";
-
-import { Suspense } from "react";
 
 // ===================================
 // Data Fetching
@@ -76,9 +72,7 @@ export default async function PopularPage() {
           </div>
 
           {/* Grid */}
-          <Suspense fallback={<AnimeGridSkeleton count={48} />}>
-            <AnimeGrid anime={anime} />
-          </Suspense>
+          <AnimeGrid anime={anime} />
         </div>
       </main>
       <Footer />

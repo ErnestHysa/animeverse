@@ -22,8 +22,8 @@ export const dynamic = 'force-dynamic';
 // TODO (M11): In-memory rate limiting resets on server restart. For production,
 // migrate to Redis-backed rate limiting so limits persist across restarts.
 const ipLoginAttempts = new Map<string, { count: number; resetTime: number }>();
-const MAX_LOGIN_ATTEMPTS = 10;
-const LOCKOUT_DURATION = 60 * 1000; // 1 minute
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes
 
 // Cleanup expired entries every 10 minutes
 setInterval(() => {

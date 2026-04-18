@@ -203,6 +203,10 @@ export async function GET(request: NextRequest) {
       videoSegments.splice(MAX_SEGMENTS_PER_DOWNLOAD);
     }
 
+    // Safety limit: reject downloads that would exceed 500MB in memory
+    const MAX_TOTAL_SIZE = 500 * 1024 * 1024; // 500MB limit
+    let totalDownloadedSize = 0;
+
     // Dynamically import archiver
     const archiverModule = await import('archiver');
     const archiver = archiverModule.default;
@@ -238,6 +242,10 @@ export async function GET(request: NextRequest) {
       try {
         const segmentStream = await proxyFetch(segment.url);
         const buffer = await streamToBuffer(segmentStream);
+        totalDownloadedSize += buffer.length;
+        if (totalDownloadedSize > MAX_TOTAL_SIZE) {
+          return NextResponse.json({ error: 'File too large for download' }, { status: 413 });
+        }
         videoBuffers.push(buffer);
       } catch (error) {
         // Track failed segments for warning in README

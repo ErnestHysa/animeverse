@@ -60,7 +60,7 @@ export function ErrorFallback({
  */
 export function CardErrorFallback({ message = "Failed to load" }: { message?: string }) {
   return (
-    <div className="aspect-[3/4] rounded-xl bg-muted/30 flex flex-col items-center justify-center p-4 text-center">
+    <div role="alert" className="aspect-[3/4] rounded-xl bg-muted/30 flex flex-col items-center justify-center p-4 text-center">
       <AlertCircle className="w-8 h-8 text-muted-foreground mb-2" />
       <p className="text-xs text-muted-foreground">{message}</p>
     </div>

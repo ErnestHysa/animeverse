@@ -240,7 +240,7 @@ export default function SettingsPage() {
     a.href = url;
     a.download = `animeverse-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
     toast.success("Data exported");
   };
 
@@ -249,68 +249,15 @@ export default function SettingsPage() {
   // ===================================
 
   // Fetch user's AniList data and sync with local state
-  const fetchAniListData = useCallback(async (token: string) => {
-    if (!token) {
-      toast.error("No access token available. Please login again.");
-      return;
-    }
-
-    if (!anilistUser?.id) {
-      toast.error("User data not available. Please login again.");
-      return;
-    }
-
+  // Fix C3: Routes through server-side /api/anilist/sync to avoid exposing token client-side
+  const fetchAniListData = useCallback(async (_token?: string) => {
     setIsSyncing(true);
     try {
-      const response = await fetch("https://graphql.anilist.co", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({
-          query: `
-            query ($userId: Int) {
-              MediaListCollection(userId: $userId, type: ANIME) {
-                lists {
-                  entries {
-                    mediaId
-                    status
-                    progress
-                    score
-                    startedAt { year month day }
-                    completedAt { year month day }
-                    media {
-                      id
-                      idMal
-                      title { romaji english }
-                      coverImage { large extraLarge }
-                      status
-                      episodes
-                      genres
-                      averageScore
-                      format
-                      duration
-                      description
-                      studios { nodes { name } }
-                    }
-                  }
-                }
-              }
-            }
-          `,
-          variables: {
-            userId: anilistUser.id,
-          },
-        }),
-      });
+      const response = await fetch("/api/anilist/sync", { method: "POST" });
 
       if (response.ok) {
-        const result = await response.json();
-        const lists = result.data?.MediaListCollection?.lists || [];
-        // Flatten the lists to get all entries
-        const allEntries = lists.flatMap((list: { entries: unknown[] }) => list.entries || []);
+        const data = await response.json();
+        const allEntries = data.entries || [];
 
         // First sync the AniList data (synchronous Zustand set)
         syncAniListData(allEntries);
@@ -321,8 +268,8 @@ export default function SettingsPage() {
         calculateAndSetStats();
         toast.success(`Synced ${allEntries.length} anime from AniList! Data migrated successfully.`);
       } else {
-        const errorText = await response.text();
-        logger.error("AniList API error:", errorText);
+        const errorData = await response.json().catch(() => ({ error: "Sync failed" }));
+        logger.error("AniList sync error:", errorData);
         toast.error("Failed to sync AniList data. Please try again.");
       }
     } catch (error) {
@@ -331,7 +278,7 @@ export default function SettingsPage() {
     } finally {
       setIsSyncing(false);
     }
-  }, [anilistUser?.id, syncAniListData, migrateAniListData, calculateAndSetStats]);
+  }, [syncAniListData, migrateAniListData, calculateAndSetStats]);
 
   // FIX H2: Server-side AniList sync using httpOnly cookie token
   // Falls back to client-side sync if server route is unavailable
@@ -534,7 +481,12 @@ export default function SettingsPage() {
   };
 
   // Logout from AniList
-  const handleAniListLogout = () => {
+  const handleAniListLogout = async () => {
+    try {
+      await fetch('/api/anilist/status', { method: 'DELETE' });
+    } catch {
+      // Cookie clearing best-effort
+    }
     clearAniListAuth();
     setAnilistConnected(false); // FIX H2: Clear connection state on logout
     toast.success("Logged out from AniList");

@@ -208,7 +208,7 @@ export function PerformanceSettings({ className = "" }: PerformanceSettingsProps
     if (bytes < 0) bytes = 0;
     if (bytes === 0) return "0 B";
     const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB"];
+    const sizes = ["B", "KB", "MB", "GB", "TB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
   };
@@ -227,6 +227,9 @@ export function PerformanceSettings({ className = "" }: PerformanceSettingsProps
           </h4>
           <button
             onClick={handlePreloadEnabledToggle}
+            role="switch"
+            aria-checked={preloadConfig.enabled}
+            aria-label="Toggle torrent preloading"
             className={`relative w-12 h-6 rounded-full transition-colors ${
               preloadConfig.enabled ? "bg-primary" : "bg-white/10"
             }`}
@@ -293,6 +296,9 @@ export function PerformanceSettings({ className = "" }: PerformanceSettingsProps
               </div>
               <button
                 onClick={handlePreloadWifiOnlyToggle}
+                role="switch"
+                aria-checked={preloadConfig.wifiOnly}
+                aria-label="Toggle WiFi only for preloading"
                 className={`relative w-12 h-6 rounded-full transition-colors ${
                   preloadConfig.wifiOnly ? "bg-primary" : "bg-white/10"
                 }`}
@@ -389,6 +395,9 @@ export function PerformanceSettings({ className = "" }: PerformanceSettingsProps
             </div>
             <button
               onClick={handleAdaptiveToggle}
+              role="switch"
+              aria-checked={bandwidthConfig.adaptiveEnabled}
+              aria-label="Toggle adaptive bandwidth"
               className={`relative w-12 h-6 rounded-full transition-colors ${
                 bandwidthConfig.adaptiveEnabled ? "bg-primary" : "bg-white/10"
               }`}
@@ -409,6 +418,9 @@ export function PerformanceSettings({ className = "" }: PerformanceSettingsProps
             </div>
             <button
               onClick={handleBandwidthWifiOnlyToggle}
+              role="switch"
+              aria-checked={bandwidthConfig.wifiOnly}
+              aria-label="Toggle WiFi only for bandwidth limiting"
               className={`relative w-12 h-6 rounded-full transition-colors ${
                 bandwidthConfig.wifiOnly ? "bg-primary" : "bg-white/10"
               }`}
@@ -471,6 +483,9 @@ export function PerformanceSettings({ className = "" }: PerformanceSettingsProps
             </div>
             <button
               onClick={handleDhtPreconnectToggle}
+              role="switch"
+              aria-checked={dhtConfig.enablePreconnect}
+              aria-label="Toggle DHT preconnect"
               className={`relative w-12 h-6 rounded-full transition-colors ${
                 dhtConfig.enablePreconnect ? "bg-primary" : "bg-white/10"
               }`}
@@ -496,6 +511,9 @@ export function PerformanceSettings({ className = "" }: PerformanceSettingsProps
             </div>
             <button
               onClick={handlePreferTrackersToggle}
+              role="switch"
+              aria-checked={dhtConfig.preferTrackers}
+              aria-label="Toggle prefer trackers over DHT"
               className={`relative w-12 h-6 rounded-full transition-colors ${
                 dhtConfig.preferTrackers ? "bg-primary" : "bg-white/10"
               }`}

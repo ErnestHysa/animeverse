@@ -1,4 +1,9 @@
 /**
+ * @deprecated This module is unused. dash-player.tsx implements its own DASH support.
+ * This file can be safely removed.
+ */
+
+/**
  * DASH Stream Manager
  *
  * Phase 10: DASH Streaming Support

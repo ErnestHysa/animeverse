@@ -38,11 +38,8 @@ export function UserRating({ animeId, animeTitle, compact = false }: UserRatingP
   const handleScoreClick = useCallback((score: number) => {
     if (isSubmittingRef.current) return;
     if (!editMode && !rating) {
-      isSubmittingRef.current = true;
-      const saved = setRating(animeId, score);
-      setRatingState(saved);
-      toast.success(`Rated ${score}/10 ⭐`);
-      setTimeout(() => { isSubmittingRef.current = false; }, 300);
+      setPendingScore(score);
+      setEditMode(true);
     } else {
       setPendingScore(score);
     }

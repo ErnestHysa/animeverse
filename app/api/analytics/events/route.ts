@@ -221,6 +221,15 @@ async function persistEvents() {
 
     // Clear in-memory storage
     analyticsEvents.length = 0;
+
+    // Rotate: keep only last 10 event files
+    const files = await fs.readdir(analyticsDir);
+    const eventFiles = files.filter(f => f.startsWith('events-')).sort();
+    if (eventFiles.length > 10) {
+      for (let i = 0; i < eventFiles.length - 10; i++) {
+        await fs.unlink(path.join(analyticsDir, eventFiles[i]));
+      }
+    }
   } catch (error) {
     console.error("Failed to persist analytics events:", error);
   }

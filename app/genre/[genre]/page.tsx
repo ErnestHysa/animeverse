@@ -88,7 +88,7 @@ export async function generateMetadata({ params }: GenrePageProps) {
 export default async function GenreDetailPage({ params, searchParams }: GenrePageProps & { searchParams: Promise<{ page?: string }> }) {
   const { genre } = await params;
   const { page: pageParam } = await searchParams;
-  const page = parseInt(pageParam || "1", 10);
+  const page = Math.max(1, parseInt(pageParam || "1", 10)) || 1;
 
   let data;
   try {
@@ -206,4 +206,3 @@ export default async function GenreDetailPage({ params, searchParams }: GenrePag
 }
 
 export const dynamic = "force-dynamic";
-export const revalidate = 3600; // Revalidate hourly

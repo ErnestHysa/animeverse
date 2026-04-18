@@ -14,6 +14,15 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB max for subtitle files
 const TIMEOUT_MS = 10000; // 10 second timeout
 
 /**
+ * Detect subtitle content type from URL file extension
+ */
+function getSubtitleContentType(url: string): string {
+  if (url.endsWith('.srt')) return 'text/srt; charset=utf-8';
+  if (url.endsWith('.ass') || url.endsWith('.ssa')) return 'text/x-ssa; charset=utf-8';
+  return 'text/vtt; charset=utf-8'; // default
+}
+
+/**
  * GET /api/proxy-subtitle?url=<encoded_url>
  * Proxies subtitle file requests to bypass CORS and hotlink protection
  */
@@ -110,7 +119,7 @@ export async function GET(request: NextRequest) {
     return new NextResponse(content, {
       status: 200,
       headers: {
-        "Content-Type": "text/vtt; charset=utf-8",
+        "Content-Type": getSubtitleContentType(subtitleUrl),
         ...buildCorsHeaders(request, 'GET', 'Content-Type'),
         "Cache-Control": "public, max-age=86400", // Cache for 24 hours
       },

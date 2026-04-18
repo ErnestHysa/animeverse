@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Flag, X, Send, CheckCircle2 } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
@@ -42,10 +42,46 @@ export function ReportDialog({
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Fix H2: Focus first interactive element when dialog opens
+  useEffect(() => {
+    if (isOpen && dialogRef.current) {
+      const firstFocusable = dialogRef.current.querySelector<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      if (firstFocusable) {
+        setTimeout(() => firstFocusable.focus(), 50);
+      }
+    }
+  }, [isOpen]);
+
+  // Fix H2: Basic focus trap - wrap Tab/Shift+Tab
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key !== "Tab" || !dialogRef.current) return;
+    const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }, []);
 
   if (!isOpen) return null;
 
   const handleSubmit = async () => {
+    if (!animeId) {
+      toast.error("Cannot submit report: no anime identified");
+      return;
+    }
+
     if (!selectedIssue) {
       toast.error("Please select an issue");
       return;
@@ -83,7 +119,14 @@ export function ReportDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+    <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="report-dialog-title"
+      onKeyDown={handleKeyDown}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
+    >
       <GlassCard className="max-w-md w-full">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-white/10">
@@ -92,7 +135,7 @@ export function ReportDialog({
               <Flag className="w-5 h-5 text-red-500" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold">Report Issue</h2>
+              <h2 id="report-dialog-title" className="text-lg font-semibold">Report Issue</h2>
               <p className="text-sm text-muted-foreground">
                 {animeTitle} - Episode {episodeNumber}
               </p>

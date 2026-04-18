@@ -41,6 +41,7 @@ export function trackPlaybackEnd(params: {
   method: StreamingMethod;
   duration: number;
   completionRate: number;
+  reasons?: string[];
 }): void {
   try {
     const tracker = getAnalyticsTracker();
@@ -51,7 +52,7 @@ export function trackPlaybackEnd(params: {
       method: normalizeStreamingMethod(params.method),
       duration: params.duration,
       completionRate: params.completionRate,
-      reasons: [],
+      reasons: params.reasons || [],
     });
   } catch (error) {
     console.error("Failed to track playback end:", error);

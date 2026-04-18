@@ -169,6 +169,9 @@ export function VideoSourceLoader({
   const [fallbackOccurred, setFallbackOccurred] = useState(false);
   const [fallbackReason, setFallbackReason] = useState<string | null>(null);
 
+  // Fix H7: Request generation counter to cancel stale fetches
+  const fetchGenerationRef = useRef(0);
+
   // NEW: Subtitle state
   const [subtitleTracks, setSubtitleTracks] = useState<Array<{
     url: string;
@@ -189,6 +192,9 @@ export function VideoSourceLoader({
    * Tries primary method (user preference) then falls back to secondary
    */
   const fetchSources = useCallback(async (language: "sub" | "dub", retryAttempt = 0) => {
+    // Fix H7: Bump generation to invalidate stale requests
+    const currentGeneration = ++fetchGenerationRef.current;
+
     if (retryAttempt === 0) {
       setLoading(true);
       setError(null);
@@ -226,6 +232,9 @@ export function VideoSourceLoader({
           });
         },
       });
+
+      // Fix H7: Bail if a newer fetch has started
+      if (currentGeneration !== fetchGenerationRef.current) return;
 
       if (result.error) {
         throw result.error;
@@ -314,6 +323,9 @@ export function VideoSourceLoader({
 
       setRetryCount(0); // Reset retry count on success
     } catch (err) {
+      // Fix H7: Bail if a newer fetch has started
+      if (currentGeneration !== fetchGenerationRef.current) return;
+
       const errorMessage = err instanceof Error ? err.message : "Failed to load video sources";
 
       // Check if error is retryable
@@ -336,6 +348,10 @@ export function VideoSourceLoader({
       if (isRetryable && !isFinalError && retryAttempt < MAX_RETRIES) {
         const delay = RETRY_DELAY * Math.pow(2, retryAttempt); // Exponential backoff
         await sleep(delay);
+
+        // Fix H7: Bail if a newer fetch has started after sleep
+        if (currentGeneration !== fetchGenerationRef.current) return;
+
         return fetchSources(language, retryAttempt + 1);
       }
 
@@ -347,8 +363,11 @@ export function VideoSourceLoader({
       onError?.(new Error(finalMessage));
       setRetryCount(retryAttempt);
     } finally {
-      setLoading(false);
-      setIsRetrying(false);
+      // Fix H7: Only clear loading if this is still the current generation
+      if (currentGeneration === fetchGenerationRef.current) {
+        setLoading(false);
+        setIsRetrying(false);
+      }
     }
   }, [animeId, episodeNumber, animeTitle, malId, onError, effectiveStreamingMethod, preferences.defaultQuality, perAnimePref]);
 

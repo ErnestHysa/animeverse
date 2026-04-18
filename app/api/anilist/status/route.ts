@@ -40,3 +40,18 @@ export async function GET() {
     return NextResponse.json({ connected: false, user: null });
   }
 }
+
+/**
+ * DELETE handler: clear AniList httpOnly cookies on logout
+ */
+export async function DELETE() {
+  try {
+    const cookieStore = await cookies();
+    cookieStore.delete('anilist_token');
+    cookieStore.delete('anilist_user');
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('[AniList Status] Error clearing cookies:', error);
+    return NextResponse.json({ success: false }, { status: 500 });
+  }
+}

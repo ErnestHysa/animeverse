@@ -415,14 +415,12 @@ export const useStore = create<StoreState>()(
           const newCache = { ...state.mediaCache, [media.id]: { ...media, _lastAccessed: now } } as any;
           const keys = Object.keys(newCache);
 
-          // Evict least-recently-accessed entries if cache exceeds 500 items
+          // Evict oldest 10% of entries when cache exceeds 500 items
           if (keys.length > 500) {
-            const excess = keys.length - 500;
-            // Sort keys by lastAccessed timestamp ascending (oldest first)
-            const sortedKeys = keys.sort((a, b) => (newCache[a]._lastAccessed || 0) - (newCache[b]._lastAccessed || 0));
-            const keysToRemove = sortedKeys.slice(0, excess);
-            for (const key of keysToRemove) {
-              delete newCache[Number(key)];
+            const entries = Object.entries(newCache);
+            const toRemove = Math.floor(entries.length * 0.1);
+            for (let i = 0; i < toRemove; i++) {
+              delete newCache[Number(entries[i][0])];
             }
           }
 
@@ -544,7 +542,7 @@ export const useStore = create<StoreState>()(
             // Store full AniList media list with proper status
             anilistMediaList: entries,
             // Only sync watchlist for PLANNING entries
-            watchlist: [...new Set([...state.watchlist, ...watchlistIds])],
+            watchlist: watchlistIds,
           };
         }),
 
@@ -747,12 +745,20 @@ export const useStore = create<StoreState>()(
       clearMiniPlayer: () => set({ miniPlayer: null }),
 
       setPerAnimePref: (animeId, pref) =>
-        set((state) => ({
-          perAnimePrefs: {
-            ...state.perAnimePrefs,
-            [animeId]: { ...state.perAnimePrefs[animeId], ...pref },
-          },
-        })),
+        set((state) => {
+          const updated: Record<number, typeof state.perAnimePrefs[number]> = { ...state.perAnimePrefs, [animeId]: { ...state.perAnimePrefs[animeId], ...pref } };
+          // Fix H6: Prune perAnimePrefs when exceeding 100 entries
+          const keys = Object.keys(updated);
+          if (keys.length > 100) {
+            const watchIds = new Set(state.watchHistory.slice(-50).map(w => w.mediaId));
+            for (const key of keys) {
+              if (!watchIds.has(Number(key)) && Object.keys(updated).length > 100) {
+                delete updated[key as unknown as number];
+              }
+            }
+          }
+          return { perAnimePrefs: updated };
+        }),
 
       getPerAnimePref: (animeId) => get().perAnimePrefs[animeId],
 

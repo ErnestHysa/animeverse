@@ -18,6 +18,7 @@ import {
   checkSeedAchievements,
   SEED_ACHIEVEMENTS,
 } from "@/lib/seed-tracker";
+import type { SeedStats } from "@/types/seed-tracking";
 import { SeedStatsPanel } from "@/components/seed-tracking/seed-stats-badge";
 
 export function SeedTrackingSettings() {
@@ -154,7 +155,7 @@ export function SeedTrackingSettings() {
 
       {/* Rank Progress */}
       {(() => {
-        const statsWithAchievements = { ...stats, achievements: [] };
+        const statsWithAchievements: SeedStats = { ...stats, achievements: [] };
         const rankProgress = getRankProgress(statsWithAchievements);
         return (
           <div className="bg-gradient-to-r from-purple-600/20 to-blue-600/20 rounded-lg p-6 border border-purple-500/30">

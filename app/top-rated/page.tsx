@@ -9,10 +9,8 @@ export const dynamic = "force-dynamic";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { AnimeGrid } from "@/components/anime/anime-grid";
-import { AnimeGridSkeleton } from "@/components/ui/skeleton";
 import { anilist } from "@/lib/anilist";
 import { Trophy } from "lucide-react";
-import { Suspense } from "react";
 
 async function getTopRatedAnime() {
   const result = await anilist.getTopRated(1, 48);
@@ -65,9 +63,7 @@ export default async function TopRatedPage() {
             </div>
           </div>
 
-          <Suspense fallback={<AnimeGridSkeleton count={48} />}>
-            <AnimeGrid anime={anime} />
-          </Suspense>
+          <AnimeGrid anime={anime} />
         </div>
       </main>
       <Footer />
