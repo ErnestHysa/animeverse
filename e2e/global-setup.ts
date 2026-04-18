@@ -17,8 +17,6 @@ async function warmupPage(page: import('@playwright/test').Page, url: string) {
 export default async function globalSetup() {
   console.log('Warming up Next.js pages...');
   const browser = await chromium.launch();
-  const context = await browser.newContext();
-  const page = await context.newPage();
 
   // Warm up the most important pages to trigger Turbopack compilation
   const pagesToWarmup = [
@@ -35,7 +33,10 @@ export default async function globalSetup() {
   ];
 
   for (const url of pagesToWarmup) {
+    const context = await browser.newContext();
+    const page = await context.newPage();
     await warmupPage(page, url);
+    await context.close();
   }
 
   await browser.close();

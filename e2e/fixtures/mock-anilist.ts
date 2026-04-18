@@ -35,7 +35,7 @@ export const mockMedia = {
 };
 
 export const mockMediaList = Array.from({ length: 24 }, (_, i) => ({
-  ...mockMedia,
+  ...JSON.parse(JSON.stringify(mockMedia)), // deep clone to avoid shared references
   id: 21459 + i,
   idMal: 31964 + i,
   title: {

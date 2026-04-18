@@ -43,6 +43,9 @@ export function EpisodeThumbnails({ duration, videoRef, thumbnails, isGenerating
     const video = videoRef.current;
     if (!video) return null;
 
+    // Bail early if a newer seek has already been requested
+    if (generationIdRef.current !== generationId) return null;
+
     // Create a temporary canvas to capture frame
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
@@ -91,8 +94,10 @@ export function EpisodeThumbnails({ duration, videoRef, thumbnails, isGenerating
     } catch {
       return null;
     } finally {
-      // Restore original position
-      video.currentTime = originalTime;
+      // Only restore if no newer seek has been requested
+      if (generationIdRef.current === generationId) {
+        video.currentTime = originalTime;
+      }
       // Delay clearing the flag so the seek-back doesn't trigger visible timeupdate
       setTimeout(() => {
         isGeneratingRef.current = false;
@@ -160,7 +165,7 @@ export function EpisodeThumbnails({ duration, videoRef, thumbnails, isGenerating
         <div
           className="absolute top-0 bottom-0 w-0.5 bg-white pointer-events-none transition-all"
           style={{
-            left: `${(hoverTime / duration) * 100}%`,
+            left: duration > 0 ? `${(hoverTime / duration) * 100}%` : '0%',
           }}
         />
       </div>
@@ -170,7 +175,7 @@ export function EpisodeThumbnails({ duration, videoRef, thumbnails, isGenerating
         <div
           className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 rounded-lg overflow-hidden shadow-xl border border-white/20 bg-black"
           style={{
-            left: `${(hoverTime / duration) * 100}%`,
+            left: duration > 0 ? `${(hoverTime / duration) * 100}%` : '0%',
           }}
         >
           <img
@@ -209,7 +214,7 @@ export function SimpleThumbnailPreview({ duration, currentTime }: SimpleThumbnai
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const getPercentage = (time: number) => (time / duration) * 100;
+  const getPercentage = (time: number) => duration > 0 ? (time / duration) * 100 : 0;
 
   return (
     <div

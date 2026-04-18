@@ -430,7 +430,9 @@ export async function fetchWithSSRFProtection(
     // For IPv6 literals in URL, wrap in brackets
     const ipForUrl = pinnedIP.includes(':') ? `[${pinnedIP}]` : pinnedIP;
     const newOrigin = `${parsed.protocol}//${ipForUrl}${portPart}`;
-    fetchUrl = url.replace(`${parsed.protocol}//${parsed.host}`, newOrigin);
+    // Use URL constructor for safe reconstruction instead of fragile string replacement
+    const safeUrl = new URL(parsed.pathname + parsed.search + parsed.hash, newOrigin);
+    fetchUrl = safeUrl.toString();
 
     // Set Host header to original hostname so the server sees the correct virtual host
     extraHeaders['Host'] = originalHostHeader;

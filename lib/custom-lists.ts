@@ -39,7 +39,7 @@ export const useCustomLists = create<CustomListsState>()(
           ...listData,
           id: typeof crypto !== 'undefined' && crypto.randomUUID
             ? `list-${crypto.randomUUID()}`
-            : `list-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            : `list-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
           createdAt: Date.now(),
           updatedAt: Date.now(),
         };

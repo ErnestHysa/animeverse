@@ -265,46 +265,44 @@ export function useWatchParty(animeId: number, episodeNumber: number) {
     safeSetItem(chatKey, existingChat.slice(-50)); // Keep last 50 messages
   }, []);
 
-  // Load room chat
+  // Poll for chat and sync state in a single interval to avoid race conditions
   useEffect(() => {
-    const { roomId } = state;
+    const { roomId, isHost } = state;
     if (!roomId) return;
 
     const chatKey = `${STORAGE_KEY}-chat-${roomId}`;
-    const loadChat = () => {
-      const result = safeGetItem<ChatMessage[]>(chatKey);
-      if (result.success && result.data) {
-        setState((prev) => ({ ...prev, chat: result.data! }));
-      }
-    };
+    const syncKey = `${STORAGE_KEY}-sync-${roomId}`;
 
-    loadChat();
+    // Initial chat load
+    const initialChat = safeGetItem<ChatMessage[]>(chatKey);
+    if (initialChat.success && initialChat.data) {
+      setState((prev) => ({ ...prev, chat: initialChat.data! }));
+    }
 
-    // Poll for new messages (in production, use WebSocket)
-    const interval = setInterval(loadChat, 2000);
-    return () => clearInterval(interval);
-  }, [state.roomId]);
-
-  // Sync state from host (poll for updates)
-  useEffect(() => {
-    const { roomId, isHost } = state;
-    if (!roomId || isHost) return;
-
+    // Single merged polling interval handles both chat + sync
     const interval = setInterval(() => {
-      const syncKey = `${STORAGE_KEY}-sync-${roomId}`;
-      const result = safeGetItem<{ currentTime: number; isPlaying: boolean; timestamp: number }>(syncKey);
-      if (result.success && result.data) {
-        const sync = result.data;
-        // Only sync if recent (within 5 seconds)
-        if (Date.now() - sync.timestamp < 5000) {
-          setState((prev) => ({
-            ...prev,
-            currentTime: sync.currentTime,
-            isPlaying: sync.isPlaying,
-          }));
+      // Chat poll (every cycle = 2s)
+      const chatResult = safeGetItem<ChatMessage[]>(chatKey);
+      if (chatResult.success && chatResult.data) {
+        setState((prev) => ({ ...prev, chat: chatResult.data! }));
+      }
+
+      // Sync poll (non-hosts only, every cycle)
+      if (!isHost) {
+        const syncResult = safeGetItem<{ currentTime: number; isPlaying: boolean; timestamp: number }>(syncKey);
+        if (syncResult.success && syncResult.data) {
+          const sync = syncResult.data;
+          // Only sync if recent (within 5 seconds)
+          if (Date.now() - sync.timestamp < 5000) {
+            setState((prev) => ({
+              ...prev,
+              currentTime: sync.currentTime,
+              isPlaying: sync.isPlaying,
+            }));
+          }
         }
       }
-    }, 500);
+    }, 2000);
 
     return () => clearInterval(interval);
   }, [state.roomId, state.isHost]);

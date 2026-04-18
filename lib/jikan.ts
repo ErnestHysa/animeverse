@@ -15,21 +15,33 @@ const jikanRateLimiter = {
   timestamps: [] as number[],
   maxPerSecond: 2,
   maxPerMinute: 50,
+  waitPromise: Promise.resolve() as Promise<void>,
 
   async wait(): Promise<void> {
-    const now = Date.now();
-    // Clean old timestamps
-    this.timestamps = this.timestamps.filter(t => now - t < 60000);
-    if (this.timestamps.length >= this.maxPerMinute) {
-      const waitMs = 60000 - (now - this.timestamps[0]) + 100;
-      await new Promise(r => setTimeout(r, waitMs));
+    // Serialize calls to prevent TOCTOU races on timestamps
+    const previousPromise = this.waitPromise;
+    let resolve!: () => void;
+    this.waitPromise = new Promise(r => resolve = r);
+
+    await previousPromise;
+
+    try {
+      const now = Date.now();
+      // Clean old timestamps
+      this.timestamps = this.timestamps.filter(t => now - t < 60000);
+      if (this.timestamps.length >= this.maxPerMinute) {
+        const waitMs = 60000 - (now - this.timestamps[0]) + 100;
+        await new Promise(r => setTimeout(r, waitMs));
+      }
+      // Also check per-second limit
+      const recentSecond = this.timestamps.filter(t => Date.now() - t < 1000);
+      if (recentSecond.length >= this.maxPerSecond) {
+        await new Promise(r => setTimeout(r, 1100));
+      }
+      this.timestamps.push(Date.now());
+    } finally {
+      resolve();
     }
-    // Also check per-second limit
-    const recentSecond = this.timestamps.filter(t => now - t < 1000);
-    if (recentSecond.length >= this.maxPerSecond) {
-      await new Promise(r => setTimeout(r, 1100));
-    }
-    this.timestamps.push(Date.now());
   }
 };
 

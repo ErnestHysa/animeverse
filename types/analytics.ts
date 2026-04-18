@@ -7,13 +7,16 @@
 
 export type StreamingMethod = "hls" | "webtorrent" | "hybrid";
 
+const VALID_METHODS = ["hls", "webtorrent", "hybrid"] as const;
+
 /**
  * Normalize a streaming method value from the store (which may use "direct")
  * to the canonical analytics/internal value ("hls").
  */
 export function normalizeStreamingMethod(method: string): StreamingMethod {
   if (method === "direct") return "hls";
-  return method as StreamingMethod;
+  if (VALID_METHODS.includes(method as typeof VALID_METHODS[number])) return method as StreamingMethod;
+  return "hls"; // safe fallback
 }
 
 export interface StreamingEvent {

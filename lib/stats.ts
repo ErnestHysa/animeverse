@@ -61,8 +61,8 @@ export function calculateStats(
   const uniqueAnime = new Set(watchHistory.map((item) => item.mediaId));
   const uniqueAnimeWatched = uniqueAnime.size;
 
-  // Count total episodes watched
-  const totalEpisodesWatched = watchHistory.length;
+  // Count total episodes watched (only completed or substantially watched entries)
+  const totalEpisodesWatched = watchHistory.filter(item => item.completed).length;
 
   // Calculate watch time
   let totalMinutes = 0;
@@ -145,6 +145,7 @@ function calculateStreaks(watchHistory: WatchHistoryItem[]): {
   }
 
   const sortedDates = Array.from(watchDates).sort((a, b) => a - b);
+  const dateSet = new Set(sortedDates);
   const now = new Date();
   const todayTime = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).getTime();
 
@@ -155,7 +156,7 @@ function calculateStreaks(watchHistory: WatchHistoryItem[]): {
   for (let i = 0; i < sortedDates.length; i++) {
     const checkDateObj = new Date(checkDate);
     const utcCheckDate = new Date(Date.UTC(checkDateObj.getUTCFullYear(), checkDateObj.getUTCMonth(), checkDateObj.getUTCDate()));
-    if (sortedDates.includes(utcCheckDate.getTime())) {
+    if (dateSet.has(utcCheckDate.getTime())) {
       currentStreak++;
       checkDate -= 24 * 60 * 60 * 1000; // Go back one day
     } else {

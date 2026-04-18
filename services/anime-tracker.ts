@@ -219,7 +219,7 @@ class AnimeTracker {
       const infoHash = query.info_hash as string;
       const peerId = query.peer_id as string;
       const ip = query.ip as string || req.socket.remoteAddress || "";
-      const port = parseInt(query.port as string);
+      const port = parseInt(query.port as string) || 0;
       const uploaded = parseInt(query.uploaded as string) || 0;
       const downloaded = parseInt(query.downloaded as string) || 0;
       const left = parseInt(query.left as string) || 0;
@@ -234,7 +234,7 @@ class AnimeTracker {
       }
 
       // Validate request
-      if (!infoHash || !peerId || !port) {
+      if (!infoHash || !peerId || !port || isNaN(port)) {
         this.writeBencodeError(res, "Missing required parameters");
         return;
       }

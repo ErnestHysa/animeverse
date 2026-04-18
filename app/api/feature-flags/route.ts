@@ -33,7 +33,16 @@ export async function GET(request: NextRequest) {
     const payload = token ? verifyToken(token) : null;
 
     const userContext = {
-      userId: payload?.userId ? parseInt(payload.userId.replace(/\D/g, '')) || undefined : undefined,
+      userId: (() => {
+        if (!payload?.userId) return undefined;
+        // Hash the userId string directly instead of stripping non-digits
+        let hash = 0;
+        for (let i = 0; i < payload.userId.length; i++) {
+          hash = ((hash << 5) - hash) + payload.userId.charCodeAt(i);
+          hash = hash | 0;
+        }
+        return hash;
+      })(),
       email: undefined as string | undefined,
       isAdmin: payload?.role === 'admin' || payload?.role === 'superadmin',
       isBetaTester: payload ? BETA_TESTER_USER_IDS.includes(payload.userId) : false,

@@ -315,7 +315,13 @@ export function EpisodeNotifications({ airingSchedule = [] }: EpisodeNotificatio
 
         // Filter to user's watchlist
         const notifiedKey = 'notified-episodes';
-        const notified: string[] = JSON.parse(localStorage.getItem(notifiedKey) || '[]');
+        let notified: string[];
+        try {
+          notified = JSON.parse(localStorage.getItem(notifiedKey) || '[]');
+        } catch {
+          localStorage.removeItem(notifiedKey);
+          notified = [];
+        }
 
         for (const schedule of schedules) {
           if (!trackedIds.has(schedule.media?.id)) continue;

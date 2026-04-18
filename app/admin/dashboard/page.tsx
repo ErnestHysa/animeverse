@@ -7,7 +7,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { toast } from "react-hot-toast";
 import {
@@ -124,11 +124,14 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const fetchRef = useRef(fetchDashboardData);
+  fetchRef.current = fetchDashboardData;
+
   useEffect(() => {
-    fetchDashboardData();
-    const interval = setInterval(fetchDashboardData, 30000); // Refresh every 30s
+    fetchRef.current();
+    const interval = setInterval(() => fetchRef.current(), 30000); // Refresh every 30s
     return () => clearInterval(interval);
-  }, [period]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [period]);
 
   const resolveAlert = async (alertId: string) => {
     try {

@@ -41,7 +41,8 @@ export const GlassCard = forwardRef<HTMLDivElement, GlassCardProps>(
             "hover:shadow-primary/20 hover:shadow-2xl": glow,
           },
           // Shine effect
-          shine && "overflow-hidden group",
+          shine && "overflow-hidden",
+          (shine || glow) && "group",
           className
         )}
         {...props}

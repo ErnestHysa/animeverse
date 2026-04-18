@@ -29,7 +29,9 @@ export default function Error({
         </div>
         <h1 className="text-2xl font-bold mb-2">Something went wrong</h1>
         <p className="text-muted-foreground mb-6">
-          {error.message || "An unexpected error occurred. Please try again."}
+          {process.env.NODE_ENV === 'development'
+            ? error.message
+            : "Something went wrong. Please try again."}
         </p>
         <div className="flex gap-3 justify-center">
           <Button onClick={reset} variant="default">

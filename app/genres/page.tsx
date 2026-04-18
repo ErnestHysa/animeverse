@@ -111,7 +111,7 @@ async function getGenreData() {
   const genres = [...POPULAR_GENRES, ...ADDITIONAL_GENRES] as const;
 
   // Fetch anime count for each genre in parallel batches
-  const batchSize = 5;
+  const batchSize = 10;
   const genreData: Array<{
     name: string;
     slug: string;
@@ -120,11 +120,21 @@ async function getGenreData() {
     sampleAnime: Array<{ id: number; title: string; coverImage: string }>;
   }> = [];
 
+  // Helper to add timeout to individual requests
+  const fetchWithTimeout = <T,>(promise: Promise<T>, timeout = 5000): Promise<T> => {
+    return Promise.race([
+      promise,
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Request timeout')), timeout)
+      ),
+    ]);
+  };
+
   for (let i = 0; i < genres.length; i += batchSize) {
     const batch = genres.slice(i, i + batchSize);
     const results = await Promise.allSettled(
       batch.map(async (genre) => {
-        const result = await anilist.getByGenre(genre, 1, 4);
+        const result = await fetchWithTimeout(anilist.getByGenre(genre, 1, 4));
         const anime = result.data?.Page.media ?? [];
         const total = result.data?.Page.pageInfo.total ?? 0;
 

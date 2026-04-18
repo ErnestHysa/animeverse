@@ -117,7 +117,10 @@ export const DASHPlayer = React.forwardRef<DASHPlayerRef, DASHPlayerProps>(
           streaming: {
             abr: {
               autoSwitchBitrate: { video: true },
-              initialBitrate: { video: initialQuality ? parseInt(initialQuality) : undefined },
+              initialBitrate: { video: (() => {
+                const parsedQuality = parseInt(initialQuality || '');
+                return !isNaN(parsedQuality) && parsedQuality > 0 ? parsedQuality : undefined;
+              })() },
               limitBitrateByPortal: true,
             },
             buffer: {

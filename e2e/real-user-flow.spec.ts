@@ -11,6 +11,14 @@ const NAV_TIMEOUT = 60000;
 
 test.describe('Real User Flow - Complete Journey', () => {
   test('complete user journey: browse -> search -> view anime -> watch episode', async ({ page }) => {
+    // Check for console errors — register listener BEFORE navigation to catch all errors
+    const consoleErrors: string[] = [];
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        consoleErrors.push(msg.text());
+      }
+    });
+
     // STEP 1: User lands on the home page
     console.log('📍 STEP 1: User lands on home page');
     await page.goto('/', { waitUntil: 'domcontentloaded' });
@@ -24,14 +32,6 @@ test.describe('Real User Flow - Complete Journey', () => {
 
     // Take screenshot of home page
     await page.screenshot({ timeout: 0, path: 'test-results/user-flow/01-homepage.png', fullPage: true });
-
-    // Check for console errors on home page
-    const consoleErrors: string[] = [];
-    page.on('console', msg => {
-      if (msg.type() === 'error') {
-        consoleErrors.push(msg.text());
-      }
-    });
 
     // STEP 2: User browses the trending section
     console.log('📍 STEP 2: User scrolls down to see trending anime');
@@ -193,6 +193,9 @@ test.describe('Real User Flow - Complete Journey', () => {
     } else {
       console.log('✓ User would have an error-free experience');
     }
+
+    // Assert that no critical JS errors occurred during the user flow
+    expect(hasCriticalErrors, 'No critical JS errors should occur during user flow').toBe(false);
   });
 
   test('user tries to watch anime from scratch', async ({ page }) => {

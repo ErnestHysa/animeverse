@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import type { Media } from "@/types/anilist";
 import { useStore } from "@/store";
 
@@ -11,13 +11,19 @@ interface CacheAnimeProps {
 export function CacheAnime({ media }: CacheAnimeProps) {
   const setMediaCache = useStore((state) => state.setMediaCache);
 
+  // Use a serialized key to avoid re-running on new array references with same content
+  const mediaKey = useMemo(() => {
+    const items = Array.isArray(media) ? media : media ? [media] : [];
+    return items.map(m => m.id).join(',');
+  }, [media]);
+
   useEffect(() => {
     const items = Array.isArray(media) ? media : media ? [media] : [];
 
     for (const item of items) {
       setMediaCache(item);
     }
-  }, [media, setMediaCache]);
+  }, [mediaKey, setMediaCache]);
 
   return null;
 }

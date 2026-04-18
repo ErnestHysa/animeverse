@@ -69,8 +69,9 @@ export function StreamingSettings({ className = "" }: StreamingSettingsProps) {
     updatePreferences({ streamingMethod: method });
   };
 
-  const handleQualityChange = (quality: typeof defaultQuality) => {
-    updatePreferences({ defaultQuality: quality });
+  const handleQualityChange = (quality: string) => {
+    const validated = QUALITY_OPTIONS.some(opt => opt.value === quality) ? quality as typeof defaultQuality : 'auto' as typeof defaultQuality;
+    updatePreferences({ defaultQuality: validated });
   };
 
   const handlePreferDubsToggle = () => {
@@ -193,7 +194,7 @@ export function StreamingSettings({ className = "" }: StreamingSettingsProps) {
         </h4>
         <select
           value={defaultQuality}
-          onChange={(e) => handleQualityChange(e.target.value as typeof defaultQuality)}
+          onChange={(e) => handleQualityChange(e.target.value)}
           className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 focus:border-primary focus:outline-none"
         >
           {QUALITY_OPTIONS.map((option) => (

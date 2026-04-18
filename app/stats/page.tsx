@@ -160,18 +160,19 @@ export default function StatsPage() {
     // Recent activity (last 7 days)
     const dailyActivity: Record<string, number> = {};
     for (let i = 6; i >= 0; i--) {
-      const date = new Date(now - i * 24 * 60 * 60 * 1000);
-      const dateStr = date.toLocaleDateString("en-US", { weekday: "short" });
-      dailyActivity[dateStr] = 0;
+      const date = new Date(now - i * 86400000);
+      const dateStr = date.toISOString().slice(0, 10);
+      const dayLabel = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][date.getUTCDay()];
+      dailyActivity[dayLabel] = 0;
     }
 
     watchHistory.forEach((item) => {
       const watchDate = new Date(item.timestamp);
-      const daysDiff = Math.floor((now - item.timestamp) / (24 * 60 * 60 * 1000));
+      const daysDiff = Math.floor((now - item.timestamp) / 86400000);
       if (daysDiff < 7) {
-        const dateStr = watchDate.toLocaleDateString("en-US", { weekday: "short" });
-        if (dailyActivity.hasOwnProperty(dateStr)) {
-          dailyActivity[dateStr]++;
+        const dayLabel = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][watchDate.getUTCDay()];
+        if (dailyActivity.hasOwnProperty(dayLabel)) {
+          dailyActivity[dayLabel]++;
         }
       }
     });

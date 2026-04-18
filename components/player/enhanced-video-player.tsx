@@ -385,6 +385,9 @@ export function EnhancedVideoPlayer({
       __onGCastApiAvailable?: (isAvailable: boolean) => void;
     };
 
+    let castCtx: CastContextInstance | null = null;
+    let handler: ((ev: any) => void) | null = null;
+
     const initCast = () => {
       if (typeof window === "undefined") return;
       const w = window as unknown as CastWindow;
@@ -392,13 +395,15 @@ export function EnhancedVideoPlayer({
       if (!CastContext) return;
       try {
         const ctx = CastContext.getInstance();
+        castCtx = ctx;
         ctx.setOptions({ receiverApplicationId: "CC1AD845", autoJoinPolicy: "origin_scoped" });
-        ctx.addEventListener("SESSION_STATE_CHANGED", (ev) => {
+        handler = (ev: any) => {
           const states = (window as unknown as CastWindow).cast?.framework?.SessionState;
           if (!states) return;
           if (ev.sessionState === states.SESSION_STARTED) setIsCasting(true);
           if (ev.sessionState === states.SESSION_ENDING) setIsCasting(false);
-        });
+        };
+        ctx.addEventListener("SESSION_STATE_CHANGED", handler);
       } catch {
         // Cast SDK not available
       }
@@ -412,6 +417,12 @@ export function EnhancedVideoPlayer({
         if (isAvailable) initCast();
       };
     }
+
+    return () => {
+      if (castCtx && handler) {
+        (castCtx as any).removeEventListener("SESSION_STATE_CHANGED", handler);
+      }
+    };
   }, []);
 
   // Ambient mode: draw blurred video frames to canvas behind player
@@ -1380,8 +1391,11 @@ export function EnhancedVideoPlayer({
         case "8":
         case "9":
           // Speed control
-          setPlaybackRate(parseInt(e.key) * 0.25);
-          toast(`Speed: ${parseInt(e.key) * 0.25}x`, { duration: 500 });
+          const rate = parseInt(e.key) * 0.25;
+          if (rate >= 0.25 && rate <= 16) {
+            setPlaybackRate(rate);
+            toast(`Speed: ${rate}x`, { duration: 500 });
+          }
           break;
         case "0":
           setPlaybackRate(1);

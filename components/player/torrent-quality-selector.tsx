@@ -147,13 +147,13 @@ export function TorrentQualitySelector({
   };
 
   // Handle quality selection
-  const handleQualitySelect = (option: QualityOption) => {
+  const handleQualitySelect = useCallback((option: QualityOption) => {
     // Select best torrent for this quality
     onQualityChange(option.bestTorrent);
     setSelectedQuality(option.quality);
     setIsOpen(false);
     setActiveIndex(-1);
-  };
+  }, [onQualityChange]);
 
   // Keyboard navigation handler
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {

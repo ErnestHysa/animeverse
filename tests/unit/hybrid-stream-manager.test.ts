@@ -10,7 +10,7 @@
  * - Attempt cancellation
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
 import { hybridStreamManager, loadStream, cancelStreamAttempt, cancelAllStreamAttempts } from '../../lib/hybrid-stream-manager';
 
 // Mock logger
@@ -22,8 +22,10 @@ vi.mock('../../lib/logger', () => ({
   },
 }));
 
-// Mock fetch
-global.fetch = vi.fn();
+// Mock fetch with proper restore
+const originalFetch = global.fetch;
+beforeAll(() => { global.fetch = vi.fn(); });
+afterAll(() => { global.fetch = originalFetch; });
 
 describe('hybrid-stream-manager', () => {
   beforeEach(() => {

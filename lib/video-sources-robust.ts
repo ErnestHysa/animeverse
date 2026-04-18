@@ -46,6 +46,17 @@ const CONFIG = {
 
 const sourceCache = new Map<string, { data: EpisodeSources | null; timestamp: number }>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const MAX_CACHE_SIZE = 100;
+
+function pruneCache() {
+  if (sourceCache.size <= MAX_CACHE_SIZE) return;
+  // Remove oldest entries (Map preserves insertion order, already LRU via getCached)
+  const keys = Array.from(sourceCache.keys());
+  const toRemove = sourceCache.size - MAX_CACHE_SIZE;
+  for (let i = 0; i < toRemove; i++) {
+    sourceCache.delete(keys[i]);
+  }
+}
 
 function getCached(animeId: number, episodeNumber: number): EpisodeSources | null {
   const key = `${animeId}-${episodeNumber}`;
@@ -64,13 +75,7 @@ function setCached(animeId: number, episodeNumber: number, data: EpisodeSources 
   // Delete first to move to end (update insertion order)
   sourceCache.delete(key);
   sourceCache.set(key, { data, timestamp: Date.now() });
-  // Evict least-recently-used entries if cache exceeds max size
-  if (sourceCache.size > 200) {
-    const keys = Array.from(sourceCache.keys());
-    for (let i = 0; i < 50 && i < keys.length; i++) {
-      sourceCache.delete(keys[i]);
-    }
-  }
+  pruneCache();
 }
 
 // ============================================
