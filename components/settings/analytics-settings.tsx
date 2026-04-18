@@ -15,7 +15,19 @@ import { Info, Shield } from "lucide-react";
 import { setAnalyticsEnabled as setTrackerEnabled } from "@/lib/analytics-tracker";
 
 export function AnalyticsSettings() {
-  const [analyticsEnabled, setAnalyticsEnabled] = useState(true);
+  const [analyticsEnabled, setAnalyticsEnabled] = useState(() => {
+    if (typeof window === "undefined") return true;
+    try {
+      const stored = localStorage.getItem("analytics-settings");
+      if (stored) {
+        const settings = JSON.parse(stored);
+        return settings.analyticsEnabled ?? true;
+      }
+    } catch {
+      // Ignore parse errors
+    }
+    return true;
+  });
   const [diagnosticsEnabled, setDiagnosticsEnabled] = useState(false);
 
   useEffect(() => {

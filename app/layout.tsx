@@ -79,6 +79,8 @@ export default function RootLayout({
           <ServiceWorkerRegister />
           <GlobalComponents />
         </ThemeProvider>
+        {/* SAFETY: Script content is entirely static with no user-controlled values.
+            Do NOT add dynamic values here without sanitization. */}
         {/* Google Cast SDK removed — loaded on-demand in player when needed */}
         <script
           dangerouslySetInnerHTML={{

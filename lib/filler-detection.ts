@@ -174,6 +174,7 @@ interface FillerCache {
 }
 
 function getCachedFillerData(malId: number): FillerData | null {
+  if (typeof window === "undefined") return null;
   try {
     const cacheJson = localStorage.getItem(FILLER_CACHE_KEY);
     if (!cacheJson) return null;
@@ -199,6 +200,7 @@ function getCachedFillerData(malId: number): FillerData | null {
 }
 
 function cacheFillerData(malId: number, data: FillerData): void {
+  if (typeof window === "undefined") return;
   try {
     const cacheJson = localStorage.getItem(FILLER_CACHE_KEY) || "{}";
     const cache: FillerCache = JSON.parse(cacheJson);

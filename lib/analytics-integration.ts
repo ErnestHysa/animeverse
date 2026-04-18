@@ -164,3 +164,24 @@ export function trackQualityChange(params: {
     console.error("Failed to track quality change:", error);
   }
 }
+
+// Track playback error
+export function trackPlaybackError(params: {
+  animeId: number;
+  animeTitle?: string;
+  episode: number;
+  error: string;
+  source?: string;
+}): void {
+  try {
+    const tracker = getAnalyticsTracker();
+    tracker.trackPlaybackError({
+      animeId: params.animeId,
+      episode: params.episode,
+      error: params.error,
+      source: params.source || "unknown",
+    });
+  } catch (error) {
+    console.error("Failed to track playback error:", error);
+  }
+}

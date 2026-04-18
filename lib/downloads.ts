@@ -334,7 +334,8 @@ class DownloadManager {
     onProgress?: (progress: number) => void
   ): Promise<Blob> {
     // Use the server-side proxy API to download HLS content
-    const proxyUrl = new URL('/api/download-hls', window.location.origin);
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const proxyUrl = new URL('/api/download-hls', origin);
     proxyUrl.searchParams.set('url', manifestUrl);
 
     try {

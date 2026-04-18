@@ -52,11 +52,17 @@ export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElemen
 }
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
-  ({ className, error, children, ...props }, ref) => {
+  ({ className, error, id: propId, children, ...props }, ref) => {
+    const generatedId = useId();
+    const selectId = propId || `select-${generatedId}`;
+
     return (
       <div className="relative">
         <select
           ref={ref}
+          id={selectId}
+          aria-invalid={!!error}
+          aria-describedby={error ? `${selectId}-error` : undefined}
           className={cn(
             "flex h-10 w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
@@ -70,7 +76,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           {children}
         </select>
         {error && (
-          <p className="mt-1 text-xs text-destructive">{error}</p>
+          <p id={`${selectId}-error`} className="mt-1 text-xs text-destructive">{error}</p>
         )}
       </div>
     );

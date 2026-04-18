@@ -12,7 +12,8 @@ export interface MagnetRating {
   episodeNumber: number;
   userId: string;
   username: string;
-  rating: number; // 1-5 stars
+  /** Rating from 1 to 5 stars. Validate at runtime before use. */
+  rating: 1 | 2 | 3 | 4 | 5;
   quality: "excellent" | "good" | "fair" | "poor";
   videoQuality: "1080p" | "720p" | "480p" | "360p" | "other";
   audioQuality: "excellent" | "good" | "fair" | "poor";

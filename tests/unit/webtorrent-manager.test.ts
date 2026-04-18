@@ -9,17 +9,15 @@
  * - Singleton pattern
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createSession, getSession, destroySession, selectBestQuality } from '../../lib/webtorrent-manager';
+import { webTorrentManager } from '../../lib/webtorrent-manager';
 import type { WebTorrentSession } from '../../lib/webtorrent-manager';
 
 describe('webtorrent-manager', () => {
-  beforeEach(() => {
-    // Clear any existing sessions
-    const session = getSession('test-session');
-    if (session) {
-      destroySession('test-session');
-    }
+  afterEach(() => {
+    // Destroy all active sessions to prevent test leakage
+    webTorrentManager.destroyAllSessions();
   });
 
   describe('createSession', () => {

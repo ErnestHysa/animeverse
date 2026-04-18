@@ -20,9 +20,7 @@ function formatCountdown(seconds: number): string {
 }
 
 export function AiringCountdown({ episode, airingAt }: AiringCountdownProps) {
-  const [secondsLeft, setSecondsLeft] = useState(() =>
-    Math.max(0, Math.floor(airingAt - Date.now() / 1000))
-  );
+  const [secondsLeft, setSecondsLeft] = useState(0);
 
   useEffect(() => {
     let id: ReturnType<typeof setInterval>;

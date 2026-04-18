@@ -15,7 +15,8 @@ export interface SeedSession {
   duration: number; // seconds
   uploaded: number; // bytes
   downloaded: number; // bytes
-  seedRatio: number; // uploaded / downloaded
+  /** Seed ratio (uploaded / downloaded). Can be Infinity if downloaded=0. Validate before display. */
+  seedRatio: number;
   peers: number; // number of peers connected to
   status: "active" | "completed" | "error";
 }

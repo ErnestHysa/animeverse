@@ -59,16 +59,19 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   // Event listeners (each returns an unsubscribe function)
   onTorrentStarted: (callback: (session: TorrentSession) => void) => {
-    ipcRenderer.on("torrent-started", (_event, session) => callback(session));
-    return () => ipcRenderer.removeAllListeners("torrent-started");
+    const handler = (_event: any, session: TorrentSession) => callback(session);
+    ipcRenderer.on("torrent-started", handler);
+    return () => ipcRenderer.removeListener("torrent-started", handler);
   },
   onTorrentStopped: (callback: (data: { infoHash: string }) => void) => {
-    ipcRenderer.on("torrent-stopped", (_event, data) => callback(data));
-    return () => ipcRenderer.removeAllListeners("torrent-stopped");
+    const handler = (_event: any, data: { infoHash: string }) => callback(data);
+    ipcRenderer.on("torrent-stopped", handler);
+    return () => ipcRenderer.removeListener("torrent-stopped", handler);
   },
   onOpenSettings: (callback: () => void) => {
-    ipcRenderer.on("open-settings", () => callback());
-    return () => ipcRenderer.removeAllListeners("open-settings");
+    const handler = () => callback();
+    ipcRenderer.on("open-settings", handler);
+    return () => ipcRenderer.removeListener("open-settings", handler);
   },
 });
 

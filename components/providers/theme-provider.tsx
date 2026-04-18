@@ -38,7 +38,7 @@ function getStoredTheme(): Theme {
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // Initialize to server-safe default to avoid SSR hydration mismatch
-  const [theme, setThemeState] = useState<Theme>("system");
+  const [theme, setThemeState] = useState<Theme>("dark");
 
   // Read stored theme on client after mount
   useEffect(() => {
@@ -48,7 +48,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   // Derive resolved theme from current theme (only on client via useEffect)
   const resolvedTheme = useMemo<"dark" | "light">(() => {
-    if (typeof window === "undefined") return "dark";
+    if (typeof window === "undefined") return "dark"; // Consistent SSR value
     return theme === "system" ? getSystemTheme() : theme;
   }, [theme]);
 

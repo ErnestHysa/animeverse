@@ -114,7 +114,8 @@ class DASHStreamManagerImpl {
     malId: number | null | undefined,
     timeout: number
   ): Promise<DASHSource | null> {
-    const url = new URL(`/api/video-sources/${animeId}/${episodeNumber}`, window.location.origin);
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const url = new URL(`/api/video-sources/${animeId}/${episodeNumber}`, origin);
 
     if (animeTitle) {
       url.searchParams.set("title", animeTitle);

@@ -243,9 +243,11 @@ const QUALITY_NORMALIZE: Record<string, string> = {
   '4k': '2160p',
   'uhd': '2160p',
   'full hd': '1080p',
+  'full.hd': '1080p',
   'fullhd': '1080p',
   'fhd': '1080p',
   'hd': '720p',
+  'sd': '480p',
 };
 
 /**

@@ -14,6 +14,7 @@ export function Skeleton({ className, variant = "rectangular", ...props }: Skele
     <div
       role="status"
       aria-busy="true"
+      aria-live="polite"
       aria-label="Loading..."
     >
       <div

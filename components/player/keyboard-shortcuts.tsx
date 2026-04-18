@@ -74,6 +74,9 @@ export function KeyboardShortcutsModal({ isOpen, onClose }: ShortcutsModalProps)
   useEffect(() => {
     if (!isOpen) return;
 
+    const modal = modalRef.current;
+    if (!modal) return;
+
     const handleKeyDown = (e: KeyboardEvent) => {
       // Highlight pressed key
       setActiveShortcuts(new Set([e.key.toUpperCase()]));
@@ -83,12 +86,12 @@ export function KeyboardShortcutsModal({ isOpen, onClose }: ShortcutsModalProps)
       setActiveShortcuts(new Set());
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("keyup", handleKeyUp);
+    modal.addEventListener("keydown", handleKeyDown);
+    modal.addEventListener("keyup", handleKeyUp);
 
     return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("keyup", handleKeyUp);
+      modal.removeEventListener("keydown", handleKeyDown);
+      modal.removeEventListener("keyup", handleKeyUp);
     };
   }, [isOpen]);
 
@@ -185,9 +188,13 @@ export function KeyboardShortcutsButton() {
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
       if (e.key === "?" && !e.ctrlKey && !e.metaKey) {
-        // Only trigger if not in an input
+        // Only trigger if not in an input, textarea, or contentEditable element
         const target = e.target as HTMLElement;
-        if (target.tagName !== "INPUT" && target.tagName !== "TEXTAREA") {
+        if (
+          target.tagName !== "INPUT" &&
+          target.tagName !== "TEXTAREA" &&
+          !(target instanceof HTMLElement && target.isContentEditable)
+        ) {
           e.preventDefault();
           setIsOpen(true);
         }

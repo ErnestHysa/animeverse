@@ -107,6 +107,10 @@ export default function AdminDashboardPage() {
         fetch("/api/admin/alerts", { headers: authHeaders }),
       ]);
 
+      if (!analyticsRes.ok || !serverRes.ok || !alertsRes.ok) {
+        throw new Error('Failed to fetch dashboard data');
+      }
+
       const [analyticsData, serverData, alertsData] = await Promise.all([
         analyticsRes.json(),
         serverRes.json(),

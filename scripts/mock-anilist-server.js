@@ -162,7 +162,16 @@ const server = http.createServer((req, res) => {
 
   if (req.method === 'POST') {
     let body = '';
-    req.on('data', chunk => { body += chunk; });
+    const MAX_BODY_SIZE = 1024 * 1024; // 1MB limit
+    req.on('data', chunk => {
+      body += chunk;
+      if (body.length > MAX_BODY_SIZE) {
+        res.writeHead(413, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Request body too large' }));
+        req.destroy();
+        return;
+      }
+    });
     req.on('end', () => {
       try {
         const parsed = JSON.parse(body);

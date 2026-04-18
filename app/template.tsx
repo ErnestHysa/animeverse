@@ -13,7 +13,7 @@ export default function RootTemplate({
   return (
     <div className="min-h-screen flex flex-col">
       <Suspense fallback={<PageTransitionFallback />}>
-        <div className="flex-1 animate-fadeIn">
+        <div className="flex-1">
           {children}
         </div>
       </Suspense>

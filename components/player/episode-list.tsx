@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Play, Clock, CheckCircle, Filter, CornerDownRight, ChevronDown } from "lucide-react";
@@ -85,15 +85,18 @@ export function EpisodeList({
   }, []);
 
   // Get watch history for this anime
-  const episodeHistoryMap = new Map<number, { progress: number; completed: boolean }>();
-  for (const item of watchHistory) {
-    if (item.mediaId === animeId) {
-      episodeHistoryMap.set(item.episodeNumber, {
-        progress: item.progress,
-        completed: item.completed,
-      });
+  const episodeHistoryMap = useMemo(() => {
+    const map = new Map<number, { progress: number; completed: boolean }>();
+    for (const item of watchHistory) {
+      if (item.mediaId === animeId) {
+        map.set(item.episodeNumber, {
+          progress: item.progress,
+          completed: item.completed,
+        });
+      }
     }
-  }
+    return map;
+  }, [watchHistory, animeId]);
 
   // Build a map from episode number to title from streamingEpisodes data.
   // AniList titles are formatted as "Episode N - Title" or just "Episode N".
@@ -122,12 +125,19 @@ export function EpisodeList({
     }
   };
 
-  const episodes = Array.from({ length: totalEpisodes }, (_, i) => i + 1);
-  const filteredEpisodes = showOnlyUnwatched
-    ? episodes.filter((ep) => !episodeHistoryMap.get(ep)?.completed)
-    : episodes;
+  // Only generate episodes for the current visible window instead of the full array
+  const filteredEpisodes = useMemo(() => {
+    const maxEp = Math.min(visibleCount, totalEpisodes);
+    const episodes = Array.from({ length: maxEp }, (_, i) => i + 1);
+    return showOnlyUnwatched
+      ? episodes.filter((ep) => !episodeHistoryMap.get(ep)?.completed)
+      : episodes;
+  }, [visibleCount, totalEpisodes, showOnlyUnwatched, episodeHistoryMap]);
 
-  const watchedCount = episodes.filter((ep) => episodeHistoryMap.get(ep)?.completed).length;
+  const watchedCount = useMemo(
+    () => Array.from(episodeHistoryMap.values()).filter((v) => v.completed).length,
+    [episodeHistoryMap]
+  );
 
   return (
     <GlassCard className="p-4">
@@ -191,7 +201,7 @@ export function EpisodeList({
       )}
 
       <div className="space-y-1 max-h-[60vh] overflow-y-auto pr-1 scrollbar-thin" ref={listContainerRef}>
-        {filteredEpisodes.slice(0, visibleCount).map((epNum) => {
+        {filteredEpisodes.map((epNum) => {
           const isCurrent = epNum === currentEpisode;
           const historyItem = episodeHistoryMap.get(epNum);
           const isWatched = historyItem?.completed ?? false;

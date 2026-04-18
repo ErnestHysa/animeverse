@@ -400,7 +400,8 @@ class HybridStreamManagerImpl {
     animeTitle?: string,
     malId?: number | null
   ): Promise<{ success: boolean; source?: StreamSource; error?: Error }> {
-    const url = new URL(`/api/video-sources/${animeId}/${episodeNumber}`, window.location.origin);
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const url = new URL(`/api/video-sources/${animeId}/${episodeNumber}`, origin);
 
     if (animeTitle) {
       url.searchParams.set("title", animeTitle);
@@ -467,7 +468,8 @@ class HybridStreamManagerImpl {
     animeTitle?: string,
     malId?: number | null
   ): Promise<{ success: boolean; source?: StreamSource; error?: Error; seeders?: number }> {
-    const url = new URL(`/api/torrent-sources/${animeId}/${episodeNumber}`, window.location.origin);
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const url = new URL(`/api/torrent-sources/${animeId}/${episodeNumber}`, origin);
 
     if (animeTitle) {
       url.searchParams.set("title", animeTitle);

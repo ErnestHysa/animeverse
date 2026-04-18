@@ -31,7 +31,8 @@ export function MiniPlayer() {
     ? Math.min(100, historyItem.completed
         ? 100
         : (() => {
-            const duration = (historyItem as any).duration || (historyItem as any).totalDuration || 1440;
+            const histItem = historyItem as { progress: number; completed: boolean; duration?: number; totalDuration?: number };
+            const duration = histItem.duration || histItem.totalDuration || 1440;
             return Math.round((historyItem.progress / duration) * 100);
           })())
     : 0;

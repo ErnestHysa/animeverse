@@ -136,6 +136,10 @@ export function ShareStatsCard({
 
   const handleDownload = () => {
     const dataUrl = generateCard();
+    if (!dataUrl || dataUrl === "data:,") {
+      toast.error("Failed to generate image");
+      return;
+    }
     const a = document.createElement("a");
     a.href = dataUrl;
     a.download = `animeverse-${year}-recap.png`;
@@ -146,6 +150,10 @@ export function ShareStatsCard({
   const handleCopy = async () => {
     try {
       const dataUrl = generateCard();
+      if (!dataUrl || dataUrl === "data:,") {
+        toast.error("Failed to generate image");
+        return;
+      }
       const res = await fetch(dataUrl);
       const blob = await res.blob();
       await navigator.clipboard.write([
@@ -161,6 +169,10 @@ export function ShareStatsCard({
 
   const handleShare = async () => {
     const dataUrl = generateCard();
+    if (!dataUrl || dataUrl === "data:,") {
+      toast.error("Failed to generate image");
+      return;
+    }
     if (navigator.share) {
       try {
         const res = await fetch(dataUrl);

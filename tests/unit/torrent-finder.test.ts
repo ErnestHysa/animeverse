@@ -6,8 +6,6 @@
  * - Magnet link validation
  * - Quality extraction
  * - Fansub group extraction
- * - Size parsing
- * - Cache utilities
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -96,23 +94,23 @@ describe('torrent-finder', () => {
   describe('extractQuality', () => {
     it('should extract 4K/2160p quality', () => {
       expect(extractQuality('[Test] 2160p')).toBe('2160p');
-      expect(extractQuality('[Test] 4K')).toBe('4k');
+      expect(extractQuality('[Test] 4K')).toBe('2160p');
     });
 
     it('should extract 1080p quality', () => {
       expect(extractQuality('[Test] 1080p')).toBe('1080p');
-      expect(extractQuality('[Test] Full HD')).toBe('full hd');
+      expect(extractQuality('[Test] Full HD')).toBe('1080p');
       expect(extractQuality('[Test] Full.HD')).toBe('1080p');
     });
 
     it('should extract 720p quality', () => {
       expect(extractQuality('[Test] 720p')).toBe('720p');
-      expect(extractQuality('[Test] HD')).toBe('hd');
+      expect(extractQuality('[Test] HD')).toBe('720p');
     });
 
     it('should extract 480p quality', () => {
       expect(extractQuality('[Test] 480p')).toBe('480p');
-      expect(extractQuality('[Test] SD')).toBe('sd');
+      expect(extractQuality('[Test] SD')).toBe('480p');
     });
 
     it('should extract 360p quality', () => {

@@ -13,6 +13,7 @@ import type {
   BufferingEvent,
   TorrentStatsEvent,
   QualityChangeEvent,
+  PlaybackErrorEvent,
   StreamingMethod,
 } from "@/types/analytics";
 
@@ -119,6 +120,29 @@ class AnalyticsTracker {
 
     this.queueEvent(event);
     this.flush(); // Flush immediately on playback end
+  }
+
+  /**
+   * Track playback error
+   */
+  trackPlaybackError(params: {
+    animeId: number;
+    episode: number;
+    error: string;
+    source?: string;
+  }): void {
+    const event: PlaybackErrorEvent = {
+      id: this.generateEventId(),
+      timestamp: Date.now(),
+      sessionId: this.sessionId,
+      eventType: "playback_error",
+      animeId: params.animeId,
+      episode: params.episode,
+      error: params.error,
+      source: params.source || "unknown",
+    };
+    this.queueEvent(event);
+    this.flush();
   }
 
   /**

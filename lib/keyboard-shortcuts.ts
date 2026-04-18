@@ -37,6 +37,10 @@ class KeyboardShortcutsManager {
       return;
     }
 
+    // Skip global shortcuts when a modal dialog is open
+    const activeDialog = document.querySelector('[role="dialog"][aria-modal="true"]');
+    if (activeDialog) return;
+
     // Skip global shortcuts when a video or audio element is focused
     const active = document.activeElement as HTMLElement | null;
     if (active && (active.tagName === "VIDEO" || active.tagName === "AUDIO")) {

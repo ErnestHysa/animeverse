@@ -79,13 +79,25 @@ export interface QualityChangeEvent extends StreamingEvent {
   reason: string;
 }
 
+export interface PlaybackErrorEvent {
+  id: string;
+  timestamp: number;
+  sessionId: string;
+  eventType: "playback_error";
+  animeId: number;
+  episode: number;
+  error: string;
+  source: string;
+}
+
 export type AnalyticsEvent =
   | PlaybackStartEvent
   | PlaybackEndEvent
   | FallbackEvent
   | BufferingEvent
   | TorrentStatsEvent
-  | QualityChangeEvent;
+  | QualityChangeEvent
+  | PlaybackErrorEvent;
 
 export interface AnalyticsSummary {
   totalStreams: number;

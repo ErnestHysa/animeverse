@@ -52,7 +52,7 @@ export function SeedStatsBadge({
       </div>
       {averageSeedRatio > 0 && (
         <div className="ml-2 text-xs text-white bg-white/20 px-2 py-1 rounded-full">
-          Ratio: {averageSeedRatio.toFixed(2)}
+          Ratio: {(Number.isFinite(averageSeedRatio) ? averageSeedRatio : 0).toFixed(2)}
         </div>
       )}
     </motion.div>
@@ -184,7 +184,7 @@ export function SeedStatsPanel({ stats, achievements = [] }: SeedStatsPanelProps
             <div>
               <div className="text-sm text-gray-400">Average Seed Ratio</div>
               <div className="text-3xl font-bold text-white">
-                {stats.averageSeedRatio.toFixed(2)}
+                {(Number.isFinite(stats.averageSeedRatio) ? stats.averageSeedRatio : 0).toFixed(2)}
               </div>
             </div>
             <div className="text-5xl opacity-20">⚖️</div>

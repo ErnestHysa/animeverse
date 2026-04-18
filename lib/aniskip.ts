@@ -96,14 +96,41 @@ function setCachedTimestamps(
 // ===================================
 
 const CUSTOM_PREFIX = "custom-skip-";
+const CUSTOM_TIMESTAMP_TTL = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 export function getCustomTimestamps(animeId: number, episodeNumber: number): IntroOutroTimestamps | null {
   if (typeof window === "undefined") return null;
 
   try {
     const key = `${CUSTOM_PREFIX}${animeId}-${episodeNumber}`;
-    const custom = localStorage.getItem(key);
-    return custom ? JSON.parse(custom) : null;
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+
+    const custom: IntroOutroTimestamps & { _timestamp?: number } = JSON.parse(raw);
+
+    // Validate timestamp ranges
+    if (custom.intro && custom.intro.start >= custom.intro.end) {
+      delete custom.intro;
+    }
+    if (custom.outro && custom.outro.start >= custom.outro.end) {
+      delete custom.outro;
+    }
+    if (custom.recap && custom.recap.start >= custom.recap.end) {
+      delete custom.recap;
+    }
+
+    // Check expiration
+    if (custom._timestamp && Date.now() - custom._timestamp > CUSTOM_TIMESTAMP_TTL) {
+      localStorage.removeItem(key);
+      return null;
+    }
+
+    // Return only the IntroOutroTimestamps fields
+    const result: IntroOutroTimestamps = {};
+    if (custom.intro) result.intro = custom.intro;
+    if (custom.outro) result.outro = custom.outro;
+    if (custom.recap) result.recap = custom.recap;
+    return result;
   } catch {
     return null;
   }
@@ -118,7 +145,8 @@ export function setCustomTimestamps(
 
   try {
     const key = `${CUSTOM_PREFIX}${animeId}-${episodeNumber}`;
-    localStorage.setItem(key, JSON.stringify(timestamps));
+    const entry = { ...timestamps, _timestamp: Date.now() };
+    localStorage.setItem(key, JSON.stringify(entry));
   } catch {
     // Silently fail
   }
@@ -165,12 +193,20 @@ export async function fetchSkipTimes(
   const url = `${baseUrl}/api/aniskip/${malId}/${episodeNumber}?${params.toString()}`;
 
   try {
-    const response = await fetch(url, {
-      signal: AbortSignal.timeout(10000), // 10 second timeout
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     // 400 means episode not found in database - expected, not an error
     // 404 means no data available - expected, not an error
@@ -317,20 +353,24 @@ export async function batchFetchTimestamps(
     }
   }
 
-  // Fetch uncached episodes in parallel (with rate limiting)
-  const fetchPromises = uncached.map(async (ep) => {
-    const timestamps = await getIntroOutroTimestamps(malId, ep, undefined, {
-      ...options,
-      skipCache: true,
+  // Fetch uncached episodes in batches with concurrency limit
+  const BATCH_SIZE = 5;
+  for (let i = 0; i < uncached.length; i += BATCH_SIZE) {
+    const batch = uncached.slice(i, i + BATCH_SIZE);
+    const fetchPromises = batch.map(async (ep) => {
+      const timestamps = await getIntroOutroTimestamps(malId, ep, undefined, {
+        ...options,
+        skipCache: true,
+      });
+      return { episode: ep, timestamps };
     });
-    return { episode: ep, timestamps };
-  });
 
-  const fetched = await Promise.allSettled(fetchPromises);
+    const fetched = await Promise.allSettled(fetchPromises);
 
-  for (const result of fetched) {
-    if (result.status === "fulfilled") {
-      results.set(result.value.episode, result.value.timestamps);
+    for (const result of fetched) {
+      if (result.status === "fulfilled") {
+        results.set(result.value.episode, result.value.timestamps);
+      }
     }
   }
 

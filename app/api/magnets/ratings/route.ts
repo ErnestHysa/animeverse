@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
       // Update existing rating
       const updatedRating: MagnetRating = {
         ...existingRating,
-        rating,
+        rating: rating as 1 | 2 | 3 | 4 | 5,
         quality,
         videoQuality,
         audioQuality,
@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
       episodeNumber: typeof episodeNumber === 'number' ? episodeNumber : Number(episodeNumber),
       userId,
       username: username || "Anonymous",
-      rating,
+      rating: rating as 1 | 2 | 3 | 4 | 5,
       quality: quality || "good",
       videoQuality: videoQuality || "720p",
       audioQuality: audioQuality || "good",

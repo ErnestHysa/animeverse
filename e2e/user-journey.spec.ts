@@ -40,6 +40,10 @@ import { test, expect, Page } from '@playwright/test';
 const TIMEOUT = 90000;
 const SHORT_TIMEOUT = 30000;
 
+// Wait for client-side hydration / CSS animations in watch pages.
+// Prefer waitForSelector when a stable selector is available.
+const HYDRATION_WAIT = 3000;
+
 // Helper to wait for main content
 async function waitForPageLoad(page: Page) {
   await page.waitForLoadState('domcontentloaded');
@@ -391,7 +395,7 @@ test.describe('Journey 6: Watch Player Full Flow', () => {
     await page.locator('main').waitFor({ timeout: TIMEOUT });
     // Wait for React hydration and client components to mount
     await page.waitForLoadState('load');
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(HYDRATION_WAIT);
 
     // Take screenshot to document the player state
     await screenshot(page, '20-player-video-element');
@@ -416,7 +420,8 @@ test.describe('Journey 6: Watch Player Full Flow', () => {
   test('episode list is present on watch page', async ({ page }) => {
     await page.goto('/watch/21459/1', { waitUntil: 'domcontentloaded' });
     await page.locator('main').waitFor({ timeout: TIMEOUT });
-    await page.waitForTimeout(3000);
+    // Wait for episode list client-side hydration
+    await page.waitForTimeout(HYDRATION_WAIT);
 
     // Episode list or episodes heading should be present
     const episodesSection = page.getByText('Episodes', { exact: false });
@@ -433,6 +438,7 @@ test.describe('Journey 6: Watch Player Full Flow', () => {
   test('watch page has share and action buttons', async ({ page }) => {
     await page.goto('/watch/21459/1', { waitUntil: 'domcontentloaded' });
     await page.locator('main').waitFor({ timeout: TIMEOUT });
+    // Wait for action buttons to render after hydration
     await page.waitForTimeout(2000);
 
     // Check for share/report/keyboard shortcut buttons in the player area
@@ -453,6 +459,7 @@ test.describe('Journey 6: Watch Player Full Flow', () => {
   test('navigate to next episode from watch page', async ({ page }) => {
     await page.goto('/watch/21459/1', { waitUntil: 'domcontentloaded' });
     await page.locator('main').waitFor({ timeout: TIMEOUT });
+    // Wait for next-episode button client-side hydration
     await page.waitForTimeout(2000);
 
     // Look for Next Episode button
@@ -584,7 +591,8 @@ test.describe('Journey 8: Mobile User Experience', () => {
     await page.goto('/watch/21459/1', { waitUntil: 'domcontentloaded' });
     await page.locator('main').waitFor({ timeout: TIMEOUT });
     await page.waitForLoadState('load');
-    await page.waitForTimeout(3000);
+    // Wait for mobile player hydration
+    await page.waitForTimeout(HYDRATION_WAIT);
 
     await page.screenshot({ path: 'test-results/journey-30-mobile-watch-page.png', timeout: 5000, animations: 'disabled' }).catch(() => {});
 
@@ -611,7 +619,8 @@ test.describe('Journey 9: Error & Edge Cases', () => {
     await page.goto('/this-page-definitely-does-not-exist-xyz-123', {
       waitUntil: 'domcontentloaded',
     });
-    await page.waitForTimeout(2000);
+    // Wait for 404 page to render client-side error state
+    await page.waitForTimeout(HYDRATION_WAIT);
 
     // Should show some error/not-found state
     const body = page.locator('body');
@@ -622,7 +631,8 @@ test.describe('Journey 9: Error & Edge Cases', () => {
 
   test('invalid anime ID shows graceful error', async ({ page }) => {
     await page.goto('/anime/999999999', { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(3000);
+    // Wait for error state to render after failed data fetch
+    await page.waitForTimeout(HYDRATION_WAIT);
 
     // Should show some state (not a crash)
     const body = page.locator('body');

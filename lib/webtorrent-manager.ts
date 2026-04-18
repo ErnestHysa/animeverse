@@ -318,13 +318,14 @@ class WebTorrentManagerImpl {
       "1080p": 4,
       "720p": 3,
       "480p": 2,
+      "sd": 1,
       "360p": 1,
       "unknown": 0,
     };
 
     return magnets.reduce((best, current) => {
-      const bestScore = best.seeders * 10 + qualityPriority[best.quality] * 5;
-      const currentScore = current.seeders * 10 + qualityPriority[current.quality] * 5;
+      const bestScore = best.seeders * 10 + (qualityPriority[best.quality] ?? 0) * 5;
+      const currentScore = current.seeders * 10 + (qualityPriority[current.quality] ?? 0) * 5;
 
       return currentScore > bestScore ? current : best;
     });
