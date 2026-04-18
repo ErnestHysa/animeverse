@@ -516,10 +516,11 @@ class SeedServer {
 // ===================================
 
 function formatBytes(bytes) {
+  if (bytes < 0) return "0 B";
   if (bytes === 0) return "0 B";
   const k = 1024;
   const sizes = ["B", "KB", "MB", "GB", "TB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 }
 
@@ -618,8 +619,7 @@ if (require.main === module) {
     }
   });
 
-  // TODO: In production, restrict bind address to 127.0.0.1 instead of 0.0.0.0
-  statusServer.listen(STATUS_PORT, () => {
+  statusServer.listen(STATUS_PORT, '127.0.0.1', () => {
     log("info", "Status server listening on port", STATUS_PORT);
     log("info", "Status available at http://localhost:" + STATUS_PORT + "/status");
   });

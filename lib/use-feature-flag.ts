@@ -60,17 +60,15 @@ export function useFeatureFlag(featureKey: FeatureKey): UseFeatureFlagResult {
         const isAdmin = localStorage.getItem('userRole') === 'admin';
         const isBetaTester = localStorage.getItem('isBetaTester') === 'true';
 
+        // NOTE: Client-claimed identity headers (userId, role, etc.) were removed
+        // because they are inherently insecure — an attacker can forge localStorage
+        // values to bypass feature gates. The server must derive identity solely
+        // from the authenticated session/token. The localStorage reads above are
+        // kept for potential future client-side-only use but are NOT sent to the server.
         const response = await fetch(
           `/api/feature-flags?feature=${featureKey}`,
           {
             signal: controller.signal,
-            headers: {
-              // Client-claimed identity — NOT authoritative. Server must validate via session/token.
-              'x-client-claimed-user-id': userId || '',
-              'x-client-claimed-email': email || '',
-              'x-client-claimed-role': isAdmin ? 'admin' : 'user',
-              'x-client-claimed-beta': isBetaTester ? 'true' : 'false',
-            },
           }
         );
 

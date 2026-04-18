@@ -46,7 +46,7 @@ export interface MALUser {
 // PKCE Helpers (used by initiate route)
 // ===================================
 
-/** Generates a cryptographically random code_verifier (43–128 chars) */
+/** Generates a cryptographically random code_verifier (43-128 chars) */
 export function generateCodeVerifier(): string {
   const array = new Uint8Array(32);
   crypto.getRandomValues(array);

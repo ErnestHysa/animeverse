@@ -129,20 +129,14 @@ class WatchPartyRoomManager {
         return;
       }
       try {
-        const a = Buffer.from(room.password, 'utf-8');
-        const b = Buffer.from(password, 'utf-8');
-        if (a.length !== b.length) {
-          const hashA = crypto.createHash('sha256').update(a).digest();
-          const hashB = crypto.createHash('sha256').update(b).digest();
-          if (!crypto.timingSafeEqual(hashA, hashB)) {
-            socket.emit('error', { message: 'Invalid room password' });
-            return;
-          }
-        } else {
-          if (!crypto.timingSafeEqual(a, b)) {
-            socket.emit('error', { message: 'Invalid room password' });
-            return;
-          }
+        // Always hash both inputs to fixed length before comparing to prevent timing leaks
+        const aBuf = Buffer.from(String(room.password), 'utf-8');
+        const bBuf = Buffer.from(String(password), 'utf-8');
+        const aHash = crypto.createHash('sha256').update(aBuf).digest();
+        const bHash = crypto.createHash('sha256').update(bBuf).digest();
+        if (!crypto.timingSafeEqual(aHash, bHash)) {
+          socket.emit('error', { message: 'Invalid room password' });
+          return;
         }
       } catch {
         socket.emit('error', { message: 'Invalid room password' });

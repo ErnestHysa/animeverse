@@ -251,7 +251,9 @@ class AnalyticsTracker {
 
     // Cap queue size to prevent unbounded memory growth (Fix H4)
     if (this.eventQueue.length >= MAX_QUEUE_SIZE) {
-      this.eventQueue = this.eventQueue.slice(-MAX_QUEUE_SIZE / 2);
+      const dropped = this.eventQueue.length - Math.floor(MAX_QUEUE_SIZE / 2);
+      console.warn(`[AnalyticsTracker] Queue overflow: dropping ${dropped} oldest events`);
+      this.eventQueue = this.eventQueue.slice(-Math.floor(MAX_QUEUE_SIZE / 2));
     }
 
     if (this.eventQueue.length >= this.batchThreshold) {
@@ -345,7 +347,18 @@ class AnalyticsTracker {
       clearInterval(this.flushTimer);
       this.flushTimer = null;
     }
-    this.flush(); // Final flush
+    // Use sendBeacon for reliable final delivery on page unload
+    if (this.eventQueue.length > 0 && typeof navigator !== 'undefined' && navigator.sendBeacon) {
+      const payload = JSON.stringify({
+        events: this.eventQueue,
+        batchSize: this.eventQueue.length,
+      });
+      navigator.sendBeacon('/api/analytics/batch', payload);
+      this.eventQueue = [];
+    } else {
+      // Fallback: fire-and-forget flush
+      this.flush().catch(() => {});
+    }
   }
 }
 

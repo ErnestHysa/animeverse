@@ -15,6 +15,19 @@
 import http from "http";
 import { WebSocketServer } from "ws";
 import { parse as parseUrl } from "url";
+import { timingSafeEqual } from "crypto";
+
+/**
+ * Mask an IP address for privacy by hiding the last octet (IPv4)
+ * or returning a placeholder for IPv6/unknown formats.
+ */
+function maskIP(ip: string): string {
+  if (ip.includes('.')) {
+    const parts = ip.split('.');
+    return `${parts[0]}.${parts[1]}.${parts[2]}.xxx`;
+  }
+  return 'xxx'; // IPv6 or unknown
+}
 
 // ===================================
 // Types
@@ -110,7 +123,18 @@ class AnimeTracker {
       // H12: Require passkey authentication on WS connections
       const url = new URL(req.url || '', `http://${req.headers.host}`);
       const passkey = url.searchParams.get('passkey');
-      if (!passkey || passkey !== process.env.TRACKER_PASSKEY) {
+      if (!passkey || !process.env.TRACKER_PASSKEY) {
+        ws.close(4001, 'Authentication required');
+        return;
+      }
+      try {
+        const a = Buffer.from(passkey, 'utf-8');
+        const b = Buffer.from(process.env.TRACKER_PASSKEY, 'utf-8');
+        if (a.length !== b.length || !timingSafeEqual(a, b)) {
+          ws.close(4001, 'Authentication required');
+          return;
+        }
+      } catch {
         ws.close(4001, 'Authentication required');
         return;
       }
@@ -268,7 +292,7 @@ class AnimeTracker {
         .filter((p) => p.peerId !== peerId)
         .slice(0, TRACKER_CONFIG.maxPeersPerResponse)
         .map((p) => ({
-          "ip": p.ip,
+          "ip": maskIP(p.ip),
           "port": p.port,
           "peer id": p.peerId,
         }));
@@ -340,6 +364,11 @@ class AnimeTracker {
 
       // Parse request body
       const body = await this.parseRequestBody(req);
+      if (!body) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Invalid JSON body" }));
+        return;
+      }
       const { infoHash, animeId, episodeNumber, title, quality, size } = body;
 
       if (!infoHash || !animeId || !episodeNumber || !title) {
@@ -393,6 +422,11 @@ class AnimeTracker {
       }
 
       const body = await this.parseRequestBody(req);
+      if (!body) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Invalid JSON body" }));
+        return;
+      }
       const { infoHash, verified, adminKey } = body;
 
       if (adminKey !== process.env.ADMIN_KEY) {
@@ -542,6 +576,7 @@ class AnimeTracker {
         toRemove.forEach((peer) => torrentPeers.delete(peer));
       }
     }, 300000);
+    this.cleanupInterval.unref();
 
     // Update torrent stats every minute
     this.statsInterval = setInterval(() => {
@@ -563,6 +598,7 @@ class AnimeTracker {
         torrent.leechers = leechers;
       }
     }, 60000);
+    this.statsInterval.unref();
   }
 
   /**
@@ -629,7 +665,7 @@ class AnimeTracker {
         try {
           resolve(JSON.parse(body));
         } catch {
-          resolve({});
+          resolve(null);
         }
       });
       req.on("error", reject);

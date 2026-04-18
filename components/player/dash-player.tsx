@@ -78,12 +78,15 @@ export const DASHPlayer = React.forwardRef<DASHPlayerRef, DASHPlayerProps>(
 
     // Store event handler references so they can be removed on re-init
     const eventHandlersRef = useRef<Array<{ event: string; handler: (e: any) => void }>>([]);
+    const initGenerationRef = useRef(0);
 
     /**
      * Initialize DASH player
      */
     const initializeDASH = useCallback(async () => {
       if (!videoRef.current || !manifestUrl) return;
+
+      const generation = ++initGenerationRef.current;
 
       try {
         setLoading(true);
@@ -100,6 +103,10 @@ export const DASHPlayer = React.forwardRef<DASHPlayerRef, DASHPlayerProps>(
 
         // Dynamically import dash.js
         const dashjs = await import("dashjs");
+
+        // Guard: if a newer init started while we awaited, bail out
+        if (generation !== initGenerationRef.current) return;
+
         const Dash = dashjs;
 
         // Create DASH instance
@@ -179,6 +186,12 @@ export const DASHPlayer = React.forwardRef<DASHPlayerRef, DASHPlayerProps>(
 
         // Load manifest
         await dashInstance.attachSource(manifestUrl);
+
+        // Guard: bail out if a newer init started while attaching source
+        if (generation !== initGenerationRef.current) {
+          dashInstance.reset();
+          return;
+        }
 
         // Get available qualities
         const qualities = getQualitiesFromDASH(dashInstance);
@@ -358,6 +371,13 @@ export const DASHPlayer = React.forwardRef<DASHPlayerRef, DASHPlayerProps>(
         track.default = index === 0;
         videoRef.current?.appendChild(track);
       });
+
+      return () => {
+        if (videoRef.current) {
+          const tracks = videoRef.current.querySelectorAll('track');
+          tracks.forEach(track => track.remove());
+        }
+      };
     }, [subtitles]);
 
     return (

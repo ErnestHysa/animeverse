@@ -29,6 +29,14 @@ import { createScopedLogger } from "@/lib/logger";
 
 const logger = createScopedLogger('admin-dashboard');
 
+function getAuthHeaders(): Record<string, string> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('admin_token') : null;
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+  };
+}
+
 interface AnalyticsData {
   totalStreams: number;
   methodDistribution: {
@@ -92,10 +100,11 @@ export default function AdminDashboardPage() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
+      const authHeaders = getAuthHeaders();
       const [analyticsRes, serverRes, alertsRes] = await Promise.all([
         fetch(`/api/analytics/summary?period=${period}`),
-        fetch("/api/admin/seed-server/status"),
-        fetch("/api/admin/alerts"),
+        fetch("/api/admin/seed-server/status", { headers: authHeaders }),
+        fetch("/api/admin/alerts", { headers: authHeaders }),
       ]);
 
       const [analyticsData, serverData, alertsData] = await Promise.all([
@@ -125,6 +134,7 @@ export default function AdminDashboardPage() {
     try {
       const response = await fetch(`/api/admin/alerts/${alertId}/resolve`, {
         method: "PUT",
+        headers: getAuthHeaders(),
       });
 
       if (response.ok) {
@@ -275,7 +285,7 @@ export default function AdminDashboardPage() {
               <div>
                 <p className="text-gray-400 text-sm">Bandwidth Saved</p>
                 <p className="text-3xl font-bold mt-2 text-green-500">
-                  {analytics?.bandwidthSavings.savingsPercent.toFixed(1)}%
+                  {(analytics?.bandwidthSavings?.savingsPercent ?? 0).toFixed(1)}%
                 </p>
               </div>
               <div className="p-3 bg-green-500/20 rounded-lg">
@@ -290,7 +300,7 @@ export default function AdminDashboardPage() {
               <div>
                 <p className="text-gray-400 text-sm">Cost Savings</p>
                 <p className="text-3xl font-bold mt-2 text-green-500">
-                  ${analytics?.bandwidthSavings.costSavings.toFixed(2) || "0.00"}
+                  ${(analytics?.bandwidthSavings?.costSavings ?? 0).toFixed(2)}
                 </p>
               </div>
               <div className="p-3 bg-green-500/20 rounded-lg">
@@ -319,11 +329,15 @@ export default function AdminDashboardPage() {
                     style={{
                       width: `${
                         analytics
-                          ? (analytics.methodDistribution.hls /
-                              (analytics.methodDistribution.hls +
-                                analytics.methodDistribution.webtorrent +
-                                analytics.methodDistribution.hybrid)) *
-                            100
+                          ? (() => {
+                              const total =
+                                (analytics.methodDistribution.hls || 0) +
+                                (analytics.methodDistribution.webtorrent || 0) +
+                                (analytics.methodDistribution.hybrid || 0);
+                              return total > 0
+                                ? Math.round(((analytics.methodDistribution.hls || 0) / total) * 100)
+                                : 0;
+                            })()
                           : 0
                       }%`,
                     }}
@@ -343,11 +357,15 @@ export default function AdminDashboardPage() {
                     style={{
                       width: `${
                         analytics
-                          ? (analytics.methodDistribution.webtorrent /
-                              (analytics.methodDistribution.hls +
-                                analytics.methodDistribution.webtorrent +
-                                analytics.methodDistribution.hybrid)) *
-                            100
+                          ? (() => {
+                              const total =
+                                (analytics.methodDistribution.hls || 0) +
+                                (analytics.methodDistribution.webtorrent || 0) +
+                                (analytics.methodDistribution.hybrid || 0);
+                              return total > 0
+                                ? Math.round(((analytics.methodDistribution.webtorrent || 0) / total) * 100)
+                                : 0;
+                            })()
                           : 0
                       }%`,
                     }}
@@ -367,11 +385,15 @@ export default function AdminDashboardPage() {
                     style={{
                       width: `${
                         analytics
-                          ? (analytics.methodDistribution.hybrid /
-                              (analytics.methodDistribution.hls +
-                                analytics.methodDistribution.webtorrent +
-                                analytics.methodDistribution.hybrid)) *
-                            100
+                          ? (() => {
+                              const total =
+                                (analytics.methodDistribution.hls || 0) +
+                                (analytics.methodDistribution.webtorrent || 0) +
+                                (analytics.methodDistribution.hybrid || 0);
+                              return total > 0
+                                ? Math.round(((analytics.methodDistribution.hybrid || 0) / total) * 100)
+                                : 0;
+                            })()
                           : 0
                       }%`,
                     }}

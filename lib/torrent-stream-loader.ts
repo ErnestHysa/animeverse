@@ -291,12 +291,12 @@ export function analyzeTorrentQuality(magnet: MagnetLink): {
  * Format bytes to human readable
  */
 export function formatBytes(bytes: number): string {
-  if (bytes < 0) bytes = 0;
+  if (bytes < 0) return "0 B";
   if (bytes === 0) return "0 B";
 
   const k = 1024;
   const sizes = ["B", "KB", "MB", "GB", "TB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
 
   return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
 }
@@ -367,13 +367,16 @@ export async function loadTorrentStream(
     return result;
   }
 
-  // Validate torrent is not dead
-  if (result.stream && isTorrentDead(result.stream as any)) {
-    return {
-      success: false,
-      error: "Selected torrent appears to be dead (no seeds)",
-      alternatives: result.alternatives,
-    };
+  // Validate torrent is not dead using the original MagnetLink (which has uploadedAt)
+  if (result.stream) {
+    const originalMagnet = validMagnets.find((m) => m.infoHash === result.stream!.infoHash);
+    if (originalMagnet && isTorrentDead(originalMagnet)) {
+      return {
+        success: false,
+        error: "Selected torrent appears to be dead (no seeds)",
+        alternatives: result.alternatives,
+      };
+    }
   }
 
   return result;

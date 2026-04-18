@@ -193,6 +193,16 @@ class AlertsManager {
       for (let i = 0; i < Math.min(toRemove, resolvedAlerts.length); i++) {
         this.alerts.delete(resolvedAlerts[i][0]);
       }
+      // Fallback: remove oldest unresolved alerts if still over limit
+      if (this.alerts.size > AlertsManager.MAX_ALERTS) {
+        const oldestUnresolved = Array.from(this.alerts.entries())
+          .filter(([, a]) => !a.resolved)
+          .sort(([, a], [, b]) => a.timestamp - b.timestamp);
+        const remaining = this.alerts.size - AlertsManager.MAX_ALERTS;
+        for (let i = 0; i < Math.min(remaining, oldestUnresolved.length); i++) {
+          this.alerts.delete(oldestUnresolved[i][0]);
+        }
+      }
     }
   }
 
@@ -302,6 +312,9 @@ class AlertsManager {
   private async getAnalyticsSummary(period: string): Promise<any> {
     try {
       const response = await fetch(`/api/analytics/summary?period=${period}`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
       const data = await response.json();
       this.lastSummary = data;
       return data;
@@ -317,6 +330,9 @@ class AlertsManager {
   private async getSeedServerStatus(): Promise<any> {
     try {
       const response = await fetch("/api/admin/seed-server/status");
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
       const data = await response.json();
       this.lastSeedServerStatus = data;
       return data;

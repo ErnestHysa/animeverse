@@ -169,7 +169,8 @@ class RecommendationEngine {
 
     // 3. Quality score (up to 20 points)
     if (anime.averageScore) {
-      const qualityScore = (anime.averageScore / 10) * 20;
+      // AniList averageScore is 0-100, so divide by 100 to get 0-1, then multiply by 20
+      const qualityScore = (anime.averageScore / 100) * 20;
       score += qualityScore;
       if (anime.averageScore >= 80) {
         reasons.push(`Highly rated (${anime.averageScore}% score)`);

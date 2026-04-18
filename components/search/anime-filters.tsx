@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useCallback, memo, useMemo } from "react";
+import { useState, useCallback, memo, useMemo, useRef } from "react";
 import { Filter, X, ChevronDown, ChevronUp } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
@@ -108,6 +108,8 @@ const FilterButton = memo(function FilterButton({
 export const AnimeFilters = memo(function AnimeFilters({ currentFilters, query, defaultExpanded = false }: AnimeFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const searchParamsRef = useRef(searchParams);
+  searchParamsRef.current = searchParams;
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   // Memoize hasActiveFilters to prevent recalculation
@@ -117,14 +119,14 @@ export const AnimeFilters = memo(function AnimeFilters({ currentFilters, query, 
   );
 
   const updateFilter = useCallback((key: keyof FilterOptions, value: string) => {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchParamsRef.current.toString());
     if (value && value !== "ALL") {
       params.set(key, value);
     } else {
       params.delete(key);
     }
     router.push(`/search?${params.toString()}`);
-  }, [router, searchParams]);
+  }, [router]);
 
   const clearAllFilters = useCallback(() => {
     const params = new URLSearchParams();

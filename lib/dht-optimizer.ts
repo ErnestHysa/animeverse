@@ -72,6 +72,7 @@ class DHTOptimizerImpl {
   private static instance: DHTOptimizerImpl;
   private webTorrentClient: any = null;
   private lastSaveTime = 0;
+  private _destroyed = false;
 
   private constructor(options: Partial<DHTOptions> = {}) {
     this.options = {
@@ -182,13 +183,14 @@ class DHTOptimizerImpl {
     if (existing) {
       // Update existing node stats
       existing.lastSeen = node.lastSeen;
+      // Before incrementing, save the old total for the average calculation
+      const previousTotal = existing.successCount + existing.failureCount;
       existing.successCount += node.successCount;
       existing.failureCount += node.failureCount;
       // Update average latency
       if (node.averageLatency > 0) {
-        const totalAttempts = existing.successCount + existing.failureCount;
         existing.averageLatency =
-          (existing.averageLatency * (totalAttempts - 1) + node.averageLatency) / totalAttempts;
+          (existing.averageLatency * previousTotal + node.averageLatency) / (previousTotal + 1);
       }
     } else {
       // Add new node
@@ -530,9 +532,17 @@ class DHTOptimizerImpl {
   }
 
   /**
+   * Check if this instance is still active (not destroyed)
+   */
+  isActive(): boolean {
+    return !this._destroyed;
+  }
+
+  /**
    * Destroy the optimizer, clearing all state (L10)
    */
   destroy(): void {
+    this._destroyed = true;
     this.connectionStats.clear();
     this.nodeCache.clear();
     this.saveNodeCache();
@@ -548,7 +558,9 @@ class DHTOptimizerImpl {
 let _dhtOptimizer: DHTOptimizerImpl | null = null;
 
 function getDHTOptimizer(): DHTOptimizerImpl {
-  if (!_dhtOptimizer) _dhtOptimizer = DHTOptimizerImpl.getInstance();
+  if (!_dhtOptimizer || !_dhtOptimizer.isActive()) {
+    _dhtOptimizer = DHTOptimizerImpl.getInstance();
+  }
   return _dhtOptimizer;
 }
 

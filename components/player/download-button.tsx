@@ -97,7 +97,8 @@ export function DownloadButton({
           downloadedAt: Date.now(),
         }).catch(() => {});
 
-        setIsDownloaded(true); // Show as downloaded
+        // Don't mark as downloaded -- the browser download was initiated, not completed.
+        // The user can verify completion in their browser's download manager.
       } else {
         // For direct videos, use the cache manager with progress
         await downloadManager.downloadVideo(

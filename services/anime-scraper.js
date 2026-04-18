@@ -78,6 +78,10 @@ async function fetchAiringAnime() {
       body: JSON.stringify({ query }),
     });
 
+    if (!response.ok) {
+      throw new Error(`AniList API returned ${response.status}`);
+    }
+
     const data = await response.json();
 
     if (data.errors) {
@@ -269,17 +273,17 @@ async function safeWriteJSON(filepath, data) {
 }
 
 async function processWriteQueue() {
-  if (writeInProgress || writeQueue.length === 0) return;
-  writeInProgress = true;
-  const { filepath, data, resolve, reject } = writeQueue.shift();
-  try {
-    await fs.writeFile(filepath, JSON.stringify(data, null, 2));
-    resolve();
-  } catch (err) {
-    reject(err);
-  } finally {
-    writeInProgress = false;
-    processWriteQueue();
+  while (writeQueue.length > 0 && !writeInProgress) {
+    writeInProgress = true;
+    const { filepath, data, resolve, reject } = writeQueue.shift();
+    try {
+      await fs.writeFile(filepath, JSON.stringify(data, null, 2));
+      resolve();
+    } catch (err) {
+      reject(err);
+    } finally {
+      writeInProgress = false;
+    }
   }
 }
 

@@ -71,8 +71,8 @@ export async function isFillerEpisode(
 
   return (
     episode.type === "filler" ||
-    episode.type === "mixed_filller" ||
-    episode.type === "mixed_canon"
+    episode.type === "mixed_filller"
+    // mixed_canon is NOT filler -- contains canonical plot content
   );
 }
 
@@ -88,8 +88,8 @@ export async function getFillerEpisodes(malId: number): Promise<number[]> {
     .filter(
       (ep) =>
         ep.type === "filler" ||
-        ep.type === "mixed_filller" ||
-        ep.type === "mixed_canon"
+        ep.type === "mixed_filller"
+        // mixed_canon is NOT filler -- contains canonical plot content
     )
     .map((ep) => ep.number);
 }

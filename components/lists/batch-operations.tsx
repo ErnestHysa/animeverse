@@ -94,6 +94,7 @@ export function BatchOperations({ className = "" }: BatchOperationsProps) {
   }, [fetchedAnime, items, mediaCache, setMediaCache]);
 
   const removeSelected = async () => {
+    if (!confirm(`Remove ${selectedItems.size} item${selectedItems.size > 1 ? 's' : ''} from ${selectionMode}?`)) return;
     if (selectionMode === "favorites") {
       for (const id of selectedItems) {
         toggleFavorite(id);

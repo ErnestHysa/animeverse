@@ -277,13 +277,22 @@ function detectEncoding(buffer: Buffer): string {
   }
 }
 
-// Track the current blob URL so we can revoke it before creating a new one
-let currentBlobUrl: string | null = null;
+// Track blob URLs per-subtitle to avoid race conditions between concurrent loads
+const blobUrls = new Map<string, string>();
+
+function revokeBlobUrl(key: string) {
+  const url = blobUrls.get(key);
+  if (url) {
+    URL.revokeObjectURL(url);
+    blobUrls.delete(key);
+  }
+}
 
 /**
  * Load subtitle file and create blob URL
  */
 export async function loadSubtitleFile(file: any): Promise<string | null> {
+  const blobKey = file.name || `subtitle-${Date.now()}`;
   try {
     // Get file content as ArrayBuffer
     const arrayBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
@@ -311,11 +320,11 @@ export async function loadSubtitleFile(file: any): Promise<string | null> {
       content = convertASStoVTT(content);
     }
 
-    // Revoke previous blob URL before creating a new one
-    if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
+    // Revoke previous blob URL for this specific subtitle before creating a new one
+    revokeBlobUrl(blobKey);
     const blob = new Blob([content], { type: "text/vtt" });
     const blobUrl = URL.createObjectURL(blob);
-    currentBlobUrl = blobUrl;
+    blobUrls.set(blobKey, blobUrl);
     return blobUrl;
   } catch (error) {
     console.error("[Subtitle] Error loading subtitle file:", error);

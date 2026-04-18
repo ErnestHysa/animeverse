@@ -30,6 +30,22 @@ import { createScopedLogger } from "@/lib/logger";
 
 const logger = createScopedLogger('admin-magnets');
 
+function getAuthHeaders(): Record<string, string> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('admin_token') : null;
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+  };
+}
+
+function csvSafeCell(value: string): string {
+  const str = String(value || '');
+  const escaped = str.replace(/"/g, '""');
+  // Prevent CSV injection: prefix dangerous first chars with tab
+  const safePrefix = /^[=+\-@\t\r]/.test(escaped) ? '\t' : '';
+  return `"${safePrefix}${escaped}"`;
+}
+
 interface MagnetEntry {
   id: string;
   animeId: number;
@@ -88,7 +104,9 @@ export default function AdminMagnetsPage() {
     const loadMagnets = async () => {
       try {
         setLoading(true);
-        const response = await fetch("/api/admin/magnets");
+        const response = await fetch("/api/admin/magnets", {
+          headers: getAuthHeaders(),
+        });
         const data = await response.json();
         setMagnets(data.magnets || []);
       } catch (error) {
@@ -108,7 +126,9 @@ export default function AdminMagnetsPage() {
   const fetchMagnets = async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/admin/magnets");
+      const response = await fetch("/api/admin/magnets", {
+        headers: getAuthHeaders(),
+      });
       const data = await response.json();
       setMagnets(data.magnets || []);
     } catch (error) {
@@ -150,7 +170,7 @@ export default function AdminMagnetsPage() {
     try {
       const response = await fetch("/api/admin/magnets", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(newMagnet),
       });
 
@@ -187,7 +207,7 @@ export default function AdminMagnetsPage() {
       setImporting(true);
       const response = await fetch("/api/admin/magnets/bulk-import", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ format: "csv", data: csvData }),
       });
 
@@ -213,7 +233,7 @@ export default function AdminMagnetsPage() {
     try {
       const response = await fetch("/api/admin/magnets/validate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ id }),
       });
 
@@ -238,6 +258,7 @@ export default function AdminMagnetsPage() {
         try {
           const response = await fetch(`/api/admin/magnets?id=${id}`, {
             method: "DELETE",
+            headers: getAuthHeaders(),
           });
 
           const data = await response.json();
@@ -283,12 +304,12 @@ export default function AdminMagnetsPage() {
       headers.join(","),
       ...magnets.map((m) =>
         [
-          m.animeId,
-          `"${m.animeTitle}"`,
-          m.episode,
-          `"${m.magnet}"`,
-          m.quality,
-          m.notes ? `"${m.notes}"` : "",
+          csvSafeCell(String(m.animeId)),
+          csvSafeCell(m.animeTitle),
+          csvSafeCell(String(m.episode)),
+          csvSafeCell(m.magnet),
+          csvSafeCell(m.quality),
+          csvSafeCell(m.notes || ""),
         ].join(",")
       ),
     ].join("\n");
@@ -299,6 +320,8 @@ export default function AdminMagnetsPage() {
     a.href = url;
     a.download = `magnets-export-${Date.now()}.csv`;
     a.click();
+    // Revoke after a short delay to allow download to start
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   return (
@@ -709,8 +732,10 @@ export default function AdminMagnetsPage() {
                 Cancel
               </button>
               <button
-                onClick={() => {
-                  confirmDialog.onConfirm();
+                onClick={async () => {
+                  if (confirmDialog.onConfirm) {
+                    await confirmDialog.onConfirm();
+                  }
                   setConfirmDialog(null);
                 }}
                 className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
