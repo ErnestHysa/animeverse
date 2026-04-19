@@ -17,6 +17,11 @@ import { anilist } from "@/lib/anilist";
 import logger from "@/lib/logger";
 import { loadStream, cancelStreamAttempt, type StreamingMethod, type StreamSource, type VideoQuality } from "@/lib/hybrid-stream-manager";
 
+// Static style constants to avoid recreating objects on every render
+const ANIMATION_DELAY_0 = { animationDelay: "0ms" };
+const ANIMATION_DELAY_150 = { animationDelay: "150ms" };
+const ANIMATION_DELAY_300 = { animationDelay: "300ms" };
+
 interface VideoSourceLoaderProps {
   animeId: number;
   episodeNumber: number;
@@ -520,9 +525,9 @@ export function VideoSourceLoader({
           </p>
           {/* Animated dots */}
           <div className="flex gap-1 justify-center mt-3">
-            <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-            <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-            <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={ANIMATION_DELAY_0} />
+            <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={ANIMATION_DELAY_150} />
+            <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={ANIMATION_DELAY_300} />
           </div>
           {/* Progress indicator */}
           {!isRetrying && (

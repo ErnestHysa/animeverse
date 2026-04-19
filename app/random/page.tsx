@@ -25,7 +25,9 @@ import type { Media } from "@/types/anilist";
 // ===================================
 
 async function getRandomAnime(): Promise<Media | null> {
-  const result = await anilist.getTrending(1, 50);
+  // Use a random page (1-5) to reduce selection bias beyond just top trending
+  const randomPage = Math.floor(Math.random() * 5) + 1;
+  const result = await anilist.getTrending(randomPage, 50);
   const anime = result.data?.Page.media ?? [];
 
   if (anime.length === 0) {
@@ -241,7 +243,7 @@ export default function RandomPage() {
                     {randomAnime.genres.slice(0, 6).map((genre) => (
                       <Link
                         key={genre}
-                        href={`/search?genre=${genre}`}
+                        href={`/search?genre=${encodeURIComponent(genre)}`}
                         className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded-full text-sm transition-colors"
                       >
                         {genre}

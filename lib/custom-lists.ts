@@ -49,10 +49,11 @@ export const useCustomLists = create<CustomListsState>()(
       },
 
       updateList: (id, updates) => {
+        const { id: _id, createdAt: _ct, ...safeUpdates } = updates;
         set((state) => ({
           lists: state.lists.map((list) =>
             list.id === id
-              ? { ...list, ...updates, updatedAt: Date.now() }
+              ? { ...list, ...safeUpdates, updatedAt: Date.now() }
               : list
           ),
         }));

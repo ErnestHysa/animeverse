@@ -43,6 +43,14 @@ export function ReportDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+
+  // Clean up timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
 
   // Fix H2: Focus first interactive element when dialog opens
   useEffect(() => {
@@ -101,7 +109,7 @@ export function ReportDialog({
       toast.success("Report submitted. Thank you!");
 
       // Reset after 2 seconds
-      setTimeout(() => {
+      timeoutRef.current = setTimeout(() => {
         handleClose();
       }, 2000);
     } catch (error) {

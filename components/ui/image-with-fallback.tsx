@@ -61,7 +61,7 @@ export function ImageWithFallback({
     return (
       <div
         className={`flex items-center justify-center bg-muted ${fallbackClassName || className}`}
-        style={fill ? undefined : { width, height }}
+        style={!fill && (width || height) ? { ...(width ? { width } : {}), ...(height ? { height } : {}) } : undefined}
       >
         <ImageIcon className="w-8 h-8 text-muted-foreground/30" />
       </div>
@@ -97,7 +97,7 @@ export function ImageWithFallback({
   }
 
   return (
-    <div className="relative" style={{ width, height }}>
+    <div className="relative" style={(width || height) ? { ...(width ? { width } : {}), ...(height ? { height } : {}) } : undefined}>
       {!imageLoaded && (
         <div className={`absolute inset-0 bg-muted animate-shimmer ${placeholderClassName}`} />
       )}

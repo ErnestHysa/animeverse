@@ -122,10 +122,11 @@ async function getGenreData() {
 
   // Helper to add timeout to individual requests
   const fetchWithTimeout = <T,>(promise: Promise<T>, timeout = 5000): Promise<T> => {
+    let timer: ReturnType<typeof setTimeout>;
     return Promise.race([
-      promise,
+      promise.finally(() => clearTimeout(timer)),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Request timeout')), timeout)
+        timer = setTimeout(() => reject(new Error('Request timeout')), timeout)
       ),
     ]);
   };

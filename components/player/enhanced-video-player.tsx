@@ -43,6 +43,11 @@ let HlsConstructor: typeof import('hls.js').default | null = null;
 type HlsType = typeof import('hls.js').default;
 import { type HlsConfig } from "hls.js";
 
+// Static style constants to avoid recreating objects on every render
+const ANIMATION_DELAY_0 = { animationDelay: "0ms" };
+const ANIMATION_DELAY_150 = { animationDelay: "150ms" };
+const ANIMATION_DELAY_300 = { animationDelay: "300ms" };
+
 // Dynamic import for watch party controls to reduce initial bundle
 const WatchPartyControls = dynamic(
   () => import("@/components/player/watch-party").then(mod => ({ default: mod.WatchPartyControls })),
@@ -2554,9 +2559,9 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
               </p>
               {/* Animated dots */}
               <div className="flex gap-1">
-                <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={ANIMATION_DELAY_0} />
+                <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={ANIMATION_DELAY_150} />
+                <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={ANIMATION_DELAY_300} />
               </div>
             </div>
           )}

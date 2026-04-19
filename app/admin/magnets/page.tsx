@@ -31,6 +31,14 @@ import { createScopedLogger } from "@/lib/logger";
 
 const logger = createScopedLogger('admin-magnets');
 
+async function safeJson<T>(res: Response): Promise<T> {
+  try {
+    return await res.json();
+  } catch {
+    throw new Error('Invalid JSON response');
+  }
+}
+
 function getAuthHeaders(): Record<string, string> {
   const token = typeof window !== 'undefined' ? localStorage.getItem('admin_token') : null;
   return {
@@ -109,7 +117,7 @@ export default function AdminMagnetsPage() {
         const response = await fetch("/api/admin/magnets", {
           headers: getAuthHeaders(),
         });
-        const data = await response.json();
+        const data = await safeJson<any>(response);
         setMagnets(data.magnets || []);
       } catch (error) {
         logger.error("Error fetching magnets:", error);
@@ -131,7 +139,7 @@ export default function AdminMagnetsPage() {
       const response = await fetch("/api/admin/magnets", {
         headers: getAuthHeaders(),
       });
-      const data = await response.json();
+      const data = await safeJson<any>(response);
       setMagnets(data.magnets || []);
     } catch (error) {
       logger.error("Error fetching magnets:", error);
@@ -176,7 +184,7 @@ export default function AdminMagnetsPage() {
         body: JSON.stringify(newMagnet),
       });
 
-      const data = await response.json();
+      const data = await safeJson<any>(response);
 
       if (response.ok) {
         toast.success(data.message);
@@ -213,7 +221,7 @@ export default function AdminMagnetsPage() {
         body: JSON.stringify({ format: "csv", data: csvData }),
       });
 
-      const data = await response.json();
+      const data = await safeJson<any>(response);
 
       if (response.ok) {
         toast.success(data.message);
@@ -239,7 +247,7 @@ export default function AdminMagnetsPage() {
         body: JSON.stringify({ id }),
       });
 
-      const data = await response.json();
+      const data = await safeJson<any>(response);
 
       if (response.ok) {
         toast.success(data.message);
@@ -263,7 +271,7 @@ export default function AdminMagnetsPage() {
             headers: getAuthHeaders(),
           });
 
-          const data = await response.json();
+          const data = await safeJson<any>(response);
 
           if (response.ok) {
             toast.success(data.message);

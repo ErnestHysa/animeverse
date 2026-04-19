@@ -253,7 +253,7 @@ export async function loadSubtitlesFromTorrent(
  * - Try strict UTF-8 validation
  * - Fall back to Shift-JIS detection or windows-1252
  */
-function detectEncoding(buffer: Buffer): string {
+function detectEncoding(buffer: Uint8Array): string {
   // Check BOM (Byte Order Mark)
   if (buffer.length >= 3 && buffer[0] === 0xEF && buffer[1] === 0xBB && buffer[2] === 0xBF) return 'utf-8';
   if (buffer.length >= 2 && buffer[0] === 0xFF && buffer[1] === 0xFE) return 'utf-16le';
@@ -308,7 +308,7 @@ export async function loadSubtitleFile(file: any): Promise<string | null> {
     });
 
     // Convert to text using encoding detection
-    const buffer = Buffer.from(arrayBuffer);
+    const buffer = new Uint8Array(arrayBuffer);
     const encoding = detectEncoding(buffer);
     const decoder = new TextDecoder(encoding);
     let content = decoder.decode(buffer);

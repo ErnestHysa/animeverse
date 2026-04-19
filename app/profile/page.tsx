@@ -364,7 +364,7 @@ export default function ProfilePage() {
                         <div key={item.genre}>
                           <div className="flex items-center justify-between mb-1">
                             <Link
-                              href={`/genre/${item.genre.toLowerCase()}`}
+                              href={`/genre/${encodeURIComponent(item.genre.toLowerCase())}`}
                               className="text-sm font-medium hover:text-primary transition-colors"
                             >
                               {item.genre}

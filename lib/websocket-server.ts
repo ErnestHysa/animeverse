@@ -9,6 +9,7 @@ import { Server as HTTPServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import crypto from 'crypto';
 import { verifyToken } from '@/lib/auth';
+import { sanitizeDescription } from '@/lib/html-sanitizer';
 
 // ===================================
 // Types
@@ -443,7 +444,7 @@ class WatchPartyRoomManager {
       roomId,
       userId: viewer.id,
       username: viewer.username,
-      message: data.message.replace(/<[^>]*>/g, ''),
+      message: sanitizeDescription(data.message),
       timestamp: Date.now(),
       type: 'text',
     };

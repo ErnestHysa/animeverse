@@ -89,9 +89,9 @@ export default function StatsPage() {
   const [currentTimestamp] = useState(() => Date.now());
 
   // Compute stable dependency keys to avoid re-computation on unrelated state changes (M12)
-  const watchHistoryKey = watchHistory.map((h) => `${h.mediaId}:${h.episodeNumber}:${h.completed}:${h.timestamp}`).join('|');
+  const watchHistoryKey = useMemo(() => watchHistory.map((h) => `${h.mediaId}:${h.episodeNumber}:${h.completed}:${h.timestamp}`).join('|'), [watchHistory]);
   const favoritesKey = favorites.length;
-  const mediaCacheKey = Object.keys(mediaCache).sort().join(',');
+  const mediaCacheKey = useMemo(() => Object.keys(mediaCache).sort().join(','), [mediaCache]);
 
   // Calculate comprehensive statistics
   const stats = useMemo(() => {
@@ -105,8 +105,11 @@ export default function StatsPage() {
     }, 0);
 
     // Calculate completion rate
+    const completedUnique = new Set(
+      watchHistory.filter(h => h.completed).map(h => h.mediaId)
+    ).size;
     const completionRate = uniqueAnime.size > 0
-      ? Math.round((completedAnime / uniqueAnime.size) * 100)
+      ? Math.min(100, Math.round((completedUnique / uniqueAnime.size) * 100))
       : 0;
 
     // Calculate average episodes per anime
@@ -162,7 +165,7 @@ export default function StatsPage() {
     for (let i = 6; i >= 0; i--) {
       const date = new Date(now - i * 86400000);
       const dateStr = date.toISOString().slice(0, 10);
-      const dayLabel = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][date.getUTCDay()];
+      const dayLabel = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][date.getDay()];
       dailyActivity[dayLabel] = 0;
     }
 
@@ -170,7 +173,7 @@ export default function StatsPage() {
       const watchDate = new Date(item.timestamp);
       const daysDiff = Math.floor((now - item.timestamp) / 86400000);
       if (daysDiff < 7) {
-        const dayLabel = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][watchDate.getUTCDay()];
+        const dayLabel = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][watchDate.getDay()];
         if (dailyActivity.hasOwnProperty(dayLabel)) {
           dailyActivity[dayLabel]++;
         }

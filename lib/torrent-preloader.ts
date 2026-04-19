@@ -71,6 +71,8 @@ class TorrentPreloaderImpl {
   private static instance: TorrentPreloaderImpl;
   private progressCallbacks: Map<string, (progress: PreloadProgress) => void> = new Map();
   private cleanupInterval: ReturnType<typeof setInterval> | null = null;
+  private initPromise: Promise<void> | null = null;
+  private pinnedTorrents = new Set<string>();
 
   private constructor(config: Partial<PreloadConfig> = {}) {
     this.config = {
@@ -158,20 +160,31 @@ class TorrentPreloaderImpl {
       return;
     }
 
-    try {
-      // Dynamic import of WebTorrent (browser-side)
-      const WebTorrent = (await import("webtorrent")).default;
-      this.webTorrentClient = new WebTorrent({
-        dht: true,
-        tracker: true,
-        webSeeds: true,
-      });
-
-      console.log("[TorrentPreloader] WebTorrent client initialized");
-    } catch (error) {
-      console.error("[TorrentPreloader] Failed to initialize WebTorrent:", error);
-      throw new Error("WebTorrent library not available. Please ensure webtorrent is installed.");
+    if (this.initPromise) {
+      await this.initPromise;
+      return;
     }
+
+    this.initPromise = (async () => {
+      if (this.webTorrentClient) return;
+
+      try {
+        // Dynamic import of WebTorrent (browser-side)
+        const WebTorrent = (await import("webtorrent")).default;
+        this.webTorrentClient = new WebTorrent({
+          dht: true,
+          tracker: true,
+          webSeeds: true,
+        });
+
+        console.log("[TorrentPreloader] WebTorrent client initialized");
+      } catch (error) {
+        this.initPromise = null; // Allow retry on failure
+        console.error("[TorrentPreloader] Failed to initialize WebTorrent:", error);
+        throw new Error("WebTorrent library not available. Please ensure webtorrent is installed.");
+      }
+    })();
+    await this.initPromise;
   }
 
   /**
@@ -461,6 +474,7 @@ class TorrentPreloaderImpl {
       ) {
         const torrent = this.activeTorrents.get(taskId);
         if (torrent) {
+          this.pinnedTorrents.add(taskId);
           console.log("[TorrentPreloader] Using preloaded torrent for episode", episodeNumber);
           return torrent;
         }
@@ -470,12 +484,22 @@ class TorrentPreloaderImpl {
   }
 
   /**
+   * Release a previously pinned preloaded torrent so it can be cleaned up
+   */
+  releasePreloadedTorrent(animeId: number, episodeNumber: number): void {
+    const taskId = this.findTask(animeId, episodeNumber);
+    if (taskId) {
+      this.pinnedTorrents.delete(taskId);
+    }
+  }
+
+  /**
    * Find task by anime and episode
    */
   private findTask(animeId: number, episodeNumber: number): string | null {
     for (const [taskId, task] of this.tasks.entries()) {
       if (task.animeId === animeId && task.episodeNumber === episodeNumber) {
-        if (task.status === 'pending' || task.status === 'downloading') {
+        if (task.status === 'pending' || task.status === 'downloading' || task.status === 'completed') {
           return taskId;
         }
       }
@@ -531,6 +555,9 @@ class TorrentPreloaderImpl {
         task.status === "error" ||
         task.status === "cancelled"
       ) {
+        // Skip pinned torrents that are actively being used
+        if (this.pinnedTorrents.has(taskId)) continue;
+
         const completedAt = task.completedAt ?? task.startedAt;
         if (now - completedAt > this.config.cleanupAfter) {
           toDelete.push(taskId);

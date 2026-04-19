@@ -222,7 +222,13 @@ export async function fetchSkipTimes(
       return { found: false, results: [], message: null };
     }
 
-    return await response.json();
+    let result;
+    try {
+      result = await response.json();
+    } catch {
+      return { found: false, results: [], message: null };
+    }
+    return result;
   } catch (error) {
     // Silently handle network errors and timeouts
     return { found: false, results: [], message: null };

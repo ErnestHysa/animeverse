@@ -40,7 +40,11 @@ export function setRating(animeId: number, score: number, review?: string): Anim
   };
   ratings[animeId] = rating;
   if (typeof window !== "undefined") {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(ratings));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(ratings));
+    } catch {
+      // Storage unavailable or quota exceeded
+    }
   }
   return rating;
 }
@@ -49,7 +53,11 @@ export function removeRating(animeId: number): void {
   const ratings = getRatings();
   delete ratings[animeId];
   if (typeof window !== "undefined") {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(ratings));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(ratings));
+    } catch {
+      // Storage unavailable or quota exceeded
+    }
   }
 }
 

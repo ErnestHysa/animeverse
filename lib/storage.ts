@@ -118,7 +118,10 @@ export function getCookie(name: string): string | null {
   const encodedName = encodeURIComponent(name);
   const pairs = document.cookie.split(';');
   for (const pair of pairs) {
-    const [key, value] = pair.trim().split('=');
+    const eqIndex = pair.trim().indexOf('=');
+    if (eqIndex === -1) continue;
+    const key = pair.trim().substring(0, eqIndex);
+    const value = pair.trim().substring(eqIndex + 1);
     if (key === encodedName || key === name) {
       return decodeURIComponent(value || '');
     }

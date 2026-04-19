@@ -303,41 +303,47 @@ export async function authenticateUser(
   const { username, password } = credentials;
 
   // Fix H9: Dummy hash ensures bcrypt.compare always runs, even when user doesn't exist
-  const DUMMY_HASH = '$2b$12$abcdefghijklmnopqrstuvwxymnoABCDEFGHIJ1234567890abcdefghijklm';
+  // Valid bcrypt hash format: $2b$12$ + 22-char salt + 31-char hash (53 chars after prefix)
+  const DUMMY_HASH = '$2b$12$LJ3m4ys3Lk0TSwMCfVSLnOXCX4wOvqFPjqpnpWBBkJzMjX9qN3DIm';
 
-  // Get user (may be undefined)
-  const userRecord = getUserByUsername(username);
-  const hashToCompare = userRecord ? userRecord.passwordHash : DUMMY_HASH;
+  try {
+    // Get user (may be undefined)
+    const userRecord = getUserByUsername(username);
+    const hashToCompare = userRecord ? userRecord.passwordHash : DUMMY_HASH;
 
-  // Always compare — takes ~100ms regardless of whether user exists
-  const passwordValid = await bcrypt.compare(password, hashToCompare);
+    // Always compare — takes ~100ms regardless of whether user exists
+    const passwordValid = await bcrypt.compare(password, hashToCompare);
 
-  if (!userRecord || !passwordValid) {
-    return { success: false, error: 'Invalid username or password' };
+    if (!userRecord || !passwordValid) {
+      return { success: false, error: 'Invalid username or password' };
+    }
+
+    // Update last login
+    userRecord.lastLogin = Date.now();
+
+    // Generate tokens
+    const user: AdminUser = {
+      id: userRecord.id,
+      username: userRecord.username,
+      email: userRecord.email,
+      role: userRecord.role,
+      createdAt: userRecord.createdAt,
+      lastLogin: userRecord.lastLogin,
+    };
+
+    const accessToken = generateAccessToken(user);
+
+    return {
+      success: true,
+      user,
+      tokens: {
+        access: accessToken,
+      },
+    };
+  } catch (error) {
+    console.error('Authentication error:', error);
+    return null as any;
   }
-
-  // Update last login
-  userRecord.lastLogin = Date.now();
-
-  // Generate tokens
-  const user: AdminUser = {
-    id: userRecord.id,
-    username: userRecord.username,
-    email: userRecord.email,
-    role: userRecord.role,
-    createdAt: userRecord.createdAt,
-    lastLogin: userRecord.lastLogin,
-  };
-
-  const accessToken = generateAccessToken(user);
-
-  return {
-    success: true,
-    user,
-    tokens: {
-      access: accessToken,
-    },
-  };
 }
 
 // ===================================

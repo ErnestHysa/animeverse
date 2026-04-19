@@ -49,14 +49,12 @@ export async function GET(
     }, SERVER_TIMEOUT);
 
     // Fetch video sources using robust implementation
-    const result = await Promise.race([
-      getEpisodeSources(animeIdNum, episodeNumber, { title, malId, language }),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Server timeout')), SERVER_TIMEOUT)
-      ),
-    ]);
-
-    clearTimeout(timeoutId);
+    let result;
+    try {
+      result = await getEpisodeSources(animeIdNum, episodeNumber, { title, malId, language });
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     const elapsed = Date.now() - startTime;
 

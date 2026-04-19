@@ -125,7 +125,15 @@ class AniListClient {
       // Push timestamp only after successful response to avoid wasting quota on failures
       this.rateLimiter.calls.push(Date.now());
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch {
+        return {
+          data: null,
+          error: { message: 'Invalid JSON response', status: response.status },
+        };
+      }
 
       if (!response.ok) {
         return {
@@ -317,7 +325,15 @@ class AniListClient {
         },
         body: JSON.stringify({ query: mutation, variables: { mediaId, progress, status } }),
       });
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch {
+        return {
+          data: null,
+          error: { message: 'Invalid JSON response' },
+        };
+      }
       if (!response.ok || data.errors) {
         return {
           data: null,

@@ -415,19 +415,30 @@ export function WatchPartyControls({
   const handleCopyRoomId = async () => {
     if (state.roomId) {
       try {
-        await navigator.clipboard.writeText(state.roomId);
+        if (typeof navigator !== 'undefined' && navigator.clipboard) {
+          await navigator.clipboard.writeText(state.roomId);
+        }
         setCopied(true);
         toast.success("Room ID copied!");
       } catch {
-        // Fallback: create a temporary textarea (Fix M8)
-        const textarea = document.createElement('textarea');
-        textarea.value = state.roomId;
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-        setCopied(true);
-        toast.success("Room ID copied!");
+        // Fallback: create a temporary textarea for clipboard copy
+        // Note: document.execCommand('copy') is deprecated but remains necessary
+        // as a fallback when the Clipboard API is unavailable (e.g. non-HTTPS contexts)
+        try {
+          const textarea = document.createElement('textarea');
+          textarea.value = state.roomId;
+          textarea.setAttribute('readonly', '');
+          textarea.style.position = 'fixed';
+          textarea.style.left = '-9999px';
+          document.body.appendChild(textarea);
+          textarea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textarea);
+          setCopied(true);
+          toast.success("Room ID copied!");
+        } catch (fallbackErr) {
+          toast.error("Failed to copy room ID");
+        }
       }
       if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
       copiedTimerRef.current = setTimeout(() => setCopied(false), 2000);

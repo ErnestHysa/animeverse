@@ -64,7 +64,9 @@ export function ShareDialog({ isOpen, onClose, title, url, episode }: ShareDialo
   const handleShare = async (platform: typeof PLATFORMS[0]) => {
     if (platform.id === "copy") {
       try {
-        await navigator.clipboard.writeText(shareUrl);
+        if (typeof navigator !== 'undefined' && navigator.clipboard) {
+          await navigator.clipboard.writeText(shareUrl);
+        }
         setCopied(true);
         toast.success("Link copied to clipboard!");
         setTimeout(() => setCopied(false), 2000);

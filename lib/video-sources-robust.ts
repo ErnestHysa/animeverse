@@ -4,6 +4,14 @@
  * Production-ready with proper error handling and logging
  */
 
+async function safeJson<T>(res: Response): Promise<T> {
+  try {
+    return await res.json();
+  } catch {
+    throw new Error('Invalid JSON response');
+  }
+}
+
 export interface VideoSource {
   url: string;
   quality: "360p" | "480p" | "720p" | "1080p" | "auto";
@@ -146,7 +154,7 @@ async function fetchWithTimeout(
       signal: controller.signal,
       headers: {
         'Accept': 'application/json',
-        'User-Agent': CONFIG.userAgent,
+        ...(typeof window === 'undefined' ? { 'User-Agent': CONFIG.userAgent } : {}),
         ...options.headers,
       },
     });
@@ -210,7 +218,7 @@ async function fetchFromAnify(
       return null;
     }
 
-    const searchData = await searchResponse.json();
+    const searchData = await safeJson<any>(searchResponse);
 
     if (!searchData || searchData.length === 0) {
       return null;
@@ -227,7 +235,7 @@ async function fetchFromAnify(
       return null;
     }
 
-    const sourcesData = await sourcesResponse.json();
+    const sourcesData = await safeJson<any>(sourcesResponse);
 
     if (!sourcesData || !sourcesData.sources || sourcesData.sources.length === 0) {
       return null;
@@ -282,7 +290,7 @@ async function fetchFromConsumet(
       return null;
     }
 
-    const searchData = await searchResponse.json();
+    const searchData = await safeJson<any>(searchResponse);
 
     if (!searchData || !searchData.results || searchData.results.length === 0) {
       return null;
@@ -300,7 +308,7 @@ async function fetchFromConsumet(
       return null;
     }
 
-    const sourcesData = await sourcesResponse.json();
+    const sourcesData = await safeJson<any>(sourcesResponse);
 
     if (!sourcesData || !sourcesData.sources || sourcesData.sources.length === 0) {
       return null;
@@ -518,7 +526,7 @@ async function fetchFromAnilistMapping(
       return null;
     }
 
-    const data = await response.json();
+    const data = await safeJson<any>(response);
     const media = data?.data?.Media;
 
     if (!media) {
@@ -685,7 +693,7 @@ export async function searchAnime(query: string): Promise<Array<{
       return [];
     }
 
-    const data = await response.json();
+    const data = await safeJson<any>(response);
     const media = data?.data?.Page?.media || [];
 
     return media.map((m: any) => ({

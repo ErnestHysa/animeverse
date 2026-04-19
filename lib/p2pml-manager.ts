@@ -12,7 +12,6 @@
  * - Works alongside WebTorrent
  */
 
-import Hls from "hls.js";
 import { createScopedLogger } from '@/lib/logger';
 const logger = createScopedLogger('P2PMLManager');
 
@@ -26,7 +25,7 @@ const logger = createScopedLogger('P2PMLManager');
  */
 interface P2PMLEngine {
   on(event: string, handler: (...args: unknown[]) => void): void;
-  attach(hlsInstance: Hls): void;
+  attach(hlsInstance: unknown): void;
   getStats(): { downloadSpeed?: number; uploadSpeed?: number } | null;
   getPeers(): Array<{ id: string; downloadSpeed: number; uploadSpeed: number }> | null;
   destroy(): void;
@@ -69,7 +68,7 @@ export interface P2PMLStats {
 }
 
 export interface P2PMLManager {
-  initialize(hlsInstance: Hls, config: P2PMLConfig): Promise<void>;
+  initialize(hlsInstance: unknown, config: P2PMLConfig): Promise<void>;
   destroy(): void;
   getStats(): P2PMLStats;
   isEnabled(): boolean;
@@ -101,7 +100,7 @@ const DEFAULT_CONFIG: Partial<P2PMLConfig> = {
 // ===================================
 
 class P2PMLManagerImpl implements P2PMLManager {
-  private hls: Hls | null = null;
+  private hls: unknown | null = null;
   private p2pml: P2PMLEngine | null = null;
   private config: P2PMLConfig = DEFAULT_CONFIG as P2PMLConfig;
   private initialized = false;
@@ -118,7 +117,7 @@ class P2PMLManagerImpl implements P2PMLManager {
   /**
    * Initialize P2PML with hls.js instance
    */
-  async initialize(hlsInstance: Hls, config: P2PMLConfig): Promise<void> {
+  async initialize(hlsInstance: unknown, config: P2PMLConfig): Promise<void> {
     if (this.initialized) {
       console.warn("[P2PMLManager] Already initialized");
       return;
@@ -137,7 +136,8 @@ class P2PMLManagerImpl implements P2PMLManager {
     }
 
     try {
-      // Dynamically import P2PML modules
+      // Dynamically import Hls.js and P2PML modules
+      const Hls = (await import("hls.js")).default;
       const p2pmlCore = await import("p2p-media-loader-core");
       const p2pmlHls = await import("p2p-media-loader-hlsjs");
 
@@ -322,7 +322,7 @@ export const p2pmlManager = new P2PMLManagerImpl();
 // Export convenience functions
 // ===================================
 
-export async function initializeP2PML(hlsInstance: Hls, config: P2PMLConfig): Promise<void> {
+export async function initializeP2PML(hlsInstance: unknown, config: P2PMLConfig): Promise<void> {
   return p2pmlManager.initialize(hlsInstance, config);
 }
 

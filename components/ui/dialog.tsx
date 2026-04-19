@@ -68,7 +68,20 @@ export function Dialog({
     if (e.key === 'Escape') { onClose(); return; }
     if (e.key !== 'Tab') return;
 
-    const focusable = dialogRef.current?.querySelectorAll(
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    // If focus has escaped the dialog, bring it back
+    if (!dialog.contains(document.activeElement)) {
+      e.preventDefault();
+      const firstFocusable = dialog.querySelector(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      ) as HTMLElement;
+      firstFocusable?.focus();
+      return;
+    }
+
+    const focusable = dialog.querySelectorAll(
       'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
     );
     if (!focusable?.length) return;

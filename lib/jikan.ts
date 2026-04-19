@@ -250,7 +250,14 @@ async function fetchFromJikan<T>(endpoint: string, timeout = 10000): Promise<T |
       return null;
     }
 
-    return await response.json();
+    let result;
+    try {
+      result = await response.json();
+    } catch {
+      console.warn(`[Jikan] Invalid JSON response for ${endpoint}`);
+      return null;
+    }
+    return result;
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
       console.warn(`[Jikan] Timeout for ${endpoint}`);

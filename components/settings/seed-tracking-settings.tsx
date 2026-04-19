@@ -35,48 +35,48 @@ export function SeedTrackingSettings() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const loadSeedData = async () => {
+      try {
+        // Load from localStorage
+        const stored = localStorage.getItem("seedSessions");
+        const sessions = stored ? JSON.parse(stored) : [];
+
+        // Calculate stats
+        const totalUploaded = sessions.reduce((sum: number, s: any) => sum + (s.uploaded || 0), 0);
+        const totalDownloaded = sessions.reduce((sum: number, s: any) => sum + (s.downloaded || 0), 0);
+        const totalSeededTime = sessions.reduce((sum: number, s: any) => sum + (s.duration || 0), 0);
+        const totalPeersHelped = sessions.reduce((sum: number, s: any) => sum + (s.peers || 0), 0);
+
+        const averageSeedRatio =
+          sessions.length > 0 && totalDownloaded > 0
+            ? totalUploaded / totalDownloaded
+            : 0;
+
+        const newStats = {
+          totalSessions: sessions.length,
+          totalUploaded,
+          totalDownloaded,
+          totalSeededTime,
+          averageSeedRatio,
+          totalPeersHelped,
+          achievements: [],
+        };
+
+        // Check achievements
+        const newAchievements = checkSeedAchievements(newStats);
+
+        setSeedSessions(sessions);
+        setStats(newStats);
+        setAchievements(newAchievements);
+      } catch (error) {
+        console.error("Error loading seed data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     loadSeedData();
   }, []);
-
-  const loadSeedData = async () => {
-    try {
-      // Load from localStorage
-      const stored = localStorage.getItem("seedSessions");
-      const sessions = stored ? JSON.parse(stored) : [];
-
-      // Calculate stats
-      const totalUploaded = sessions.reduce((sum: number, s: any) => sum + (s.uploaded || 0), 0);
-      const totalDownloaded = sessions.reduce((sum: number, s: any) => sum + (s.downloaded || 0), 0);
-      const totalSeededTime = sessions.reduce((sum: number, s: any) => sum + (s.duration || 0), 0);
-      const totalPeersHelped = sessions.reduce((sum: number, s: any) => sum + (s.peers || 0), 0);
-
-      const averageSeedRatio =
-        sessions.length > 0 && totalDownloaded > 0
-          ? totalUploaded / totalDownloaded
-          : 0;
-
-      const newStats = {
-        totalSessions: sessions.length,
-        totalUploaded,
-        totalDownloaded,
-        totalSeededTime,
-        averageSeedRatio,
-        totalPeersHelped,
-        achievements: [],
-      };
-
-      // Check achievements
-      const newAchievements = checkSeedAchievements(newStats);
-
-      setSeedSessions(sessions);
-      setStats(newStats);
-      setAchievements(newAchievements);
-    } catch (error) {
-      console.error("Error loading seed data:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   if (loading) {
     return (

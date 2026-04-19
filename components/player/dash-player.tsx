@@ -80,6 +80,12 @@ export const DASHPlayer = React.forwardRef<DASHPlayerRef, DASHPlayerProps>(
     const eventHandlersRef = useRef<Array<{ event: string; handler: (e: any) => void }>>([]);
     const initGenerationRef = useRef(0);
 
+    // Use refs for callbacks to avoid re-init loop from dep array changes
+    const onErrorRef = useRef(onError);
+    onErrorRef.current = onError;
+    const onQualityChangeRef = useRef(onQualityChange);
+    onQualityChangeRef.current = onQualityChange;
+
     /**
      * Initialize DASH player
      */
@@ -155,7 +161,7 @@ export const DASHPlayer = React.forwardRef<DASHPlayerRef, DASHPlayerProps>(
               label: `${e.newQuality.height}p`,
             };
             setCurrentQuality(newQuality);
-            onQualityChange?.(newQuality);
+            onQualityChangeRef.current?.(newQuality);
           }
         };
         const bufferLoadedHandler = () => {
@@ -167,7 +173,7 @@ export const DASHPlayer = React.forwardRef<DASHPlayerRef, DASHPlayerProps>(
           const errorMsg = `DASH error: ${e.error || "Unknown error"}`;
           setError(errorMsg);
           setLoading(false);
-          onError?.(new Error(errorMsg));
+          onErrorRef.current?.(new Error(errorMsg));
           toast.error(errorMsg);
         };
 
@@ -218,10 +224,10 @@ export const DASHPlayer = React.forwardRef<DASHPlayerRef, DASHPlayerProps>(
         logger.error("Initialization failed:", error);
         setError(error.message);
         setLoading(false);
-        onError?.(error);
+        onErrorRef.current?.(error);
         toast.error(`Failed to load DASH stream: ${error.message}`);
       }
-    }, [manifestUrl, autoPlay, initialQuality, onError, onQualityChange]);
+    }, [manifestUrl, autoPlay, initialQuality]);
 
     /**
      * Get available qualities from DASH instance
@@ -428,10 +434,15 @@ DASHPlayer.displayName = "DASHPlayer";
 // Export utility functions
 // ===================================
 
+let _isDASHSupported: boolean | null = null;
+
 export function isDASHSupported(): boolean {
   if (typeof window === "undefined") return false;
+  if (_isDASHSupported !== null) return _isDASHSupported;
   const video = document.createElement("video");
-  return video.canPlayType("application/dash+xml") !== "";
+  _isDASHSupported = video.canPlayType("application/dash+xml") !== "";
+  video.remove();
+  return _isDASHSupported;
 }
 
 export function getDASHQualities(manifestUrl: string): Promise<DASHQuality[]> {

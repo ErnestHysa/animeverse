@@ -11,13 +11,9 @@ import { Footer } from "@/components/layout/footer";
 
 import { AnimeGrid } from "@/components/anime/anime-grid";
 
-import { AnimeGridSkeleton } from "@/components/ui/skeleton";
-
 import { anilist, getCurrentSeason, getCurrentYear } from "@/lib/anilist";
 
 import { Calendar } from "lucide-react";
-
-import { Suspense } from "react";
 
 // ===================================
 // Data Fetching
@@ -61,10 +57,8 @@ export default async function SeasonalPage() {
               </div>
             </div>
 
-            {/* Anime Grid */}
-            <Suspense fallback={<AnimeGridSkeleton count={24} />}>
-              <AnimeGrid anime={anime} priorityFirst />
-            </Suspense>
+            {/* Anime Grid — data is already awaited in this server component, no Suspense needed */}
+            <AnimeGrid anime={anime} priorityFirst />
           </div>
         </main>
         <Footer />

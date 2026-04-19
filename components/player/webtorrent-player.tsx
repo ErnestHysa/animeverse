@@ -19,6 +19,9 @@ import { Play, Pause, Download, Users, AlertCircle, CheckCircle } from "lucide-r
 // WebTorrent is only available in the browser
 declare const WebTorrent: any;
 
+// Static style constant to avoid recreating object on every render
+const HIDDEN_STYLE = { display: "none" };
+
 interface TorrentProgress {
   progress: number; // 0-1
   downloadSpeed: number; // bytes/s
@@ -54,6 +57,10 @@ export function WebTorrentPlayer({
   // Use ref for onError to avoid client recreation on every parent re-render
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
+
+  // Use ref for onReady to avoid infinite useEffect recreation
+  const onReadyRef = useRef(onReady);
+  onReadyRef.current = onReady;
 
   const [isClientReady, setIsClientReady] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -197,7 +204,7 @@ export function WebTorrentPlayer({
           videoElement.remove();
 
           setIsLoading(false);
-          onReady?.();
+          onReadyRef.current?.();
           toast.success("Torrent loaded successfully!");
         }
       });
@@ -257,7 +264,7 @@ export function WebTorrentPlayer({
         torrentRef.current.removeAllListeners();
       }
     };
-  }, [isClientReady, magnet, infoHash, onReady]);
+  }, [isClientReady, magnet, infoHash]);
 
   // Toggle play/pause
   const togglePlayPause = useCallback(() => {
@@ -300,7 +307,7 @@ export function WebTorrentPlayer({
   return (
     <div className={`webtorrent-player relative ${className}`}>
       {/* Hidden container for WebTorrent video injection */}
-      <div ref={containerRef} style={{ display: "none" }} />
+      <div ref={containerRef} style={HIDDEN_STYLE} />
 
       {/* Video Element */}
       <video
