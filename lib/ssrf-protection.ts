@@ -357,8 +357,13 @@ export async function isUrlAllowed(url: string, skipDns: boolean = false): Promi
  * Synchronous version for backwards compatibility with routes that
  * only need hostname-level checks (no DNS resolution).
  * Use the async isUrlAllowed() for full protection.
+ *
+ * @deprecated Use isUrlAllowed() instead. This synchronous version does NOT
+ * perform DNS resolution and can be bypassed via DNS rebinding attacks.
+ * @see isUrlAllowed
  */
 export function isUrlAllowedSync(url: string): boolean {
+  console.warn('[SSRF] isUrlAllowedSync() does not perform DNS resolution. Use isUrlAllowed() for production.');
   try {
     const parsed = new URL(url);
 

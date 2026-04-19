@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { useStore } from "@/store";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
@@ -17,16 +18,24 @@ export function MiniPlayer() {
   const watchHistory = useStore((s) => s.watchHistory);
   const pathname = usePathname();
 
+  // Memoize the O(n) history lookup so it doesn't run on every render
+  const historyItem = useMemo(
+    () =>
+      miniPlayer
+        ? watchHistory.find(
+            (h) =>
+              h.mediaId === miniPlayer.animeId &&
+              h.episodeNumber === miniPlayer.episode
+          )
+        : undefined,
+    [watchHistory, miniPlayer?.animeId, miniPlayer?.episode]
+  );
+
   // Hide on the watch page itself
   if (!miniPlayer) return null;
   if (pathname.startsWith(`/watch/${miniPlayer.animeId}`)) return null;
 
   const watchUrl = `/watch/${miniPlayer.animeId}/${miniPlayer.episode}`;
-
-  // Look up progress from watch history
-  const historyItem = watchHistory.find(
-    (h) => h.mediaId === miniPlayer.animeId && h.episodeNumber === miniPlayer.episode
-  );
   const progressPercent = historyItem
     ? Math.min(100, historyItem.completed
         ? 100

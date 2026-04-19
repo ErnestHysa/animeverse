@@ -79,7 +79,10 @@ export function KeyboardShortcutsModal({ isOpen, onClose }: ShortcutsModalProps)
 
     const handleKeyDown = (e: KeyboardEvent) => {
       // Highlight pressed key
-      setActiveShortcuts(new Set([e.key.toUpperCase()]));
+      let normalizedKey = e.key;
+      if (e.key === ' ') normalizedKey = 'Space';
+      if (e.key === 'Escape') normalizedKey = 'ESC';
+      setActiveShortcuts(new Set([normalizedKey.toUpperCase()]));
     };
 
     const handleKeyUp = () => {

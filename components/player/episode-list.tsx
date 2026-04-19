@@ -100,21 +100,25 @@ export function EpisodeList({
 
   // Build a map from episode number to title from streamingEpisodes data.
   // AniList titles are formatted as "Episode N - Title" or just "Episode N".
-  const streamingEpisodeTitleMap = new Map<number, string>();
-  if (streamingEpisodes) {
-    for (const ep of streamingEpisodes) {
-      if (!ep.title) continue;
-      // Try to parse "Episode N - Title" pattern
-      const match = ep.title.match(/^Episode\s+(\d+)(?:\s+-\s+(.+))?$/i);
-      if (match) {
-        const epNum = parseInt(match[1], 10);
-        const subtitle = match[2]?.trim();
-        if (!Number.isNaN(epNum) && subtitle) {
-          streamingEpisodeTitleMap.set(epNum, subtitle);
+  // H7: Memoized to avoid recreating Map on every render.
+  const streamingEpisodeTitleMap = useMemo(() => {
+    const map = new Map<number, string>();
+    if (streamingEpisodes) {
+      for (const ep of streamingEpisodes) {
+        if (!ep.title) continue;
+        // Try to parse "Episode N - Title" pattern
+        const match = ep.title.match(/^Episode\s+(\d+)(?:\s+-\s+(.+))?$/i);
+        if (match) {
+          const epNum = parseInt(match[1], 10);
+          const subtitle = match[2]?.trim();
+          if (!Number.isNaN(epNum) && subtitle) {
+            map.set(epNum, subtitle);
+          }
         }
       }
     }
-  }
+    return map;
+  }, [streamingEpisodes]);
 
   const handleJumpTo = (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,14 +129,16 @@ export function EpisodeList({
     }
   };
 
-  // Only generate episodes for the current visible window instead of the full array
-  const filteredEpisodes = useMemo(() => {
-    const maxEp = Math.min(visibleCount, totalEpisodes);
-    const episodes = Array.from({ length: maxEp }, (_, i) => i + 1);
+  // C1: Separate filtering from windowing. Build the FULL filtered list first,
+  // then slice for display so the "Show More" button renders correctly.
+  const allFilteredEpisodes = useMemo(() => {
+    const allEpisodes = Array.from({ length: totalEpisodes }, (_, i) => i + 1);
     return showOnlyUnwatched
-      ? episodes.filter((ep) => !episodeHistoryMap.get(ep)?.completed)
-      : episodes;
-  }, [visibleCount, totalEpisodes, showOnlyUnwatched, episodeHistoryMap]);
+      ? allEpisodes.filter((ep) => !episodeHistoryMap.get(ep)?.completed)
+      : allEpisodes;
+  }, [totalEpisodes, showOnlyUnwatched, episodeHistoryMap]);
+
+  const filteredEpisodes = allFilteredEpisodes.slice(0, visibleCount);
 
   const watchedCount = useMemo(
     () => Array.from(episodeHistoryMap.values()).filter((v) => v.completed).length,
@@ -289,13 +295,13 @@ export function EpisodeList({
         })}
 
         {/* Show More button for windowing */}
-        {filteredEpisodes.length > visibleCount && (
+        {allFilteredEpisodes.length > visibleCount && (
           <button
             onClick={loadMore}
             className="w-full py-2.5 rounded-lg text-sm text-muted-foreground hover:text-white hover:bg-white/5 transition-colors flex items-center justify-center gap-1.5"
           >
             <span>Show More</span>
-            <span className="text-xs">({Math.min(visibleCount + CHUNK_SIZE, filteredEpisodes.length) - visibleCount} of {filteredEpisodes.length - visibleCount} remaining)</span>
+            <span className="text-xs">({Math.min(visibleCount + CHUNK_SIZE, allFilteredEpisodes.length) - visibleCount} of {allFilteredEpisodes.length - visibleCount} remaining)</span>
             <ChevronDown className="w-4 h-4" />
           </button>
         )}

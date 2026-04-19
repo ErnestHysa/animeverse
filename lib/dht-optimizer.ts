@@ -197,9 +197,19 @@ class DHTOptimizerImpl {
       this.nodeCache.set(key, { ...node });
 
       // Cap nodeCache size to prevent unbounded growth (M7)
+      // Evict the node with the lowest success rate instead of FIFO
       if (this.nodeCache.size > 500) {
-        const firstKey = this.nodeCache.keys().next().value;
-        if (firstKey) this.nodeCache.delete(firstKey);
+        let worstKey: string | null = null;
+        let worstScore = Infinity;
+        for (const [k, n] of this.nodeCache) {
+          const total = n.successCount + n.failureCount;
+          const score = total > 0 ? n.successCount / total : 0;
+          if (score < worstScore) {
+            worstScore = score;
+            worstKey = k;
+          }
+        }
+        if (worstKey) this.nodeCache.delete(worstKey);
       }
     }
 
@@ -264,9 +274,19 @@ class DHTOptimizerImpl {
       });
 
       // Cap nodeCache size to prevent unbounded growth (M7)
+      // Evict the node with the lowest success rate instead of FIFO
       if (this.nodeCache.size > 500) {
-        const firstKey = this.nodeCache.keys().next().value;
-        if (firstKey) this.nodeCache.delete(firstKey);
+        let worstKey: string | null = null;
+        let worstScore = Infinity;
+        for (const [k, n] of this.nodeCache) {
+          const total = n.successCount + n.failureCount;
+          const score = total > 0 ? n.successCount / total : 0;
+          if (score < worstScore) {
+            worstScore = score;
+            worstKey = k;
+          }
+        }
+        if (worstKey) this.nodeCache.delete(worstKey);
       }
     }
 

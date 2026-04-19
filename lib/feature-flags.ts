@@ -275,8 +275,10 @@ class FeatureFlagManager {
       if (!flag.allowedUserIds) {
         flag.allowedUserIds = [];
       }
-      flag.allowedUserIds.push(userId);
-      logger.info(`User ${userId} added to ${featureKey}`);
+      if (!flag.allowedUserIds.includes(userId)) {
+        flag.allowedUserIds.push(userId);
+        logger.info(`User ${userId} added to ${featureKey}`);
+      }
     }
   }
 

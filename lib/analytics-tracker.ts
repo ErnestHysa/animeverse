@@ -34,6 +34,7 @@ class AnalyticsTracker {
   private flushTimer: NodeJS.Timeout | null = null;
   private isFlushing = false;
   private enabled = true; // Fix H1: enabled flag for opt-out support
+  private consecutiveFailures = 0;
 
   constructor() {
     this.sessionId = generateId();
@@ -61,6 +62,15 @@ class AnalyticsTracker {
     this.flushTimer = setInterval(() => {
       this.flush();
     }, this.flushInterval);
+  }
+
+  /**
+   * Schedule next flush with exponential backoff after failures
+   */
+  private scheduleNextFlush(): void {
+    if (this.consecutiveFailures <= 0) return;
+    const delay = Math.min(30000, 1000 * 2 ** this.consecutiveFailures);
+    setTimeout(() => this.flush(), delay);
   }
 
   /**
@@ -127,6 +137,7 @@ class AnalyticsTracker {
    */
   trackPlaybackError(params: {
     animeId: number;
+    animeTitle?: string;
     episode: number;
     error: string;
     source?: string;
@@ -137,6 +148,7 @@ class AnalyticsTracker {
       sessionId: this.sessionId,
       eventType: "playback_error",
       animeId: params.animeId,
+      animeTitle: params.animeTitle,
       episode: params.episode,
       error: params.error,
       source: params.source || "unknown",
@@ -317,8 +329,12 @@ class AnalyticsTracker {
         this.eventQueue.unshift(...eventsToSend);
         // Cap queue size on flush failure (Fix H4)
         if (this.eventQueue.length >= MAX_QUEUE_SIZE) {
-          this.eventQueue = this.eventQueue.slice(-MAX_QUEUE_SIZE / 2);
+          this.eventQueue = this.eventQueue.slice(-Math.floor(MAX_QUEUE_SIZE / 2));
         }
+        this.consecutiveFailures++;
+        this.scheduleNextFlush();
+      } else {
+        this.consecutiveFailures = 0;
       }
     } catch (error) {
       console.error("Failed to send analytics events:", error);
@@ -326,8 +342,10 @@ class AnalyticsTracker {
       this.eventQueue.unshift(...eventsToSend);
       // Cap queue size on flush failure (Fix H4)
       if (this.eventQueue.length >= MAX_QUEUE_SIZE) {
-        this.eventQueue = this.eventQueue.slice(-MAX_QUEUE_SIZE / 2);
+        this.eventQueue = this.eventQueue.slice(-Math.floor(MAX_QUEUE_SIZE / 2));
       }
+      this.consecutiveFailures++;
+      this.scheduleNextFlush();
     } finally {
       this.isFlushing = false;
     }

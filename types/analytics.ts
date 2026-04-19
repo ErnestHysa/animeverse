@@ -85,6 +85,7 @@ export interface PlaybackErrorEvent {
   sessionId: string;
   eventType: "playback_error";
   animeId: number;
+  animeTitle?: string;
   episode: number;
   error: string;
   source: string;

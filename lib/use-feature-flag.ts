@@ -55,16 +55,10 @@ export function useFeatureFlag(featureKey: FeatureKey): UseFeatureFlagResult {
         // TODO: Implement server-side /api/feature-flags route that resolves the
         // user's actual role from the session/token and do NOT rely on these
         // client-provided headers for authorization decisions.
-        const userId = localStorage.getItem('userId');
-        const email = localStorage.getItem('userEmail');
-        const isAdmin = localStorage.getItem('userRole') === 'admin';
-        const isBetaTester = localStorage.getItem('isBetaTester') === 'true';
-
         // NOTE: Client-claimed identity headers (userId, role, etc.) were removed
         // because they are inherently insecure — an attacker can forge localStorage
         // values to bypass feature gates. The server must derive identity solely
-        // from the authenticated session/token. The localStorage reads above are
-        // kept for potential future client-side-only use but are NOT sent to the server.
+        // from the authenticated session/token.
         const response = await fetch(
           `/api/feature-flags?feature=${featureKey}`,
           {

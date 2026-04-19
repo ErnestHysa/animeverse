@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Share2, Download, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "react-hot-toast";
@@ -44,6 +44,14 @@ export function ShareStatsCard({
   const [open, setOpen] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const copiedTimerRef = useRef<NodeJS.Timeout | undefined>(undefined);
+
+  // Cleanup copied timer on unmount
+  useEffect(() => {
+    return () => {
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+    };
+  }, []);
   function getCanvas(): HTMLCanvasElement {
     if (!canvasRef.current) {
       canvasRef.current = document.createElement("canvas");
@@ -161,7 +169,8 @@ export function ShareStatsCard({
       ]);
       setCopied(true);
       toast.success("Copied to clipboard!");
-      setTimeout(() => setCopied(false), 2000);
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+      copiedTimerRef.current = setTimeout(() => setCopied(false), 2000);
     } catch {
       toast.error("Copy failed — try Download instead");
     }

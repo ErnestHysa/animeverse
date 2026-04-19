@@ -113,8 +113,7 @@ export async function getNextNonFillerEpisode(
       .filter(
         (ep) =>
           ep.type === "filler" ||
-          ep.type === "mixed_filller" ||
-          ep.type === "mixed_canon"
+          ep.type === "mixed_filller"
       )
       .map((ep) => ep.number)
   );

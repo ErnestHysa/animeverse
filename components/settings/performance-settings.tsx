@@ -62,6 +62,19 @@ const PRELOAD_SIZE_OPTIONS = [
   { value: 500 * 1024 * 1024, label: "500 MB" },
 ];
 
+/**
+ * Format bytes into human-readable string (pure utility — hoisted outside component
+ * to avoid re-creation on every render).
+ */
+function formatBytes(bytes: number): string {
+  if (bytes < 0) bytes = 0;
+  if (bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
+  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
+}
+
 export function PerformanceSettings({ className = "" }: PerformanceSettingsProps) {
   const { preferences, updatePreferences } = usePreferences();
 
@@ -204,14 +217,7 @@ export function PerformanceSettings({ className = "" }: PerformanceSettingsProps
   // Utility Functions
   // ===================================
 
-  const formatBytes = (bytes: number): string => {
-    if (bytes < 0) bytes = 0;
-    if (bytes === 0) return "0 B";
-    const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB", "TB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
-  };
+  // formatBytes is defined outside the component (pure utility)
 
   return (
     <div className={`space-y-6 ${className}`}>

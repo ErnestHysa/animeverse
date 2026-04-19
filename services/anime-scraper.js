@@ -231,9 +231,15 @@ function decodeHtmlEntities(text) {
     "&quot;": '"',
     "&#39;": "'",
     "&apos;": "'",
+    "&nbsp;": " ",
+    "&mdash;": "\u2014",
+    "&ndash;": "\u2013",
   };
 
-  return text.replace(/&[^;]+;/g, (entity) => entities[entity] || entity);
+  return text
+    .replace(/&#x([0-9a-fA-F]+);/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)))
+    .replace(/&[^;]+;/g, (entity) => entities[entity] || entity);
 }
 
 /**
@@ -283,6 +289,10 @@ async function processWriteQueue() {
       reject(err);
     } finally {
       writeInProgress = false;
+      // H2: Re-check queue after write completes in case items were added during write
+      if (writeQueue.length > 0) {
+        processWriteQueue();
+      }
     }
   }
 }
@@ -297,7 +307,13 @@ async function processWriteQueue() {
 async function readMagnetsDatabase() {
   try {
     const content = await fs.readFile(CONFIG.magnetsDbPath, "utf-8");
-    return JSON.parse(content);
+    const db = JSON.parse(content);
+    // Cap magnets array to prevent unbounded growth
+    const MAX_MAGNETS = 50000;
+    if (db.magnets && db.magnets.length > MAX_MAGNETS) {
+      db.magnets = db.magnets.slice(-MAX_MAGNETS);
+    }
+    return db;
   } catch (error) {
     // Initialize if doesn't exist
     return { magnets: [], lastUpdated: Date.now() };

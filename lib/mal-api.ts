@@ -86,7 +86,7 @@ export async function getMALAnimeList(token: string): Promise<MALListEntry[]> {
 
   while (nextUrl) {
     pageCount++;
-    if (pageCount >= MAX_PAGES) {
+    if (pageCount > MAX_PAGES) {
       console.warn(`[MAL] Reached max pages (${MAX_PAGES}), stopping pagination`);
       break;
     }

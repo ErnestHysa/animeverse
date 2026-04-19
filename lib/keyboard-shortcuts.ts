@@ -100,20 +100,31 @@ export function unregisterShortcuts() {
   keydownHandler = null;
 }
 
+// Default shortcuts — navigation actions use SPA-safe helper
+function spaNavigate(path: string) {
+  // Prefer Next.js router when available; fall back to pushState + popstate
+  // so the client-side router picks it up without a full reload.
+  if (typeof window === "undefined") return;
+  window.history.pushState(null, "", path);
+  window.dispatchEvent(new PopStateEvent("popstate", { state: null }));
+}
+
+export type NavigateFn = (path: string) => void;
+
 // Default shortcuts
 export const DEFAULT_SHORTCUTS = {
   // Navigation
-  HOME: { key: "h", description: "Go to Home", action: () => (window.location.href = "/"), category: "navigation" as const },
+  HOME: { key: "h", description: "Go to Home", action: () => spaNavigate("/"), category: "navigation" as const },
   SEARCH: { key: "/", description: "Open Search", action: () => {
     const searchInput = document.querySelector('input[type="search"], input[placeholder*="search"]') as HTMLInputElement;
     searchInput?.focus();
   }, category: "search" as const },
-  FAVORITES: { key: "f", description: "Go to Favorites", action: () => (window.location.href = "/favorites"), category: "navigation" as const },
-  WATCHLIST: { key: "w", description: "Go to Watchlist", action: () => (window.location.href = "/watchlist"), category: "navigation" as const },
-  SETTINGS: { key: "s", description: "Go to Settings", action: () => (window.location.href = "/settings"), category: "navigation" as const },
-  STATS: { key: "i", description: "Go to Stats", action: () => (window.location.href = "/stats"), category: "navigation" as const },
-  ACHIEVEMENTS: { key: "a", description: "Go to Achievements", action: () => (window.location.href = "/achievements"), category: "navigation" as const },
-  LISTS: { key: "l", description: "Go to Lists", action: () => (window.location.href = "/lists"), category: "navigation" as const },
+  FAVORITES: { key: "f", description: "Go to Favorites", action: () => spaNavigate("/favorites"), category: "navigation" as const },
+  WATCHLIST: { key: "w", description: "Go to Watchlist", action: () => spaNavigate("/watchlist"), category: "navigation" as const },
+  SETTINGS: { key: "s", description: "Go to Settings", action: () => spaNavigate("/settings"), category: "navigation" as const },
+  STATS: { key: "i", description: "Go to Stats", action: () => spaNavigate("/stats"), category: "navigation" as const },
+  ACHIEVEMENTS: { key: "a", description: "Go to Achievements", action: () => spaNavigate("/achievements"), category: "navigation" as const },
+  LISTS: { key: "l", description: "Go to Lists", action: () => spaNavigate("/lists"), category: "navigation" as const },
 
   // General
   HELP: { key: "?", description: "Show Shortcuts", action: () => {

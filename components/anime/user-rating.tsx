@@ -120,7 +120,7 @@ export function UserRating({ animeId, animeTitle, compact = false }: UserRatingP
       </div>
 
       {/* Score Grid - 1 to 10 */}
-      <div className="flex flex-wrap gap-1 mb-2">
+      <div className="flex flex-wrap gap-1 mb-2" role="radiogroup" aria-label="Rating">
         {Array.from({ length: 10 }, (_, i) => i + 1).map((score) => {
           const isActive = displayScore !== null && score <= displayScore;
           return (

@@ -322,8 +322,9 @@ export async function scrapeNyaa(
 
     // Fetch the page
     const controller = new AbortController();
-    // Abort if either the outer signal or our internal timeout fires
-    outerSignal?.addEventListener('abort', () => controller.abort());
+    // H3: Store abort handler for cleanup to prevent event listener leak
+    const abortHandler = () => controller.abort();
+    outerSignal?.addEventListener('abort', abortHandler);
     const timeoutId = setTimeout(() => controller.abort(), 15000);
     let response: Response;
     try {
@@ -335,6 +336,8 @@ export async function scrapeNyaa(
       });
     } finally {
       clearTimeout(timeoutId);
+      // H3: Remove abort listener to prevent leak
+      outerSignal?.removeEventListener('abort', abortHandler);
     }
 
     if (!response.ok) {
@@ -448,8 +451,9 @@ export async function scrapeNyaaLand(
     console.log(`[Nyaa.land] Searching: ${searchQuery}`);
 
     const nyaaLandController = new AbortController();
-    // Abort if either the outer signal or our internal timeout fires
-    outerSignal?.addEventListener('abort', () => nyaaLandController.abort());
+    // H3: Store abort handler for cleanup to prevent event listener leak
+    const nyaaAbortHandler = () => nyaaLandController.abort();
+    outerSignal?.addEventListener('abort', nyaaAbortHandler);
     const nyaaLandTimeoutId = setTimeout(() => nyaaLandController.abort(), 15000);
     let response: Response;
     try {
@@ -461,6 +465,8 @@ export async function scrapeNyaaLand(
       });
     } finally {
       clearTimeout(nyaaLandTimeoutId);
+      // H3: Remove abort listener to prevent leak
+      outerSignal?.removeEventListener('abort', nyaaAbortHandler);
     }
 
     if (!response.ok) {
@@ -566,8 +572,9 @@ export async function scrapeAniDex(
     console.log(`[AniDex] Searching: ${searchQuery}`);
 
     const anidexController = new AbortController();
-    // Abort if either the outer signal or our internal timeout fires
-    outerSignal?.addEventListener('abort', () => anidexController.abort());
+    // H3: Store abort handler for cleanup to prevent event listener leak
+    const anidexAbortHandler = () => anidexController.abort();
+    outerSignal?.addEventListener('abort', anidexAbortHandler);
     const anidexTimeoutId = setTimeout(() => anidexController.abort(), 15000);
     let response: Response;
     try {
@@ -579,6 +586,8 @@ export async function scrapeAniDex(
       });
     } finally {
       clearTimeout(anidexTimeoutId);
+      // H3: Remove abort listener to prevent leak
+      outerSignal?.removeEventListener('abort', anidexAbortHandler);
     }
 
     if (!response.ok) {

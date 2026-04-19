@@ -84,8 +84,6 @@ class HybridStreamManagerImpl {
   private activeAttempts: Map<string, AbortController> = new Map();
   private static instance: HybridStreamManagerImpl;
   private analyticsEnabled = false;
-  private fallbackStartTime = 0;
-  private lastSwitchTime = 0;
 
   private constructor() {
     // Singleton pattern
@@ -124,6 +122,10 @@ class HybridStreamManagerImpl {
 
     const attemptKey = `${animeId}-${episodeNumber}-${language}`;
 
+    // Per-call local state to avoid shared mutable state across concurrent calls
+    let fallbackStartTime = 0;
+    let lastSwitchTime = 0;
+
     // Cancel any existing attempt for this episode
     this.cancelAttempt(attemptKey);
 
@@ -158,7 +160,7 @@ class HybridStreamManagerImpl {
         }
       }
 
-      this.fallbackStartTime = Date.now();
+      fallbackStartTime = Date.now();
 
       // Try primary method first
       const primaryResult = await this.tryMethod(
@@ -173,7 +175,7 @@ class HybridStreamManagerImpl {
         if (primary === "webtorrent" && primaryResult.seeders !== undefined) {
           if (primaryResult.seeders < MIN_SEED_THRESHOLD) {
             // Stream switching cooldown (M14)
-            if (Date.now() - this.lastSwitchTime < 5000) {
+            if (Date.now() - lastSwitchTime < 5000) {
               return {
                 source: primaryResult.source,
                 method: primary,
@@ -181,12 +183,12 @@ class HybridStreamManagerImpl {
               };
             }
 
-            const timeToFallback = Date.now() - this.fallbackStartTime;
+            const timeToFallback = Date.now() - fallbackStartTime;
             logger.warn(
               `[HybridStream] WebTorrent has low seed count (${primaryResult.seeders}), falling back to HLS`
             );
             onFallback?.("webtorrent", "hls", `Low seed count (${primaryResult.seeders} < ${MIN_SEED_THRESHOLD})`);
-            this.lastSwitchTime = Date.now();
+            lastSwitchTime = Date.now();
             // Track fallback event (Phase 9)
             if (this.analyticsEnabled) {
               try {
@@ -233,7 +235,7 @@ class HybridStreamManagerImpl {
       // Primary method failed, try secondary
       if (secondary) {
         // Stream switching cooldown (M14)
-        if (Date.now() - this.lastSwitchTime < 5000) {
+        if (Date.now() - lastSwitchTime < 5000) {
           return {
             source: null,
             method: primary,
@@ -241,9 +243,9 @@ class HybridStreamManagerImpl {
             error: primaryResult.error || new Error("Primary method failed, cooldown active"),
           };
         }
-        this.lastSwitchTime = Date.now();
+        lastSwitchTime = Date.now();
 
-        const timeToFallback = Date.now() - this.fallbackStartTime;
+        const timeToFallback = Date.now() - fallbackStartTime;
         logger.warn(
           `[HybridStream] Primary method (${primary}) failed: ${primaryResult.error?.message}`,
           "Falling back to secondary method"
@@ -334,7 +336,6 @@ class HybridStreamManagerImpl {
   destroy(): void {
     this.cancelAllAttempts();
     this.analyticsEnabled = false;
-    this.fallbackStartTime = 0;
     HybridStreamManagerImpl.instance = null as any;
   }
 
@@ -560,12 +561,10 @@ class HybridStreamManagerImpl {
       });
       clearTimeout(timeoutId);
       return response;
-    } catch (error) {
+    } catch (error: any) {
       clearTimeout(timeoutId);
-      if ((error as Error).name === "AbortError") {
-        throw new Error(`Request timeout after ${timeout}ms`);
-      }
-      throw error;
+      if (error.name === 'AbortError') throw error; // preserve user aborts
+      throw new Error(`Request timed out after ${timeout}ms`);
     } finally {
       if (signal) {
         signal.removeEventListener("abort", abortHandler);

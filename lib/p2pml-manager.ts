@@ -25,6 +25,7 @@ const logger = createScopedLogger('P2PMLManager');
  */
 interface P2PMLEngine {
   on(event: string, handler: (...args: unknown[]) => void): void;
+  off(event: string, handler: (...args: unknown[]) => void): void;
   attach(hlsInstance: unknown): void;
   getStats(): { downloadSpeed?: number; uploadSpeed?: number } | null;
   getPeers(): Array<{ id: string; downloadSpeed: number; uploadSpeed: number }> | null;
@@ -104,6 +105,8 @@ class P2PMLManagerImpl implements P2PMLManager {
   private p2pml: P2PMLEngine | null = null;
   private config: P2PMLConfig = DEFAULT_CONFIG as P2PMLConfig;
   private initialized = false;
+  // H4: Stored event handler references for proper cleanup on destroy
+  private eventHandlers: Map<string, (...args: unknown[]) => void> = new Map();
   private stats: P2PMLStats = {
     peersCount: 0,
     p2pBytesDownloaded: 0,
@@ -184,23 +187,27 @@ class P2PMLManagerImpl implements P2PMLManager {
     if (!this.p2pml) return;
 
     // Peer connect event
-    this.p2pml.on("on-peer-connect", (peerId: unknown) => {
+    const peerConnectHandler = (peerId: unknown) => {
       logger.info(`Peer connected: ${peerId}`);
       // Derive from engine to avoid counter drift from out-of-order events
       this.stats.peersCount = this.p2pml?.getPeers()?.length ?? 0;
       this.config.onPeerConnect?.(String(peerId));
-    });
+    };
+    this.p2pml.on("on-peer-connect", peerConnectHandler);
+    this.eventHandlers.set("on-peer-connect", peerConnectHandler);
 
     // Peer disconnect event
-    this.p2pml.on("on-peer-disconnect", (peerId: unknown) => {
+    const peerDisconnectHandler = (peerId: unknown) => {
       logger.info(`Peer disconnected: ${peerId}`);
       // Derive from engine to avoid counter drift from out-of-order events
       this.stats.peersCount = this.p2pml?.getPeers()?.length ?? 0;
       this.config.onPeerDisconnect?.(String(peerId));
-    });
+    };
+    this.p2pml.on("on-peer-disconnect", peerDisconnectHandler);
+    this.eventHandlers.set("on-peer-disconnect", peerDisconnectHandler);
 
     // Segment downloaded event
-    this.p2pml.on("on-segment-download", (segment: any) => {
+    const segmentDownloadHandler = (segment: any) => {
       const source = segment.downloadSource === "p2p" ? "p2p" : "cdn";
       const bytes = segment.bytesDownloaded || 0;
 
@@ -213,23 +220,29 @@ class P2PMLManagerImpl implements P2PMLManager {
       this.updateStats();
 
       this.config.onSegmentDownloaded?.({ bytes, source });
-    });
+    };
+    this.p2pml.on("on-segment-download", segmentDownloadHandler);
+    this.eventHandlers.set("on-segment-download", segmentDownloadHandler);
 
     // Segment uploaded event
-    this.p2pml.on("on-segment-upload", (segment: any) => {
+    const segmentUploadHandler = (segment: any) => {
       const bytes = segment.bytesUploaded || 0;
       this.stats.p2pBytesUploaded += bytes;
       this.updateStats();
-    });
+    };
+    this.p2pml.on("on-segment-upload", segmentUploadHandler);
+    this.eventHandlers.set("on-segment-upload", segmentUploadHandler);
 
     // Segment error event
-    this.p2pml.on("on-segment-error", (segment: any) => {
+    const segmentErrorHandler = (segment: any) => {
       console.error("[P2PMLManager] Segment error:", segment);
       this.config.onSegmentError?.({
         url: segment.url,
         error: new Error(segment.error || "Unknown error"),
       });
-    });
+    };
+    this.p2pml.on("on-segment-error", segmentErrorHandler);
+    this.eventHandlers.set("on-segment-error", segmentErrorHandler);
   }
 
   /**
@@ -287,7 +300,17 @@ class P2PMLManagerImpl implements P2PMLManager {
    * Destroy P2PML instance
    */
   destroy(): void {
+    // H4: Remove event listeners using stored handler references
     if (this.p2pml) {
+      for (const [event, handler] of this.eventHandlers) {
+        try {
+          this.p2pml.off(event, handler);
+        } catch (error) {
+          console.warn(`[P2PMLManager] Error removing listener for ${event}:`, error);
+        }
+      }
+      this.eventHandlers.clear();
+
       try {
         this.p2pml.destroy();
       } catch (error) {

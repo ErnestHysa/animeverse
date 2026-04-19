@@ -55,6 +55,7 @@ export interface TorrentMetadata {
  */
 class WebTorrentManagerImpl {
   private sessions: Map<string, WebTorrentSession> = new Map();
+  private static readonly MAX_SESSIONS = 20;
   private static instance: WebTorrentManagerImpl;
 
   private constructor() {
@@ -79,6 +80,14 @@ class WebTorrentManagerImpl {
    */
   createSession(magnet: string, infoHash: string): WebTorrentSession {
     const sessionId = `${infoHash}-${Date.now()}`;
+
+    // Enforce max sessions cap — evict oldest if over limit
+    if (this.sessions.size >= WebTorrentManagerImpl.MAX_SESSIONS) {
+      const oldestKey = this.sessions.keys().next().value;
+      if (oldestKey) {
+        this.destroySession(oldestKey);
+      }
+    }
 
     const session: WebTorrentSession = {
       id: sessionId,

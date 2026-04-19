@@ -490,12 +490,15 @@ export function useAiringSchedule() {
   const [schedule, setSchedule] = useState<AiringAnime[]>([]);
 
   useEffect(() => {
+    // H6: Cancel flag to prevent setState after unmount
+    let cancelled = false;
+
     async function fetchAiringSchedule() {
       try {
         const { anilist } = await import("@/lib/anilist");
         const result = await anilist.getAiring(1, 50);
 
-        if (result.data?.Page?.airingSchedules) {
+        if (!cancelled && result.data?.Page?.airingSchedules) {
           const schedules: AiringAnime[] = result.data.Page.airingSchedules.map((item) => ({
             mediaId: item.media.id,
             title: item.media.title?.userPreferred || item.media.title?.english || item.media.title?.romaji || "Unknown",
@@ -510,6 +513,7 @@ export function useAiringSchedule() {
     }
 
     fetchAiringSchedule();
+    return () => { cancelled = true; };
   }, []);
 
   return schedule;

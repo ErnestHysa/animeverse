@@ -134,6 +134,9 @@ export function BatchOperations({ className = "" }: BatchOperationsProps) {
           <GlassCard
             className="p-6 cursor-pointer hover:bg-white/5 transition-colors"
             onClick={() => setSelectionMode("favorites")}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectionMode("favorites"); } }}
           >
             <div className="flex items-center gap-4">
               <div className="p-3 rounded-xl bg-red-500/20">
@@ -149,6 +152,9 @@ export function BatchOperations({ className = "" }: BatchOperationsProps) {
           <GlassCard
             className="p-6 cursor-pointer hover:bg-white/5 transition-colors"
             onClick={() => setSelectionMode("watchlist")}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectionMode("watchlist"); } }}
           >
             <div className="flex items-center gap-4">
               <div className="p-3 rounded-xl bg-blue-500/20">

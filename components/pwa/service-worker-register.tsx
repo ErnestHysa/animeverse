@@ -6,11 +6,13 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export function ServiceWorkerRegister() {
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
   const [showUpdate, setShowUpdate] = useState(false);
+  // H5: Track mount status to guard setState after unmount
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
     // Disable service worker in development
@@ -28,33 +30,59 @@ export function ServiceWorkerRegister() {
       return;
     }
 
+    let registrationRef: ServiceWorkerRegistration | null = null;
+    let newWorkerRef: ServiceWorker | null = null;
+
+    // H5: Store handler references for cleanup
+    const handleStateChange = () => {
+      if (!isMountedRef.current) return;
+      if (newWorkerRef && newWorkerRef.state === "installed" && navigator.serviceWorker.controller) {
+        setWaitingWorker(newWorkerRef);
+        setShowUpdate(true);
+      }
+    };
+
+    const handleUpdateFound = () => {
+      if (!isMountedRef.current) return;
+      const newWorker = registrationRef?.installing;
+      if (newWorker) {
+        newWorkerRef = newWorker;
+        newWorker.removeEventListener("statechange", handleStateChange);
+        newWorker.addEventListener("statechange", handleStateChange);
+      }
+    };
+
+    const handleControllerChange = () => {
+      if (!isMountedRef.current) return;
+      window.location.reload();
+    };
+
     // Register service worker only in production
     navigator.serviceWorker
       .register("/sw.js")
       .then((registration) => {
-        // Service Worker registered successfully
-
-        // Check for updates
-        registration.addEventListener("updatefound", () => {
-          const newWorker = registration.installing;
-          if (newWorker) {
-            newWorker.addEventListener("statechange", () => {
-              if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
-                setWaitingWorker(newWorker);
-                setShowUpdate(true);
-              }
-            });
-          }
-        });
+        if (!isMountedRef.current) return;
+        registrationRef = registration;
+        registration.addEventListener("updatefound", handleUpdateFound);
       })
       .catch((error) => {
         console.error("SW registration failed:", error);
       });
 
     // Listen for controlling service worker
-    navigator.serviceWorker.addEventListener("controllerchange", () => {
-      window.location.reload();
-    });
+    navigator.serviceWorker.addEventListener("controllerchange", handleControllerChange);
+
+    // H5: Cleanup event listeners on unmount
+    return () => {
+      isMountedRef.current = false;
+      if (registrationRef) {
+        registrationRef.removeEventListener("updatefound", handleUpdateFound);
+      }
+      if (newWorkerRef) {
+        newWorkerRef.removeEventListener("statechange", handleStateChange);
+      }
+      navigator.serviceWorker.removeEventListener("controllerchange", handleControllerChange);
+    };
   }, []);
 
   const handleUpdate = () => {

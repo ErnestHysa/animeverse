@@ -266,7 +266,7 @@ export function useWatchParty(animeId: number, episodeNumber: number) {
 
   // Poll for chat and sync state in a single interval to avoid race conditions
   useEffect(() => {
-    const { roomId, isHost } = state;
+    const { roomId } = state;
     if (!roomId) return;
 
     const chatKey = `${STORAGE_KEY}-chat-${roomId}`;
@@ -287,7 +287,7 @@ export function useWatchParty(animeId: number, episodeNumber: number) {
       }
 
       // Sync poll (non-hosts only, every cycle)
-      if (!isHost) {
+      if (!stateRef.current.isHost) {
         const syncResult = safeGetItem<{ currentTime: number; isPlaying: boolean; timestamp: number }>(syncKey);
         if (syncResult.success && syncResult.data) {
           const sync = syncResult.data;
@@ -304,7 +304,7 @@ export function useWatchParty(animeId: number, episodeNumber: number) {
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [state.roomId, state.isHost]);
+  }, [state.roomId]);
 
   return {
     state,
@@ -361,6 +361,8 @@ export function WatchPartyControls({
   const chatEndRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<BroadcastChannel | null>(null);
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const onSyncStateRef = useRef(onSyncState);
+  onSyncStateRef.current = onSyncState;
 
   // BroadcastChannel for real cross-tab sync
   useEffect(() => {
@@ -371,7 +373,7 @@ export function WatchPartyControls({
       channelRef.current.onmessage = (event) => {
         const { type, data } = event.data;
         if (type === "SYNC_STATE") {
-          if (onSyncState) onSyncState(data);
+          onSyncStateRef.current?.(data);
         } else if (type === "CHAT_MESSAGE") {
           // Messages from other tabs arrive here; the localStorage poll handles dedup
         }
@@ -382,7 +384,7 @@ export function WatchPartyControls({
       channelRef.current?.close();
       channelRef.current = null;
     };
-  }, [state.roomId, onSyncState]);
+  }, [state.roomId]);
 
   // Sync playback when current time changes — also broadcast to other tabs
   // Throttled to once per second to avoid flooding at ~60fps

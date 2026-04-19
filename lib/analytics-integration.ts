@@ -75,8 +75,8 @@ export function trackFallback(params: {
       animeId: params.animeId,
       animeTitle: params.animeTitle || `Anime ${params.animeId}`,
       episode: params.episode,
-      fromMethod: params.fromMethod,
-      toMethod: params.toMethod,
+      fromMethod: normalizeStreamingMethod(params.fromMethod),
+      toMethod: normalizeStreamingMethod(params.toMethod),
       reason: params.reason,
       timeToFallback: params.timeToFallback,
     });
@@ -177,6 +177,7 @@ export function trackPlaybackError(params: {
     const tracker = getAnalyticsTracker();
     tracker.trackPlaybackError({
       animeId: params.animeId,
+      animeTitle: params.animeTitle || `Anime ${params.animeId}`,
       episode: params.episode,
       error: params.error,
       source: params.source || "unknown",

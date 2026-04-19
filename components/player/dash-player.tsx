@@ -474,14 +474,19 @@ export function getDASHQualities(manifestUrl: string): Promise<DASHQuality[]> {
             reject(err);
           }).finally(() => {
             if (dashInstance) dashInstance.reset();
-            if (videoElement && videoElement.parentNode) videoElement.parentNode.removeChild(videoElement);
+            videoElement?.remove();
           });
         } catch (err) {
           reject(err);
           if (dashInstance) dashInstance.reset();
-          if (videoElement && videoElement.parentNode) videoElement.parentNode.removeChild(videoElement);
+          videoElement?.remove();
         }
       })
-      .catch(reject);
+      .catch((err) => {
+        // Import failed — clean up any partially-created resources
+        if (dashInstance) dashInstance.reset();
+        videoElement?.remove();
+        reject(err);
+      });
   });
 }

@@ -143,7 +143,7 @@ export function EpisodeThumbnails({ duration, videoRef, thumbnails, isGenerating
     const rect = containerRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const percentage = x / rect.width;
-    const time = percentage * duration;
+    const time = Math.max(0, Math.min(duration, percentage * duration));
 
     setHoverTime(time);
   };

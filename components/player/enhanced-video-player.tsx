@@ -435,8 +435,10 @@ export function EnhancedVideoPlayer({
   // Ambient mode: draw blurred video frames to canvas behind player
   useEffect(() => {
     const canvas = ambientCanvasRef.current;
-    const video = videoRef.current;
-    if (!canvas || !video || !isAmbientMode) {
+    // Read videoRef.current once for the initial guard only.
+    // Inside the RAF loop we re-read videoRef.current each frame to avoid
+    // capturing a stale reference if the underlying <video> element changes.
+    if (!canvas || !videoRef.current || !isAmbientMode) {
       cancelAnimationFrame(ambientRafRef.current);
       return;
     }
@@ -447,7 +449,9 @@ export function EnhancedVideoPlayer({
     const draw = (timestamp: number) => {
       if (timestamp - lastDraw > 66) { // ~15fps is enough for ambient glow
         lastDraw = timestamp;
-        if (!video.paused && video.readyState >= 2) {
+        // Re-read ref each frame to avoid stale closure
+        const video = videoRef.current;
+        if (video && !video.paused && video.readyState >= 2) {
           canvas.width = 64;
           canvas.height = 36;
           ctx.drawImage(video, 0, 0, 64, 36);
@@ -587,6 +591,8 @@ export function EnhancedVideoPlayer({
     };
 
     const handleError = (e?: Event | Error) => {
+      // H9: Don't fire error handler if the effect has been cancelled (unmounted/changed source)
+      if (cancelled) return;
       clearTimeout(loadingTimeout);
       setIsLoading(false);
       setIsBuffering(false);
@@ -1020,6 +1026,16 @@ export function EnhancedVideoPlayer({
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
+      }
+      // C2: Clear checkReady polling timeout on cleanup
+      if (checkReadyTimerRef.current) {
+        clearTimeout(checkReadyTimerRef.current);
+        checkReadyTimerRef.current = null;
+      }
+      // C2: Clear play fallback timeout on cleanup
+      if (playFallbackRef.current) {
+        clearTimeout(playFallbackRef.current);
+        playFallbackRef.current = null;
       }
     };
   }, [source.url, source.type, source.referer, preferences.autoplay]);
@@ -2051,6 +2067,8 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
           video.play().catch(() => {});
         }
       }, 2000);
+      // C2: Store the fallback timeout in playFallbackRef as well for unmount cleanup
+      playFallbackRef.current = playFallbackRef2.current;
 
       return;
     }
@@ -2074,7 +2092,8 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
           // Check again in 100ms (max 100 retries = 10 seconds)
           if (retries < 100) {
             retries++;
-            setTimeout(checkReady, 100);
+            // C2: Store timeout so it can be cleared on unmount
+            checkReadyTimerRef.current = setTimeout(checkReady, 100);
           } else {
             logger.warn("[play] Gave up waiting for video to be ready");
             setIsLoading(false);
