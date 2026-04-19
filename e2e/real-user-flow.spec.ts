@@ -10,6 +10,21 @@ const DEFAULT_TIMEOUT = 120000;
 const NAV_TIMEOUT = 60000;
 
 test.describe('Real User Flow - Complete Journey', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
+  });
+
+  test.afterEach(async ({ page }) => {
+    await page.evaluate(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
+  });
+
   test('complete user journey: browse -> search -> view anime -> watch episode', async ({ page }) => {
     // Check for console errors — register listener BEFORE navigation to catch all errors
     const consoleErrors: string[] = [];
@@ -254,6 +269,21 @@ test.describe('Real User Flow - Complete Journey', () => {
 });
 
 test.describe('Real User - Error Scenarios', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
+  });
+
+  test.afterEach(async ({ page }) => {
+    await page.evaluate(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
+  });
+
   test('user encounters invalid anime ID', async ({ page }) => {
     console.log('📍 TEST: Invalid anime handling');
 

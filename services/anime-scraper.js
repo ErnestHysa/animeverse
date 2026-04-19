@@ -462,10 +462,8 @@ async function runScraper() {
         for (const episode of episodesToScrape) {
           try {
             // Search using both romaji and english titles
-            const searchTitles = [anime.title.romaji];
-            if (anime.title.english) {
-              searchTitles.push(anime.title.english);
-            }
+            const searchTitles = [anime.title.romaji || anime.title.english || anime.title.native || 'Unknown'];
+            if (anime.title.english && anime.title.romaji) { searchTitles.push(anime.title.english); }
 
             let torrents = [];
             for (const title of searchTitles) {

@@ -259,6 +259,10 @@ export function checkSeedAchievements(stats: SeedStats): SeedAchievement[] {
       case "peers":
         shouldUnlock = stats.totalPeersHelped >= achievement.requirement.value;
         break;
+      default:
+        console.warn(`Unknown achievement type: ${achievement.requirement.type}`);
+        shouldUnlock = false;
+        break;
     }
 
     if (shouldUnlock) {

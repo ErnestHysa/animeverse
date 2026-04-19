@@ -73,15 +73,6 @@ async function getPlayerState(page) {
   });
 }
 
-async function getPageErrors(page) {
-  const errors = [];
-  page.on('console', msg => {
-    if (msg.type() === 'error') errors.push(msg.text());
-  });
-  page.on('pageerror', err => errors.push(err.message));
-  return errors;
-}
-
 async function main() {
   console.log('\n╔══════════════════════════════════════════╗');
   console.log('║      Visual Player Check                 ║');

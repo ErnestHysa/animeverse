@@ -42,6 +42,19 @@ function getAllowedOriginsList(): string[] {
 // ===================================
 
 /**
+ * Normalize expanded IPv6-mapped IPv4 forms.
+ * Collapses 0:0:0:0:0:ffff:X:X -> ::ffff:X:X
+ * so that downstream ::ffff: checks catch the expanded form.
+ */
+function normalizeIPv6(hostname: string): string {
+  const expandedMatch = hostname.match(/^0+:0+:0+:0+:0+:ffff:(.+)$/i);
+  if (expandedMatch) {
+    return `::ffff:${expandedMatch[1]}`;
+  }
+  return hostname;
+}
+
+/**
  * Normalize a hostname that may use decimal, octal, hex, or IPv6-mapped IPv4
  * representations into a standard dotted-decimal or plain IPv6 string.
  * Returns null if the input cannot be normalized.
@@ -53,6 +66,9 @@ function normalizeHostname(hostname: string): string | null {
   if (h.startsWith('[') && h.endsWith(']')) {
     h = h.slice(1, -1);
   }
+
+  // Step 1b: Normalize expanded IPv6-mapped IPv4 forms (e.g., 0:0:0:0:0:ffff:7f00:1 -> ::ffff:7f00:1)
+  h = normalizeIPv6(h);
 
   // Step 2: Handle IPv6-mapped IPv4 like ::ffff:127.0.0.1 or ::ffff:7f00:1
   const ipv6MappedV4 = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/;
@@ -69,7 +85,7 @@ function normalizeHostname(hostname: string): string | null {
     // Combine two 16-bit hex parts into a 32-bit IPv4
     const high = parseInt(mappedMatch[1], 16);
     const low = parseInt(mappedMatch[2], 16);
-    const ip = ((high >>> 16) & 0xff) + '.' + ((high >>> 0) & 0xff) + '.' + ((low >>> 16) & 0xff) + '.' + ((low >>> 0) & 0xff);
+    const ip = ((high >> 8) & 0xff) + '.' + (high & 0xff) + '.' + ((low >> 8) & 0xff) + '.' + (low & 0xff);
     return ip;
   }
 
@@ -193,8 +209,8 @@ function isPrivateHostname(hostname: string): boolean {
  *          IPv6-mapped loopback ::ffff:127.0.0.1, etc.
  */
 function isPrivateIPv6(ip: string): boolean {
-  // Expand :: shorthand for comparison
-  const h = ip.toLowerCase();
+  // Normalize expanded IPv6-mapped IPv4 forms first
+  let h = normalizeIPv6(ip.toLowerCase());
 
   // Loopback
   if (h === '::1' || h === '0:0:0:0:0:0:0:1') return true;
@@ -214,7 +230,7 @@ function isPrivateIPv6(ip: string): boolean {
   if (mappedHexMatch) {
     const high = parseInt(mappedHexMatch[1], 16);
     const low = parseInt(mappedHexMatch[2], 16);
-    const v4 = ((high >>> 16) & 0xff) + '.' + ((high >>> 0) & 0xff) + '.' + ((low >>> 16) & 0xff) + '.' + ((low >>> 0) & 0xff);
+    const v4 = ((high >> 8) & 0xff) + '.' + (high & 0xff) + '.' + ((low >> 8) & 0xff) + '.' + (low & 0xff);
     return isPrivateHostname(v4);
   }
   // Node-local multicast ff01::/16, link-local multicast ff02::/16

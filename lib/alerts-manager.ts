@@ -125,7 +125,11 @@ class AlertsManager {
     }
 
     this.checkTimer = setInterval(async () => {
-      await this.checkRules();
+      try {
+        await this.checkRules();
+      } catch (error) {
+        console.error('Alert check failed:', error);
+      }
     }, this.checkInterval);
 
     // Run initial check

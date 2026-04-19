@@ -71,7 +71,7 @@ export function useWatchParty(animeId: number, episodeNumber: number) {
 
   // Generate room ID
   const generateRoomId = useCallback(() => {
-    return Math.random().toString(36).substring(2, 8).toUpperCase();
+    return crypto.randomUUID().substring(0, 8).toUpperCase();
   }, []);
 
   // Create a new watch party room

@@ -472,7 +472,7 @@ class WatchPartyRoomManager {
   }
 
   generateRoomId() {
-    return Math.random().toString(36).substring(2, 8).toUpperCase();
+    return require('crypto').randomBytes(4).toString('hex').toUpperCase();
   }
 
   formatTimestamp(seconds) {

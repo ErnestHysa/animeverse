@@ -270,7 +270,14 @@ export default function CustomListsPage() {
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                         {selectedList.animeIds.map((animeId) => {
                           const anime = mediaCache[animeId];
-                          if (!anime) return null;
+                          if (!anime) {
+                            // Fix M5: Show placeholder for uncached anime instead of skipping
+                            return (
+                              <div key={animeId} className="p-4 rounded-lg bg-card animate-pulse">
+                                <div className="h-4 w-32 bg-muted rounded" />
+                              </div>
+                            );
+                          }
 
                           return (
                             <div key={animeId} className="group relative">

@@ -117,10 +117,11 @@ class RecommendationEngine {
   private determineWatchingPattern(watchHistory: WatchHistoryItem[]): "binge" | "casual" | "weekly" {
     if (watchHistory.length < 3) return "casual";
 
-    // Calculate time between watches
+    // Fix M2: Sort by timestamp descending before computing intervals
+    const sorted = [...watchHistory].sort((a, b) => b.timestamp - a.timestamp);
     const intervals: number[] = [];
-    for (let i = 1; i < Math.min(watchHistory.length, 10); i++) {
-      intervals.push(watchHistory[i - 1].timestamp - watchHistory[i].timestamp);
+    for (let i = 1; i < Math.min(sorted.length, 10); i++) {
+      intervals.push(sorted[i - 1].timestamp - sorted[i].timestamp);
     }
 
     const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;

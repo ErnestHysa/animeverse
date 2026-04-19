@@ -110,7 +110,7 @@ export default function(data) {
     'p2p bandwidth > 30%': (r) => {
       try {
         const body = JSON.parse(r.body);
-        const p2pRatio = body.p2pBandwidth / (body.totalBandwidth || 1);
+        const p2pRatio = body.totalBandwidth > 0 ? body.p2pBandwidth / body.totalBandwidth : 0;
         p2pBandwidthRate.add(p2pRatio > 0.3);
         return p2pRatio > 0.3;
       } catch {

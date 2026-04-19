@@ -43,7 +43,7 @@ export interface ButtonProps
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, loading, disabled, children, ...props }, ref) => {
+  ({ className, variant, size, asChild = false, loading, disabled, children, onClick: consumerOnClick, ...restProps }, ref) => {
     const Comp = asChild ? Primitive.Slot : "button";
     const isDisabled = disabled || loading;
 
@@ -58,7 +58,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           aria-disabled="true"
           tabIndex={-1}
           onClick={(e: any) => { e.preventDefault(); e.stopPropagation(); }}
-          {...props}
+          {...restProps}
         >
           {loading && (
             <svg
@@ -85,7 +85,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         className={cn(buttonVariants({ variant, size, className }))}
         disabled={isDisabled}
-        {...props}
+        onClick={consumerOnClick}
+        {...restProps}
       >
         {loading && (
           <svg

@@ -23,7 +23,7 @@ export function InstallPrompt() {
     const dismissed = localStorage.getItem("pwa-install-dismissed");
     if (dismissed) {
       const since = Date.now() - parseInt(dismissed, 10);
-      if (since < 7 * 24 * 60 * 60 * 1000) return;
+      if (!isNaN(since) && since < 7 * 24 * 60 * 60 * 1000) return;
     }
 
     const handler = (e: Event) => {

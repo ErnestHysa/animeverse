@@ -8,6 +8,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { toast } from "react-hot-toast";
 import {
@@ -86,9 +87,10 @@ interface Alert {
 
 export default function AdminDashboardPage() {
   // Client-side auth guard
+  const router = useRouter();
   useEffect(() => {
     const token = localStorage.getItem('admin_token');
-    if (!token) { window.location.href = '/admin/login'; return; }
+    if (!token) { router.push('/admin/login'); return; }
   }, []);
 
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);

@@ -83,11 +83,23 @@ class WatchPartyRoomManager {
 
   // Per-socket rate limiter: track last event timestamp
   private socketLastEvent: Map<string, number> = new Map();
+  private socketEventCleanupInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
     // Clean up inactive rooms every 5 minutes
     this.cleanupInterval = setInterval(() => this.cleanupInactiveRooms(), 5 * 60 * 1000);
     this.cleanupInterval.unref();
+
+    // Clean up stale socketLastEvent entries every hour
+    this.socketEventCleanupInterval = setInterval(() => {
+      const now = Date.now();
+      for (const [socketId, timestamp] of this.socketLastEvent.entries()) {
+        if (now - timestamp > 24 * 60 * 60 * 1000) { // 24 hours
+          this.socketLastEvent.delete(socketId);
+        }
+      }
+    }, 60 * 60 * 1000);
+    this.socketEventCleanupInterval.unref();
   }
 
   /**
@@ -700,6 +712,11 @@ class WatchPartyRoomManager {
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
       this.cleanupInterval = null;
+    }
+
+    if (this.socketEventCleanupInterval) {
+      clearInterval(this.socketEventCleanupInterval);
+      this.socketEventCleanupInterval = null;
     }
 
     if (this.io) {

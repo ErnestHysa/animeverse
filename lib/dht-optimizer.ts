@@ -370,15 +370,14 @@ class DHTOptimizerImpl {
         return true;
       }
 
-      // Fallback: mark latency as unverified since no actual ping was performed
+      // Fix M4: Don't record false success when ping is unavailable
       const latency = Date.now() - startTime;
       console.warn(
         `[DHTOptimizer] pingNode: no DHT ping available for ${node.address}:${node.port}, ` +
-        `recording unverified latency (${latency}ms)`
+        `skipping unverified latency (${latency}ms)`
       );
-      this.recordSuccess(node.address, node.port, latency);
-
-      return true;
+      // Cannot verify - don't record false success
+      return false;
     } catch (error) {
       this.recordFailure(node.address, node.port);
       return false;

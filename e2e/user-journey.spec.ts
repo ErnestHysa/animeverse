@@ -69,6 +69,21 @@ async function screenshot(page: Page, name: string) {
 // =============================================
 
 test.describe('Journey 1: New User Discovery', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
+  });
+
+  test.afterEach(async ({ page }) => {
+    await page.evaluate(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
+  });
+
   test('user lands on homepage and sees content', async ({ page }) => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await waitForPageLoad(page);
@@ -195,6 +210,21 @@ test.describe('Journey 1: New User Discovery', () => {
 // =============================================
 
 test.describe('Journey 2: Genre Explorer', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
+  });
+
+  test.afterEach(async ({ page }) => {
+    await page.evaluate(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
+  });
+
   test('user browses genres page', async ({ page }) => {
     await page.goto('/genres', { waitUntil: 'domcontentloaded' });
     await waitForPageLoad(page);
@@ -251,6 +281,21 @@ test.describe('Journey 2: Genre Explorer', () => {
 // =============================================
 
 test.describe('Journey 3: Schedule Watcher', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
+  });
+
+  test.afterEach(async ({ page }) => {
+    await page.evaluate(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
+  });
+
   test('user views airing schedule', async ({ page }) => {
     await page.goto('/schedule', { waitUntil: 'domcontentloaded' });
     await waitForPageLoad(page);
@@ -277,6 +322,21 @@ test.describe('Journey 3: Schedule Watcher', () => {
 // =============================================
 
 test.describe('Journey 4: History & Watchlist User', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
+  });
+
+  test.afterEach(async ({ page }) => {
+    await page.evaluate(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
+  });
+
   test('user visits favorites page', async ({ page }) => {
     await page.goto('/favorites', { waitUntil: 'domcontentloaded' });
     await waitForPageLoad(page);
@@ -330,6 +390,21 @@ test.describe('Journey 4: History & Watchlist User', () => {
 // =============================================
 
 test.describe('Journey 5: Settings Power User', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
+  });
+
+  test.afterEach(async ({ page }) => {
+    await page.evaluate(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
+  });
+
   test('user opens settings page and sees all sections', async ({ page }) => {
     await page.goto('/settings', { waitUntil: 'domcontentloaded' });
     await waitForPageLoad(page);
@@ -376,6 +451,21 @@ test.describe('Journey 5: Settings Power User', () => {
 // =============================================
 
 test.describe('Journey 6: Watch Player Full Flow', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
+  });
+
+  test.afterEach(async ({ page }) => {
+    await page.evaluate(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
+  });
+
   test('player page renders with all key elements', async ({ page }) => {
     await page.goto('/watch/21459/1', { waitUntil: 'domcontentloaded' });
     await page.locator('main').waitFor({ timeout: TIMEOUT });
@@ -487,6 +577,21 @@ test.describe('Journey 6: Watch Player Full Flow', () => {
 // =============================================
 
 test.describe('Journey 7: Information Pages', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
+  });
+
+  test.afterEach(async ({ page }) => {
+    await page.evaluate(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
+  });
+
   test('user reads about page', async ({ page }) => {
     await page.goto('/about', { waitUntil: 'domcontentloaded' });
     await waitForPageLoad(page);

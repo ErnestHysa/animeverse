@@ -16,6 +16,7 @@ import http from "http";
 import { WebSocketServer } from "ws";
 import { parse as parseUrl } from "url";
 import { timingSafeEqual } from "crypto";
+import { logger } from "@/lib/logger";
 
 /**
  * Mask an IP address for privacy by hiding the last octet (IPv4)
@@ -114,7 +115,7 @@ class AnimeTracker {
     });
 
     this.server.listen(Number(TRACKER_CONFIG.port), () => {
-      console.log(`[AnimeTracker] HTTP tracker listening on port ${TRACKER_CONFIG.port}`);
+      logger.info(`[AnimeTracker] HTTP tracker listening on port ${TRACKER_CONFIG.port}`);
     });
 
     // Start WebSocket tracker
@@ -141,7 +142,7 @@ class AnimeTracker {
       this.handleWebSocketConnection(ws);
     });
 
-    console.log(`[AnimeTracker] WebSocket tracker listening on port ${TRACKER_CONFIG.wsPort}`);
+    logger.info(`[AnimeTracker] WebSocket tracker listening on port ${TRACKER_CONFIG.wsPort}`);
 
     // Start periodic tasks
     this.startPeriodicTasks();
@@ -306,7 +307,7 @@ class AnimeTracker {
 
       this.writeBencode(res, response);
     } catch (error) {
-      console.error("[AnimeTracker] Announce error:", error);
+      logger.error("[AnimeTracker] Announce error:", error);
       this.writeBencodeError(res, "Internal server error");
     }
   }
@@ -337,7 +338,7 @@ class AnimeTracker {
       const response = { files };
       this.writeBencode(res, response);
     } catch (error) {
-      console.error("[AnimeTracker] Scrape error:", error);
+      logger.error("[AnimeTracker] Scrape error:", error);
       this.writeBencodeError(res, "Internal server error");
     }
   }
@@ -404,7 +405,7 @@ class AnimeTracker {
       res.writeHead(201, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ message: "Torrent uploaded pending verification", infoHash }));
     } catch (error) {
-      console.error("[AnimeTracker] Upload error:", error);
+      logger.error("[AnimeTracker] Upload error:", error);
       res.writeHead(500, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Internal server error" }));
     }
@@ -448,7 +449,7 @@ class AnimeTracker {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ message: "Torrent verified", torrent }));
     } catch (error) {
-      console.error("[AnimeTracker] Verify error:", error);
+      logger.error("[AnimeTracker] Verify error:", error);
       res.writeHead(500, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Internal server error" }));
     }
@@ -458,7 +459,7 @@ class AnimeTracker {
    * Handle WebSocket connections for real-time updates
    */
   private handleWebSocketConnection(ws: any): void {
-    console.log("[AnimeTracker] New WebSocket connection");
+    logger.info("[AnimeTracker] New WebSocket connection");
 
     ws.on("message", (data: any) => {
       try {
@@ -472,12 +473,12 @@ class AnimeTracker {
           this.handleWSSubscribe(ws, message);
         }
       } catch (error) {
-        console.error("[AnimeTracker] WebSocket error:", error);
+        logger.error("[AnimeTracker] WebSocket error:", error);
       }
     });
 
     ws.on("close", () => {
-      console.log("[AnimeTracker] WebSocket disconnected");
+      logger.info("[AnimeTracker] WebSocket disconnected");
     });
   }
 

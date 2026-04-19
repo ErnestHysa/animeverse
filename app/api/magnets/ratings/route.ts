@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
 
     // Create new rating
     const newRating: MagnetRating = {
-      id: `rating-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: `rating-${crypto.randomUUID()}`,
       magnetHash,
       animeId: typeof animeId === 'number' ? animeId : Number(animeId),
       episodeNumber: typeof episodeNumber === 'number' ? episodeNumber : Number(episodeNumber),

@@ -175,6 +175,8 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(
     caches.match(request).then((cached) => {
       if (cached) {
+        // Fix M11: Re-insert to move to end of cache order (makes FIFO into LRU)
+        caches.open(DYNAMIC_CACHE).then(cache => cache.put(request, cached.clone()));
         return cached;
       }
 
@@ -205,7 +207,8 @@ self.addEventListener("fetch", (event) => {
             { headers: { "Content-Type": "text/html" } }
           );
         }
-        throw new Error("Network request failed");
+        console.error('SW fetch failed:', new Error('Network error'));
+        return new Response('Network error', { status: 503, statusText: 'Service Unavailable' });
       });
     })
   );

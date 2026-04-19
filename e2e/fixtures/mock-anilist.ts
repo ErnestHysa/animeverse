@@ -93,7 +93,7 @@ export async function mockAniListAPI(page: import('@playwright/test').Page) {
 
     // Single media query (by ID)
     if (query.includes("media(id:") || query.includes("Media(id:") ||
-        (query.includes("Media") && query.includes("id") && !query.includes("Page"))) {
+        (query.includes("Media") && query.includes("id:") && !query.includes("Page"))) {
       await route.fulfill({
         status: 200,
         contentType: "application/json",

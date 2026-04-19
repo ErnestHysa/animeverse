@@ -538,11 +538,15 @@ export const useStore = create<StoreState>()(
             }
           }
 
+          // Merge: union of existing local watchlist + AniList PLANNING entries
+          const existingWatchlist = new Set(state.watchlist);
+          const mergedWatchlist = [...new Set([...watchlistIds, ...existingWatchlist])];
+
           return {
             // Store full AniList media list with proper status
             anilistMediaList: entries,
-            // Only sync watchlist for PLANNING entries
-            watchlist: watchlistIds,
+            // Merge watchlist: keep existing local entries + add AniList PLANNING
+            watchlist: mergedWatchlist,
           };
         }),
 
@@ -646,7 +650,7 @@ export const useStore = create<StoreState>()(
                 entry.status === "COMPLETED" || entry.status === "REPEATING"
                   ? totalEpisodes
                   : episodesWatched,
-                50 // Cap at 50 entries per anime to prevent unbounded history
+                25 // Cap at 25 entries per anime to prevent unbounded history
               );
 
               for (let ep = 1; ep <= episodesToCreate; ep++) {
@@ -699,6 +703,12 @@ export const useStore = create<StoreState>()(
             } catch (error) {
               console.error("Failed to save stats:", error);
             }
+          }
+
+          // Cap total migration entries to prevent localStorage overflow
+          const MAX_MIGRATION_ENTRIES = 500;
+          if (newWatchHistory.length > MAX_MIGRATION_ENTRIES) {
+            newWatchHistory.splice(MAX_MIGRATION_ENTRIES);
           }
 
           return {
@@ -1024,7 +1034,6 @@ export const useStore = create<StoreState>()(
           watchHistory: state.watchHistory,
           preferences: state.preferences,
           mediaCache: state.mediaCache,
-          anilistUser: state.anilistUser,
           anilistMediaList: state.anilistMediaList,
           achievements: state.achievements,
           unlockedAchievements: state.unlockedAchievements,

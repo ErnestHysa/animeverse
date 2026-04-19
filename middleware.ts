@@ -116,10 +116,19 @@ function getCorsOrigin(request: NextRequest): string {
       if (isDevLocalhost || isProductionOrigin) {
         return origin;
       }
-    } catch {}
+    } catch (error) {
+      // Fix M9: Log CORS validation errors instead of silently swallowing
+      console.warn('CORS origin validation failed:', error);
+    }
   }
-  const protocol = request.headers.get('x-forwarded-proto') || 'https';
-  return `${protocol}://${host}`;
+  // Fix M8: Validate host against allowlist instead of blindly reflecting
+  const allowedHosts = [process.env.NEXT_PUBLIC_APP_URL, 'localhost:3000'].filter(Boolean);
+  const hostName = host.split(':')[0];
+  if (allowedHosts.some(h => hostName === new URL(h!.startsWith('http') ? h! : `https://${h}`).hostname)) {
+    const protocol = request.headers.get('x-forwarded-proto') || 'https';
+    return `${protocol}://${host}`;
+  }
+  return '';
 }
 
 // ===================================

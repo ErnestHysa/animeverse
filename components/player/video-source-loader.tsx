@@ -100,8 +100,10 @@ export function VideoSourceLoader({
   const malSyncedRef = useRef(false);
 
   // Get per-anime streaming preference (overrides global preference)
+  // Fix M10: Extract scalar values to avoid unstable object reference in deps
   const perAnimePref = getPerAnimePref(animeId);
-  const effectiveStreamingMethod = perAnimePref?.streamingMethod || preferences.streamingMethod;
+  const perAnimeStreamingMethod = perAnimePref?.streamingMethod;
+  const effectiveStreamingMethod = perAnimeStreamingMethod || preferences.streamingMethod;
 
   const syncProgressToAniList = useCallback(async () => {
     if (!isAuthenticated || !anilistToken || anilistSyncedRef.current) return;
@@ -369,7 +371,7 @@ export function VideoSourceLoader({
         setIsRetrying(false);
       }
     }
-  }, [animeId, episodeNumber, animeTitle, malId, onError, effectiveStreamingMethod, preferences.defaultQuality, perAnimePref]);
+  }, [animeId, episodeNumber, animeTitle, malId, onError, effectiveStreamingMethod, preferences.defaultQuality, perAnimeStreamingMethod]);
 
   // Reset loadingSeconds counter whenever a new load starts
   useEffect(() => {

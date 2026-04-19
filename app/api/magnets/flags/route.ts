@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
 
     // Create new flag
     const newFlag: MagnetFlag = {
-      id: `flag-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: `flag-${crypto.randomUUID()}`,
       magnetHash,
       userId,
       username: username || "Anonymous",

@@ -171,6 +171,8 @@ export function EnhancedVideoPlayer({
   const playFallbackRef2 = useRef<NodeJS.Timeout | null>(null);
   // Debounce ref for volume localStorage writes
   const volumeSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Fix M12: Unique player instance ID for scoped subtitle styles
+  const playerIdRef = useRef(Math.random().toString(36).substring(2));
 
   // State
   const [isPlaying, setIsPlaying] = useState(false);
@@ -489,6 +491,27 @@ export function EnhancedVideoPlayer({
           timestamp: Date.now(),
         };
         localStorage.setItem(key, JSON.stringify(data));
+
+        // Fix M1: Periodically clean up orphaned watch_progress_ keys
+        if (Math.random() < 0.1) {
+          try {
+            const currentHistory = useStore.getState().watchHistory;
+            const activeIds = new Set(currentHistory.map((h: any) => h.mediaId));
+            const keysToRemove: string[] = [];
+            for (let i = 0; i < localStorage.length; i++) {
+              const lKey = localStorage.key(i);
+              if (lKey?.startsWith('watch_progress_')) {
+                const mId = lKey.replace('watch_progress_', '');
+                if (!activeIds.has(Number(mId) || mId)) {
+                  keysToRemove.push(lKey);
+                }
+              }
+            }
+            keysToRemove.forEach(k => localStorage.removeItem(k));
+          } catch {
+            // Cleanup is best-effort
+          }
+        }
 
       } catch (e) {
         // Silently fail - app will work without persistence
@@ -1844,11 +1867,13 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
     if (!video) return;
 
     const updateSubtitleStyles = () => {
+      // Fix M12: Use player-instance-specific style ID to avoid conflicts with multiple players
+      const styleId = `subtitle-style-${playerIdRef.current}`;
       // Create or update style element for ::cue pseudo-element
-      let styleEl = document.getElementById("subtitle-custom-style");
+      let styleEl = document.getElementById(styleId);
       if (!styleEl) {
         styleEl = document.createElement("style");
-        styleEl.id = "subtitle-custom-style";
+        styleEl.id = styleId;
         document.head.appendChild(styleEl);
       }
 
@@ -1883,8 +1908,9 @@ C: Subtitles | 0-9: Speed | N: Next | T: Theater | P: PiP | ESC: Exit
     localStorage.setItem("subtitle-position", subtitlePosition);
 
     return () => {
-      const el = document.getElementById("subtitle-custom-style");
-      el?.remove();
+      const styleId = `subtitle-style-${playerIdRef.current}`;
+      const el = document.getElementById(styleId);
+      if (el) el.remove();
     };
   }, [subtitleSize, subtitleColor, subtitleBackground, subtitlePosition]);
 

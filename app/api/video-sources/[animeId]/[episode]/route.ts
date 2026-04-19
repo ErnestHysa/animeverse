@@ -119,7 +119,10 @@ function getAllowedVideoOrigin(request: NextRequest): string {
       ) {
         return origin;
       }
-    } catch {}
+    } catch (error) {
+      // Fix M9: Log CORS validation errors instead of silently swallowing
+      console.warn('CORS origin validation failed:', error);
+    }
   }
   const host = request.headers.get('host') || '';
   const protocol = request.headers.get('x-forwarded-proto') || 'https';

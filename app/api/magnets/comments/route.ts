@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
 
     // Create new comment
     const newComment: MagnetComment = {
-      id: `comment-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: `comment-${crypto.randomUUID()}`,
       magnetHash,
       animeId,
       episodeNumber,

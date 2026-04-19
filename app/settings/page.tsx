@@ -498,7 +498,13 @@ export default function SettingsPage() {
   };
 
   // Disconnect from MAL
-  const handleMALLogout = () => {
+  const handleMALLogout = async () => {
+    // Fix M13: Clear server-side httpOnly cookies before clearing client state
+    try {
+      await fetch('/api/mal/status', { method: 'DELETE' });
+    } catch {
+      // Cookie clearing best-effort
+    }
     clearMALAuth();
     toast.success("Disconnected from MyAnimeList");
   };

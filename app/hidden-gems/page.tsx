@@ -19,7 +19,7 @@ import { AnimeGridSkeleton } from "@/components/ui/skeleton";
 
 async function fetchHiddenGems() {
   const result = await anilist.getHiddenGems(1, 48);
-  return result.data?.Page.media ?? [];
+  return result.data?.Page?.media ?? [];
 }
 
 // ===================================
