@@ -77,7 +77,11 @@ export function isTokenBlacklisted(jti: string | undefined): boolean {
  * This prevents unbounded memory growth since tokens naturally expire.
  */
 if (typeof setInterval !== 'undefined') {
-  setInterval(() => {
+  // Clear any previous interval from HMR hot-reload
+  if ((globalThis as any).__authCleanupInterval) {
+    clearInterval((globalThis as any).__authCleanupInterval);
+  }
+  (globalThis as any).__authCleanupInterval = setInterval(() => {
     const now = Date.now() / 1000;
     let cleaned = 0;
     for (const [jti, exp] of blacklistedTokens) {
@@ -89,7 +93,8 @@ if (typeof setInterval !== 'undefined') {
     if (cleaned > 0) {
       console.log(`[Auth] Cleaned ${cleaned} expired tokens from blacklist (remaining: ${blacklistedTokens.size})`);
     }
-  }, 10 * 60 * 1000).unref?.(); // .unref() so the timer doesn't keep the process alive
+  }, 10 * 60 * 1000); // .unref() so the timer doesn't keep the process alive
+  (globalThis as any).__authCleanupInterval.unref?.();
 }
 
 // ===================================
@@ -299,7 +304,7 @@ export async function createAdminUser(
  */
 export async function authenticateUser(
   credentials: LoginCredentials
-): Promise<{ success: boolean; error?: string; user?: AdminUser; tokens?: { access: string } }> {
+): Promise<{ success: boolean; error?: string; user?: AdminUser; tokens?: { access: string } } | null> {
   const { username, password } = credentials;
 
   // Fix H9: Dummy hash ensures bcrypt.compare always runs, even when user doesn't exist
@@ -342,7 +347,7 @@ export async function authenticateUser(
     };
   } catch (error) {
     console.error('Authentication error:', error);
-    return null as any;
+    return null;
   }
 }
 

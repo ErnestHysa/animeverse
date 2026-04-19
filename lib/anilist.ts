@@ -19,6 +19,12 @@ import { ANILIST_API_URL, API_CONFIG } from "./constants";
 // Media Fragments (Reusable GraphQL)
 // ===================================
 
+// TODO (M8 tech-debt): Several list/card queries (trending, popular, seasonal, search, byGenre)
+// use MEDIA_FULL_FRAGMENT when MEDIA_MINIMAL_FRAGMENT would suffice. These endpoints render
+// card/list views that only need cover art, title, score, and format. Switching them would
+// significantly reduce GraphQL response size and improve API performance. Only byId truly
+// needs the full fragment for detail pages.
+
 const MEDIA_MINIMAL_FRAGMENT = `id idMal title { romaji english native userPreferred } coverImage { extraLarge large medium color } format status episodes averageScore genres seasonYear`;
 
 const MEDIA_FULL_FRAGMENT = `id idMal title { romaji english native userPreferred } format type status description synonyms isLicensed source countryOfOrigin isAdult genres tags { id name rank } studios { nodes { id name isAnimationStudio } } startDate { year month day } endDate { year month day } season seasonYear seasonInt averageScore meanScore popularity favourites trending episodes duration coverImage { extraLarge large medium color } bannerImage trailer { id site thumbnail } relations { edges { node { ${MEDIA_MINIMAL_FRAGMENT} } relationType } } characters(sort: FAVOURITES_DESC, perPage: 8) { edges { node { id name { full native } image { large medium } } role voiceActors(language: JAPANESE, sort: RELEVANCE) { id name { full } } } } staff(sort: RELEVANCE, perPage: 8) { edges { node { id name { full } image { large medium } } role } } externalLinks { site url type icon } nextAiringEpisode { id airingAt timeUntilAiring episode } streamingEpisodes { site title thumbnail url }`;
@@ -89,6 +95,7 @@ class AniListClient {
    */
   private async fetchWithRetry(url: string, options: RequestInit, maxRetries: number = 3): Promise<Response> {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      this.rateLimiter.calls.push(Date.now());
       const response = await fetch(url, options);
       if (response.status === 429 || response.status >= 500) {
         if (attempt < maxRetries) {
@@ -122,8 +129,8 @@ class AniListClient {
 
       clearTimeout(timeout);
 
-      // Push timestamp only after successful response to avoid wasting quota on failures
-      this.rateLimiter.calls.push(Date.now());
+      // Note: rate limiter timestamp is now pushed inside fetchWithRetry (H3)
+      // so ALL requests including retries are tracked
 
       let data;
       try {
@@ -340,6 +347,7 @@ class AniListClient {
           error: { message: data.errors?.[0]?.message || `HTTP ${response.status}` },
         };
       }
+      this.rateLimiter.calls.push(Date.now());
       return { data: data.data, error: null };
     } catch (error) {
       return {

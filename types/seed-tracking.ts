@@ -15,7 +15,7 @@ export interface SeedSession {
   duration: number; // seconds
   uploaded: number; // bytes
   downloaded: number; // bytes
-  /** Seed ratio (uploaded / downloaded). Can be Infinity if downloaded=0. Validate before display. */
+  /** Seed ratio (uploaded / downloaded). Can be Infinity if downloaded=0 — use isFinite() before JSON.stringify. */
   seedRatio: number;
   peers: number; // number of peers connected to
   status: "active" | "completed" | "error";

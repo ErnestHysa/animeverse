@@ -274,7 +274,7 @@ class WatchPartyRoomManager {
       roomId,
       userId: viewer.id,
       username: viewer.username,
-      message: data.message ? data.message.replace(/<[^>]*>/g, '') : '',
+      message: data.message ? data.message.replace(/<[^>]*>/g, '').replace(/on\w+\s*=/gi, '') : '',
       timestamp: Date.now(),
       type: 'text',
     };
@@ -308,7 +308,7 @@ class WatchPartyRoomManager {
     this.io.to(roomId).emit('new_reaction', reaction);
 
     this.io.to(roomId).emit('new_message', {
-      id: `msg-react-${Date.now()}`,
+      id: `msg-react-${Date.now()}-${Math.random().toString(36).slice(2,9)}`,
       roomId,
       userId: viewer.id,
       username: viewer.username,
@@ -459,7 +459,7 @@ class WatchPartyRoomManager {
 
   broadcastToRoom(roomId, data) {
     const message = {
-      id: `sys-${Date.now()}`,
+      id: `sys-${Date.now()}-${Math.random().toString(36).slice(2,9)}`,
       roomId,
       userId: 'system',
       username: 'System',
@@ -522,4 +522,7 @@ app.prepare().then(() => {
       console.log(`> Ready on http://${hostname}:${port}`);
       console.log('> WebSocket server initialized for watch parties');
     });
+}).catch((error) => {
+  console.error('Failed to prepare Next.js app:', error);
+  process.exit(1);
 });

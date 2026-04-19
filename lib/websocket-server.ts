@@ -35,6 +35,7 @@ export interface WatchPartyViewer {
   joinedAt: number;
   lastSeen: number;
   isHost: boolean;
+  disconnected?: boolean;
 }
 
 export interface PlaybackSyncState {
@@ -484,7 +485,7 @@ class WatchPartyRoomManager {
 
     // Also show as temporary chat message
     this.io?.to(roomId).emit('new_message', {
-      id: `msg-react-${Date.now()}`,
+      id: `msg-react-${Date.now()}-${Math.random().toString(36).slice(2,9)}`,
       roomId,
       userId: viewer.id,
       username: viewer.username,
@@ -632,7 +633,7 @@ class WatchPartyRoomManager {
         name: room.name,
         animeId: room.animeId,
         episodeNumber: room.episodeNumber,
-        viewerCount: room.viewers.size,
+        viewerCount: Array.from(room.viewers.values()).filter(v => !v.disconnected).length,
         createdAt: room.createdAt,
       }));
   }
@@ -674,7 +675,7 @@ class WatchPartyRoomManager {
    */
   private broadcastToRoom(roomId: string, data: { type: string; message: string }): void {
     const message: ChatMessage = {
-      id: `sys-${Date.now()}`,
+      id: `sys-${Date.now()}-${Math.random().toString(36).slice(2,9)}`,
       roomId,
       userId: 'system',
       username: 'System',

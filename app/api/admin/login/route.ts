@@ -26,14 +26,19 @@ const MAX_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes
 
 // Cleanup expired entries every 10 minutes
-setInterval(() => {
+// Clear any previous interval from HMR hot-reload
+if ((globalThis as any).__loginRateLimitCleanupInterval) {
+  clearInterval((globalThis as any).__loginRateLimitCleanupInterval);
+}
+(globalThis as any).__loginRateLimitCleanupInterval = setInterval(() => {
   const now = Date.now();
   for (const [key, attempts] of ipLoginAttempts.entries()) {
     if (now > attempts.resetTime) {
       ipLoginAttempts.delete(key);
     }
   }
-}, 10 * 60 * 1000).unref();
+}, 10 * 60 * 1000);
+(globalThis as any).__loginRateLimitCleanupInterval.unref();
 
 function isIpLocked(ip: string): boolean {
   const attempts = ipLoginAttempts.get(ip);
@@ -133,6 +138,13 @@ export async function POST(request: NextRequest): Promise<NextResponse<LoginResp
 
     // Attempt authentication
     const result = await authenticateUser({ username, password });
+
+    if (!result) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 500 }
+      );
+    }
 
     if (!result.success) {
       // Record failed attempt for both username and IP

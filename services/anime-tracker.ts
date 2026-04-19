@@ -185,7 +185,11 @@ class AnimeTracker {
    */
   private handleHTTPRequest(req: http.IncomingMessage, res: http.ServerResponse): void {
     // H10: Restrict CORS to specific origins instead of wildcard
-    const allowedOrigin = process.env.ALLOWED_ORIGINS?.split(',')[0] || 'https://animeverse.stream';
+    const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'https://animeverse.stream').split(',').map(s => s.trim());
+    const requestOrigin = req.headers.origin;
+    const allowedOrigin = requestOrigin && allowedOrigins.includes(requestOrigin)
+      ? requestOrigin
+      : allowedOrigins[0];
     res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST');
 
@@ -430,7 +434,8 @@ class AnimeTracker {
       }
       const { infoHash, verified, adminKey } = body;
 
-      if (adminKey !== process.env.ADMIN_KEY) {
+      const expectedKey = process.env.ADMIN_KEY;
+      if (!expectedKey || expectedKey.length !== adminKey.length || !timingSafeEqual(Buffer.from(adminKey), Buffer.from(expectedKey))) {
         res.writeHead(403, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: "Unauthorized" }));
         return;

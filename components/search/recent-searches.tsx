@@ -35,6 +35,17 @@ export function RecentSearches({ currentQuery }: { currentQuery?: string }) {
     }
   }, []);
 
+  // Cross-tab sync via storage event
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEY) {
+        setRecents(e.newValue ? JSON.parse(e.newValue) : []);
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
   // Save current query when it exists (debounced to avoid saving partial keystrokes)
   useEffect(() => {
     if (!currentQuery?.trim()) return;
@@ -81,8 +92,8 @@ export function RecentSearches({ currentQuery }: { currentQuery?: string }) {
         </button>
       </div>
       <div className="flex flex-wrap gap-2">
-        {recents.map((query) => (
-          <div key={query} className="flex items-center gap-1 group">
+        {recents.map((query, index) => (
+          <div key={`search-${index}-${query}`} className="flex items-center gap-1 group">
             <Link
               href={`/search?q=${encodeURIComponent(query)}`}
               className="px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-full text-sm transition-colors"

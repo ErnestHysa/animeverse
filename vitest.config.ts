@@ -26,6 +26,8 @@ export default defineConfig({
       '@/components': path.resolve(__dirname, './components'),
       '@/app': path.resolve(__dirname, './app'),
       '@/store': path.resolve(__dirname, './store'),
+      '@/types': path.resolve(__dirname, './types'),
+      '@/services': path.resolve(__dirname, './services'),
     },
   },
 });

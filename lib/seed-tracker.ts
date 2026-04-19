@@ -150,7 +150,7 @@ export function startSeedSession(
   infoHash: string
 ): SeedSession {
   return {
-    id: `${animeId}-${episode}-${Date.now()}`,
+    id: `${animeId}-${episode}-${Date.now()}-${Math.random().toString(36).slice(2,9)}`,
     animeId,
     animeTitle,
     episode,

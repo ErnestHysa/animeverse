@@ -224,7 +224,7 @@ class AlertsManager {
     }
 
     const alert: Alert = {
-      id: `alert_${Date.now()}_${rule.type}`,
+      id: `alert_${Date.now()}_${Math.random().toString(36).slice(2,9)}_${rule.type}`,
       type: rule.type,
       severity: rule.severity,
       message: rule.message(),
@@ -249,7 +249,7 @@ class AlertsManager {
     metadata?: Record<string, unknown>
   ): Alert {
     const alert: Alert = {
-      id: `alert_manual_${Date.now()}_${type}`,
+      id: `alert_manual_${Date.now()}_${Math.random().toString(36).slice(2,9)}_${type}`,
       type,
       severity,
       message,

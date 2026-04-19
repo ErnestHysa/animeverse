@@ -30,7 +30,7 @@ async function getUpcomingAnime() {
 
   // Calculate next season
   const seasons: Array<"WINTER" | "SPRING" | "SUMMER" | "FALL"> = ["WINTER", "SPRING", "SUMMER", "FALL"];
-  const currentSeasonIndex = seasons.indexOf(currentSeason as any);
+  const currentSeasonIndex = seasons.indexOf(currentSeason);
   const nextSeasonIndex = (currentSeasonIndex + 1) % 4;
   const nextSeason = seasons[nextSeasonIndex];
   const nextYear = nextSeasonIndex < currentSeasonIndex ? currentYear + 1 : currentYear;

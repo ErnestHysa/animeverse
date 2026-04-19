@@ -106,6 +106,9 @@ if (!gotTheLock) {
     if (config.startInBackground) {
       mainWindow?.hide();
     }
+  }).catch((error) => {
+    console.error('Failed to initialize Electron app:', error);
+    app.quit();
   });
 }
 

@@ -107,7 +107,7 @@ export function useWatchParty(animeId: number, episodeNumber: number) {
 
   // Helper: atomic-ish localStorage read-modify-write with retry (Fix H8)
   const atomicRoomUpdate = useCallback(
-    (roomId: string, mutate: (room: WatchPartyRoom) => void, retries = 1): boolean => {
+    async (roomId: string, mutate: (room: WatchPartyRoom) => void, retries = 1): Promise<boolean> => {
       try {
         const result = safeGetItem<WatchPartyRoom>(`${STORAGE_KEY}-room-${roomId}`);
         if (!result.success || !result.data) return false;
@@ -119,8 +119,7 @@ export function useWatchParty(animeId: number, episodeNumber: number) {
         if (retries > 0) {
           // Small random delay to reduce collision probability, then retry once
           const delay = 50 + Math.floor(Math.random() * 100);
-          const start = Date.now();
-          while (Date.now() - start < delay) { /* busy-wait is fine for <150ms */ }
+          await new Promise(resolve => setTimeout(resolve, delay));
           try {
             const result = safeGetItem<WatchPartyRoom>(`${STORAGE_KEY}-room-${roomId}`);
             if (!result.success || !result.data) return false;
@@ -139,7 +138,7 @@ export function useWatchParty(animeId: number, episodeNumber: number) {
   );
 
   // Join an existing room
-  const joinRoom = useCallback((roomId: string) => {
+  const joinRoom = useCallback(async (roomId: string) => {
     const result = safeGetItem<WatchPartyRoom>(`${STORAGE_KEY}-room-${roomId}`);
 
     if (!result.success || !result.data) {
@@ -158,9 +157,9 @@ export function useWatchParty(animeId: number, episodeNumber: number) {
       safeSetItem(`${STORAGE_KEY}-current`, { roomId, isHost: false });
 
       // Add viewer to room with retry (Fix H8)
-      const updated = atomicRoomUpdate(roomId, (r) => { r.viewers++; });
+      const updated = await atomicRoomUpdate(roomId, (r) => { r.viewers++; });
       if (!updated) {
-        // Write failed after retry — still join but warn
+        // Write failed after retry - still join but warn
         console.warn("Failed to update room viewer count after retry");
       }
 
@@ -182,12 +181,12 @@ export function useWatchParty(animeId: number, episodeNumber: number) {
   }, [animeId, episodeNumber, atomicRoomUpdate]);
 
   // Leave current room — uses refs to avoid stale closure (Fix L7)
-  const leaveRoom = useCallback(() => {
+  const leaveRoom = useCallback(async () => {
     const { roomId } = stateRef.current;
     if (!roomId) return;
 
     try {
-      const updated = atomicRoomUpdate(roomId, (room) => {
+      const updated = await atomicRoomUpdate(roomId, (room) => {
         if (room.viewers > 0) {
           room.viewers--;
         }
@@ -386,15 +385,25 @@ export function WatchPartyControls({
   }, [state.roomId, onSyncState]);
 
   // Sync playback when current time changes — also broadcast to other tabs
+  // Throttled to once per second to avoid flooding at ~60fps
+  const lastSyncRef = useRef(0);
   useEffect(() => {
     if (state.isHost && onSync) {
-      onSync(currentTime, isPlaying);
+      const now = Date.now();
+      if (now - lastSyncRef.current >= 1000) {
+        lastSyncRef.current = now;
+        onSync(currentTime, isPlaying);
+      }
     }
     if (state.isHost && state.roomId && channelRef.current) {
-      channelRef.current.postMessage({
-        type: "SYNC_STATE",
-        data: { currentTime, isPlaying },
-      });
+      const now = Date.now();
+      if (now - lastSyncRef.current >= 1000 || lastSyncRef.current === 0) {
+        lastSyncRef.current = now;
+        channelRef.current.postMessage({
+          type: "SYNC_STATE",
+          data: { currentTime, isPlaying },
+        });
+      }
     }
   }, [currentTime, isPlaying, state.isHost, state.roomId, onSync]);
 

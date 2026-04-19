@@ -1007,7 +1007,7 @@ export function EnhancedVideoPlayer({
             onError?.(err);
           },
         });
-      });
+      }).catch(() => {});
     }
     })(); // end async IIFE
 

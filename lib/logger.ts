@@ -18,14 +18,26 @@ interface ScopedLogger {
 }
 
 /**
- * Default logger that wraps console methods
+ * Log level filtering — in production suppress debug/info
+ */
+const LOG_LEVEL =
+  typeof process !== "undefined" && process.env.NODE_ENV === "production"
+    ? "warn"
+    : "debug";
+const LEVELS: Record<string, number> = { debug: 0, info: 1, warn: 2, error: 3 };
+function shouldLog(level: string): boolean {
+  return LEVELS[level] >= LEVELS[LOG_LEVEL];
+}
+
+/**
+ * Default logger that wraps console methods with level filtering
  */
 const logger: Logger = {
-  log: (...args: unknown[]) => console.log(...args),
-  warn: (...args: unknown[]) => console.warn(...args),
+  log: (...args: unknown[]) => { if (shouldLog("info")) console.log(...args); },
+  warn: (...args: unknown[]) => { if (shouldLog("warn")) console.warn(...args); },
   error: (...args: unknown[]) => console.error(...args),
-  info: (...args: unknown[]) => console.info(...args),
-  debug: (...args: unknown[]) => console.debug(...args),
+  info: (...args: unknown[]) => { if (shouldLog("info")) console.info(...args); },
+  debug: (...args: unknown[]) => { if (shouldLog("debug")) console.debug(...args); },
 };
 
 export default logger;
@@ -41,10 +53,10 @@ export function createScopedLogger(scope: string): ScopedLogger {
       console.error(prefix, ...args);
     },
     warn: (...args: unknown[]) => {
-      console.warn(prefix, ...args);
+      if (shouldLog("warn")) console.warn(prefix, ...args);
     },
     info: (...args: unknown[]) => {
-      console.info(prefix, ...args);
+      if (shouldLog("info")) console.info(prefix, ...args);
     },
   };
 }

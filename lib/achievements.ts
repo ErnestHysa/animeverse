@@ -187,7 +187,7 @@ export const RARITY_BADGES = {
 // Helper function to get achievement requirement
 export function getAchievementRequirement(achievementId: string): number {
   const achievement = ACHIEVEMENTS.find((a) => a.id === achievementId);
-  return achievement?.requirement || 0;
+  return achievement?.requirement ?? -1;
 }
 
 // ===================================

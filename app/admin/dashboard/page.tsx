@@ -104,7 +104,7 @@ export default function AdminDashboardPage() {
       setLoading(true);
       const authHeaders = getAuthHeaders();
       const [analyticsRes, serverRes, alertsRes] = await Promise.all([
-        fetch(`/api/analytics/summary?period=${period}`),
+        fetch(`/api/analytics/summary?period=${period}`, { headers: authHeaders }),
         fetch("/api/admin/seed-server/status", { headers: authHeaders }),
         fetch("/api/admin/alerts", { headers: authHeaders }),
       ]);
@@ -471,7 +471,7 @@ export default function AdminDashboardPage() {
               <span className="text-gray-400">Fallback Rate</span>
               <RefreshCw className="w-4 h-4 text-gray-500" />
             </div>
-            <p className="text-2xl font-bold">{analytics?.fallbackRate.toFixed(1)}%</p>
+            <p className="text-2xl font-bold">{(analytics?.fallbackRate ?? 0).toFixed(1)}%</p>
             <p className="text-sm text-gray-500 mt-1">
               {analytics && analytics.fallbackRate > 50 ? (
                 <span className="text-yellow-500">Above 50% threshold</span>
@@ -487,7 +487,7 @@ export default function AdminDashboardPage() {
               <span className="text-gray-400">Avg Seeders</span>
               <Users className="w-4 h-4 text-gray-500" />
             </div>
-            <p className="text-2xl font-bold">{analytics?.averageSeederCount.toFixed(1)}</p>
+            <p className="text-2xl font-bold">{(analytics?.averageSeederCount ?? 0).toFixed(1)}</p>
             <p className="text-sm text-gray-500 mt-1">
               {analytics && analytics.averageSeederCount < 3 ? (
                 <span className="text-yellow-500">Low seeder count</span>

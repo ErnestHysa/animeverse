@@ -18,7 +18,11 @@ const rateLimitStore = new Map<string, RateLimitEntry>();
 
 // Cleanup old entries every 60 seconds and cap map size
 if (typeof setInterval !== 'undefined') {
-  setInterval(() => {
+  // Clear any previous interval from HMR hot-reload
+  if ((globalThis as any).__rateLimitCleanupInterval) {
+    clearInterval((globalThis as any).__rateLimitCleanupInterval);
+  }
+  (globalThis as any).__rateLimitCleanupInterval = setInterval(() => {
     const now = Date.now();
     for (const [key, entry] of rateLimitStore.entries()) {
       if (now > entry.resetTime) {
@@ -35,7 +39,8 @@ if (typeof setInterval !== 'undefined') {
         deleted++;
       }
     }
-  }, 60 * 1000).unref();
+  }, 60 * 1000);
+  (globalThis as any).__rateLimitCleanupInterval.unref();
 }
 
 interface RateLimitRule {

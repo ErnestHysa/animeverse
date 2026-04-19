@@ -878,8 +878,34 @@ export const useStore = create<StoreState>()(
               case "list-creator":
                 // This is handled elsewhere when creating a list
                 continue;
+              case "shonen-fan": {
+                // Count episodes watched that belong to shonen anime
+                let shonenEpisodes = 0;
+                for (const item of state.watchHistory) {
+                  const media = state.mediaCache[item.mediaId];
+                  if (media?.genres?.some((g: string) => g.toLowerCase() === "action" || g.toLowerCase() === "shounen")) {
+                    shonenEpisodes++;
+                  }
+                }
+                currentProgress = shonenEpisodes;
+                shouldUnlock = shonenEpisodes >= (achievement.requirement || 100);
+                break;
+              }
+              case "slice-of-life": {
+                // Count episodes watched that belong to slice of life anime
+                let solEpisodes = 0;
+                for (const item of state.watchHistory) {
+                  const media = state.mediaCache[item.mediaId];
+                  if (media?.genres?.some((g: string) => g.toLowerCase() === "slice of life")) {
+                    solEpisodes++;
+                  }
+                }
+                currentProgress = solEpisodes;
+                shouldUnlock = solEpisodes >= (achievement.requirement || 50);
+                break;
+              }
               default:
-                // Genre-specific achievements would need genre tracking
+                // Unknown achievement type, skip
                 continue;
             }
 

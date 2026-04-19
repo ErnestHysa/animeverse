@@ -78,7 +78,7 @@ export function ServerSelector({
         if (!cancelled) {
           setLatencies((prev) => ({ ...prev, [server.id]: ms }));
         }
-      });
+      }).catch(() => {});
     });
     return () => {
       cancelled = true;

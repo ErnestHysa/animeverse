@@ -24,7 +24,7 @@ const MAX_PER_MINUTE = 10;
 
 async function rateLimitedFetch(url: string, options?: RequestInit): Promise<Response> {
   const domain = new URL(url).hostname;
-  const now = Date.now();
+  let now = Date.now();
   const timestamps = domainRequests.get(domain) || [];
   // Clean old timestamps
   const recent = timestamps.filter(t => now - t < 60000);
@@ -32,6 +32,8 @@ async function rateLimitedFetch(url: string, options?: RequestInit): Promise<Res
     const waitMs = 60000 - (now - recent[0]) + 100;
     await new Promise(r => setTimeout(r, waitMs));
   }
+  // Recapture now after any awaits to avoid stale timestamp
+  now = Date.now();
   // Check per-request interval
   if (recent.length > 0) {
     const elapsed = now - recent[recent.length - 1];
@@ -307,7 +309,8 @@ export function extractFansubGroup(title: string): string | null {
 export async function scrapeNyaa(
   animeTitle: string,
   episode: number,
-  maxResults: number = 10
+  maxResults: number = 10,
+  outerSignal?: AbortSignal
 ): Promise<MagnetLink[]> {
   return withRetry(async () => {
   try {
@@ -319,6 +322,8 @@ export async function scrapeNyaa(
 
     // Fetch the page
     const controller = new AbortController();
+    // Abort if either the outer signal or our internal timeout fires
+    outerSignal?.addEventListener('abort', () => controller.abort());
     const timeoutId = setTimeout(() => controller.abort(), 15000);
     let response: Response;
     try {
@@ -431,7 +436,8 @@ export async function scrapeNyaa(
 export async function scrapeNyaaLand(
   animeTitle: string,
   episode: number,
-  maxResults: number = 10
+  maxResults: number = 10,
+  outerSignal?: AbortSignal
 ): Promise<MagnetLink[]> {
   return withRetry(async () => {
   try {
@@ -442,6 +448,8 @@ export async function scrapeNyaaLand(
     console.log(`[Nyaa.land] Searching: ${searchQuery}`);
 
     const nyaaLandController = new AbortController();
+    // Abort if either the outer signal or our internal timeout fires
+    outerSignal?.addEventListener('abort', () => nyaaLandController.abort());
     const nyaaLandTimeoutId = setTimeout(() => nyaaLandController.abort(), 15000);
     let response: Response;
     try {
@@ -546,7 +554,8 @@ export async function scrapeNyaaLand(
 export async function scrapeAniDex(
   animeTitle: string,
   episode: number,
-  maxResults: number = 10
+  maxResults: number = 10,
+  outerSignal?: AbortSignal
 ): Promise<MagnetLink[]> {
   return withRetry(async () => {
   try {
@@ -557,6 +566,8 @@ export async function scrapeAniDex(
     console.log(`[AniDex] Searching: ${searchQuery}`);
 
     const anidexController = new AbortController();
+    // Abort if either the outer signal or our internal timeout fires
+    outerSignal?.addEventListener('abort', () => anidexController.abort());
     const anidexTimeoutId = setTimeout(() => anidexController.abort(), 15000);
     let response: Response;
     try {
@@ -1020,9 +1031,9 @@ export async function findTorrentSources(
   const anidexController = new AbortController();
 
   const results = await Promise.allSettled([
-    withTimeout(scrapeNyaa(animeTitle, episode), 15000, nyaaController),
-    withTimeout(scrapeNyaaLand(animeTitle, episode), 15000, nyaaLandController),
-    withTimeout(scrapeAniDex(animeTitle, episode), 15000, anidexController),
+    withTimeout(scrapeNyaa(animeTitle, episode, 10, nyaaController.signal), 15000, nyaaController),
+    withTimeout(scrapeNyaaLand(animeTitle, episode, 10, nyaaLandController.signal), 15000, nyaaLandController),
+    withTimeout(scrapeAniDex(animeTitle, episode, 10, anidexController.signal), 15000, anidexController),
   ]);
 
   // Collect all successful results
