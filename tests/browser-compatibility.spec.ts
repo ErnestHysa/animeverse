@@ -37,13 +37,15 @@ for (const [browserName, displayName] of Object.entries(browsers)) {
       expect(webrtcSupport).toBe(true);
     });
 
-    // TODO: Update selectors to match real DOM - data-testid="anime-card" and related selectors don't exist
+    // TODO: Re-enable once a stable seeded watch flow is available in test env.
+    // Current UI uses route links and accessible labels rather than the old
+    // `data-testid="anime-card"` / `episode-item` selectors.
     test.skip('should initialize WebTorrent client', async ({ page }) => {
       await page.goto('http://localhost:3000');
 
-      // Navigate to video player with WebTorrent
-      await page.click('[data-testid="anime-card"]:first-child');
-      await page.click('[data-testid="episode-item"]:first-child');
+      // Navigate to an anime details page, then use the primary watch CTA.
+      await page.locator('a[href^="/anime/"]').first().click();
+      await page.getByRole('link', { name: /watch now/i }).first().click();
 
       // Set streaming method to WebTorrent
       await page.click('[data-testid="settings-button"]');
@@ -58,12 +60,12 @@ for (const [browserName, displayName] of Object.entries(browsers)) {
       expect(clientInitialized).toBe(true);
     });
 
-    // TODO: Update selectors to match real DOM - data-testid selectors don't exist
+    // TODO: Re-enable once fixture-backed anime/watch routes are available.
     test.skip('should display video player', async ({ page }) => {
       await page.goto('http://localhost:3000');
 
-      await page.click('[data-testid="anime-card"]:first-child');
-      await page.click('[data-testid="episode-item"]:first-child');
+      await page.locator('a[href^="/anime/"]').first().click();
+      await page.getByRole('link', { name: /watch now/i }).first().click();
 
       // Check if video element is present
       const videoElement = await page.locator('video').isVisible();
@@ -97,12 +99,13 @@ for (const [browserName, displayName] of Object.entries(browsers)) {
       expect(magnetParsed).toBe(true);
     });
 
-    // TODO: Update selectors to match real DOM - data-testid selectors don't exist
+    // TODO: Re-enable after the in-player settings dialog has dedicated test fixtures.
     test.skip('should display streaming settings', async ({ page }) => {
       await page.goto('http://localhost:3000');
 
-      await page.click('[data-testid="settings-button"]');
-      await page.click('[data-testid="playback-settings-tab"]');
+      await page.locator('a[href^="/anime/"]').first().click();
+      await page.getByRole('link', { name: /watch now/i }).first().click();
+      await page.getByLabel('Settings').click();
 
       // Check if streaming method options are visible
       await expect(page.locator('[data-testid="streaming-method-hls"]')).toBeVisible();
@@ -110,33 +113,31 @@ for (const [browserName, displayName] of Object.entries(browsers)) {
       await expect(page.locator('[data-testid="streaming-method-hybrid"]')).toBeVisible();
     });
 
-    // TODO: Update selectors to match real DOM - data-testid selectors don't exist
+    // TODO: Re-enable after player settings can be controlled reliably in tests.
     test.skip('should persist settings in localStorage', async ({ page }) => {
       await page.goto('http://localhost:3000');
 
-      // Set streaming method
-      await page.click('[data-testid="settings-button"]');
-      await page.click('[data-testid="playback-settings-tab"]');
-      await page.click('[data-testid="streaming-method-webtorrent"]');
+      await page.locator('a[href^="/anime/"]').first().click();
+      await page.getByRole('link', { name: /watch now/i }).first().click();
+      await page.getByLabel('Settings').click();
 
       // Reload page
       await page.reload();
 
       // Navigate to settings again
-      await page.click('[data-testid="settings-button"]');
-      await page.click('[data-testid="playback-settings-tab"]');
+      await page.getByLabel('Settings').click();
 
       // Verify setting persisted
       const isChecked = await page.locator('[data-testid="streaming-method-webtorrent"]').isChecked();
       expect(isChecked).toBe(true);
     });
 
-    // TODO: Update selectors to match real DOM - data-testid selectors don't exist
+    // TODO: Re-enable once watch routes are seeded consistently for Playwright.
     test.skip('should handle video playback controls', async ({ page }) => {
       await page.goto('http://localhost:3000');
 
-      await page.click('[data-testid="anime-card"]:first-child');
-      await page.click('[data-testid="episode-item"]:first-child');
+      await page.locator('a[href^="/anime/"]').first().click();
+      await page.getByRole('link', { name: /watch now/i }).first().click();
 
       // Wait for video player
       await page.waitForSelector('video', { timeout: 10000 });
@@ -154,12 +155,12 @@ for (const [browserName, displayName] of Object.entries(browsers)) {
       expect(paused).toBe(true);
     });
 
-    // TODO: Update selectors to match real DOM - data-testid selectors don't exist
+    // TODO: Re-enable after the quality menu has a stable open-state fixture in tests.
     test.skip('should display quality selector', async ({ page }) => {
       await page.goto('http://localhost:3000');
 
-      await page.click('[data-testid="anime-card"]:first-child');
-      await page.click('[data-testid="episode-item"]:first-child');
+      await page.locator('a[href^="/anime/"]').first().click();
+      await page.getByRole('link', { name: /watch now/i }).first().click();
 
       // Check if quality selector exists
       const qualitySelector = page.locator('[data-testid="quality-selector"]');
@@ -171,13 +172,13 @@ for (const [browserName, displayName] of Object.entries(browsers)) {
       }
     });
 
-    // TODO: Update selectors to match real DOM - data-testid selectors don't exist
+    // TODO: Re-enable after the player settings flow is stabilized for tests.
     test.skip('should handle streaming method switching', async ({ page }) => {
       await page.goto('http://localhost:3000');
 
       // Navigate to video player
-      await page.click('[data-testid="anime-card"]:first-child');
-      await page.click('[data-testid="episode-item"]:first-child');
+      await page.locator('a[href^="/anime/"]').first().click();
+      await page.getByRole('link', { name: /watch now/i }).first().click();
 
       // Set to WebTorrent
       await page.click('[data-testid="settings-button"]');
@@ -218,26 +219,26 @@ test.describe('Mobile Browser Compatibility', () => {
     hasTouch: true,
   });
 
-  // TODO: Update selectors to match real DOM - data-testid selectors don't exist
+  // TODO: Re-enable after mobile fixtures cover a stable anime -> watch flow.
   test.skip('should work on mobile Chrome', async ({ page }) => {
     await page.goto('http://localhost:3000');
 
     // Check if page loads correctly
-    await expect(page.locator('[data-testid="home-container"]')).toBeVisible();
+    await expect(page.getByRole('link', { name: /animeverse/i }).first()).toBeVisible();
 
     // Test navigation
-    await page.click('[data-testid="anime-card"]:first-child');
+    await page.locator('a[href^="/anime/"]').first().click();
 
-    // Verify episode list loads
-    await expect(page.locator('[data-testid="episode-item"]:first-child')).toBeVisible();
+    // Verify watch CTA is present
+    await expect(page.getByRole('link', { name: /watch now/i }).first()).toBeVisible();
   });
 
-  // TODO: Update selectors to match real DOM - data-testid selectors don't exist
+  // TODO: Re-enable after mobile player controls are covered by a deterministic fixture.
   test.skip('should display mobile-friendly controls', async ({ page }) => {
     await page.goto('http://localhost:3000');
 
-    await page.click('[data-testid="anime-card"]:first-child');
-    await page.click('[data-testid="episode-item"]:first-child');
+    await page.locator('a[href^="/anime/"]').first().click();
+    await page.getByRole('link', { name: /watch now/i }).first().click();
 
     // Check if video player is responsive
     const video = page.locator('video');

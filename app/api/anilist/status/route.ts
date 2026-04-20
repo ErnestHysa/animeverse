@@ -49,6 +49,7 @@ export async function DELETE() {
     const cookieStore = await cookies();
     cookieStore.delete('anilist_token');
     cookieStore.delete('anilist_user');
+    cookieStore.delete('anilist_user_display');
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('[AniList Status] Error clearing cookies:', error);

@@ -115,4 +115,4 @@ export const metadata = {
     "Discover underrated anime with high ratings that most people haven't seen yet.",
 };
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;

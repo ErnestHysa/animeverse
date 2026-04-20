@@ -28,6 +28,7 @@ export interface EpisodeSources {
   provider: string;
   referer?: string;
   isFallback?: boolean;
+  isDemo?: boolean;
 }
 
 export interface SubtitleSource {
@@ -571,9 +572,13 @@ export async function getEpisodeSources(
     title?: string;
     malId?: number | null;
     language?: 'sub' | 'dub';
+  } = {},
+  config: {
+    allowDemoFallback?: boolean;
   } = {}
 ): Promise<EpisodeSources> {
   const { title = `Anime ${animeId}`, language = 'sub' } = options;
+  const { allowDemoFallback = true } = config;
 
   log('info', `Fetching sources: ${title} - Episode ${episodeNumber} (${language})`);
 
@@ -618,6 +623,10 @@ export async function getEpisodeSources(
     }
   }
 
+  if (!allowDemoFallback) {
+    throw new Error(`No playable sources found for ${title} episode ${episodeNumber}`);
+  }
+
   // All strategies failed - return demo
   log('warn', 'All strategies failed, returning demo video');
   const demoResult = getDemoSources(animeId, episodeNumber, title);
@@ -640,6 +649,7 @@ export function getDemoSources(
     subtitles: [],
     provider: 'Demo',
     isFallback: true,
+    isDemo: true,
   };
 }
 

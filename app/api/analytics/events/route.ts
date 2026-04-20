@@ -28,6 +28,7 @@ const MAX_ANALYTICS_EVENTS = 10000; // Fix H3: Cap events array size
 const ALLOWED_EVENT_TYPES = new Set([
   "playback_start",
   "playback_end",
+  "playback_error",
   "fallback",
   "buffering",
   "torrent_stats",
@@ -63,8 +64,12 @@ const ALLOWED_EVENT_FIELDS = new Set([
   "uploadSpeed",
   "progress",
   "infoHash",
+  "p2pBytes",
+  "cdnBytes",
   "fromQuality",
   "toQuality",
+  "error",
+  "source",
 ]);
 
 const MAX_EVENTS_PER_REQUEST = 20;

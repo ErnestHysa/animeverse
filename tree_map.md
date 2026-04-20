@@ -1,7 +1,7 @@
 ================================================================================
   ANIMEVERSE — CODEBASE TREE MAP
-  Last updated: 2026-04-13
-  Total files: ~320 | Total lines: ~36,850 (source code)
+  Last updated: 2026-04-20
+  Total files: ~324 | Total lines: ~37,100 (source code)
 ================================================================================
 
 > **THIS FILE IS THE SINGLE SOURCE OF TRUTH FOR UNDERSTANDING THIS CODEBASE.**
@@ -58,6 +58,22 @@ features AniList and MyAnimeList integration, a recommendation engine, watch
 party functionality, PWA support, Electron desktop packaging, admin dashboard,
 community features (ratings, comments), and comprehensive analytics.
 
+Recent implementation notes (2026-04-20):
+  - Admin auth now uses secure cookie-backed sessions end-to-end. The app now
+    includes `/admin/login` plus a shared `lib/admin-client.ts` helper used by
+    admin screens instead of `localStorage` tokens.
+  - Monitoring/analytics now share a single server-side data layer in
+    `lib/monitoring-data.ts`. Admin status routes and alerts read from that
+    module, and alert monitoring is started lazily when the alerts system loads.
+  - `/api/admin/torrents/health` now exists and backs the alert system.
+  - Video source resolution no longer silently swaps to demo playback on normal
+    failures. The API exposes explicit preview availability and the player only
+    enters preview mode when the user chooses it.
+  - Recommendation UI copy was renamed from “AI Picks” to neutral personalized
+    phrasing; the underlying recommendation engine remains heuristic.
+  - Several content pages now use ISR/revalidation instead of forced dynamic
+    rendering, and AniList list/search queries use lighter fragments.
+
   - Name:    AnimeVerse Stream
   - Domain:  animeverse.stream
   - Version: 0.1.0
@@ -110,8 +126,8 @@ animeverse/
 │   ├── favicon.ico
 │   ├── about/                      # About page
 │   ├── achievements/               # User achievements
-│   ├── admin/                      # Admin panel (dashboard, magnets)
-│   ├── anime/[id]/                 # Anime detail page (dynamic route)
+│   ├── admin/                      # Admin panel (login, dashboard, magnets)
+│   ├── anime/[id]/                 # Anime detail page (ISR, info, episodes)
 │   ├── api/                        # API route handlers (see Section 6)
 │   ├── auth/                       # OAuth callbacks (AniList, MAL)
 │   ├── batch/                      # Batch operations page
@@ -150,7 +166,7 @@ animeverse/
 │   ├── player/                     # Video player suite (HLS, DASH, Torrent)
 │   ├── providers/                  # Context providers (theme)
 │   ├── pwa/                        # PWA (service worker, install prompt)
-│   ├── recommendations/            # AI recommendations
+│   ├── recommendations/            # Personalized recommendation UI
 │   ├── search/                     # Search UI (filters, recent searches)
 │   ├── seed-tracking/              # Seed ratio badges
 │   ├── settings/                   # Settings panels
@@ -186,6 +202,7 @@ animeverse/
 ├── lib/                            # Business logic & utilities (see Section 8)
 │   ├── achievements.ts             # Achievement definitions & unlock logic
 │   ├── alerts-manager.ts           # Admin alert system
+│   ├── admin-client.ts             # Client helper for cookie-backed admin auth
 │   ├── analytics-integration.ts    # Analytics API integration
 │   ├── analytics-tracker.ts        # Client-side event tracking
 │   ├── anilist.ts                  # AniList GraphQL client
@@ -207,6 +224,7 @@ animeverse/
 │   ├── keyboard-shortcuts.ts       # Keyboard shortcut definitions
 │   ├── logger.ts                   # Scoped logger (dev/production aware)
 │   ├── mal-api.ts                  # MyAnimeList API client
+│   ├── monitoring-data.ts          # Shared analytics/health snapshot helpers
 │   ├── notifications.ts            # Notification management
 │   ├── p2pml-manager.ts            # P2P Media Loader (HLS P2P sharing)
 │   ├── ratings.ts                  # Magnet/user rating logic
@@ -326,9 +344,10 @@ animeverse/
 
   Route                       | File                                    | Description
   ----------------------------|-----------------------------------------|---------------------------
-  /                           | app/page.tsx (426 lines)                | Home — hero, trending, continue watching, AI recs
+  /                           | app/page.tsx (426 lines)                | Home — hero, trending, continue watching, personalized recs
   /about                      | app/about/page.tsx                      | About the app
   /achievements               | app/achievements/page.tsx               | User achievement gallery
+  /admin/login                | app/admin/login/page.tsx                | Admin sign-in page
   /admin/dashboard            | app/admin/dashboard/page.tsx            | Admin panel dashboard
   /admin/magnets              | app/admin/magnets/page.tsx              | Admin magnet management
   /anime/[id]                 | app/anime/[id]/page.tsx                 | Anime detail — info, episodes, characters
@@ -386,11 +405,12 @@ animeverse/
   GET /api/watch-party/rooms/[roomId]         | app/api/watch-party/rooms/.../route.ts | Room details
   POST /api/admin/login                       | app/api/admin/login/route.ts        | Admin JWT login
   GET /api/admin/feature-flags                | app/api/admin/feature-flags/route.ts| Admin flag management
-  GET/POST /api/admin/alerts                  | app/api/admin/alerts/route.ts       | Admin alert system
+  GET/POST/PATCH /api/admin/alerts            | app/api/admin/alerts/route.ts       | Admin alert system
   GET/POST /api/admin/magnets                 | app/api/admin/magnets/route.ts      | Admin magnet CRUD
   POST /api/admin/magnets/bulk-import         | app/api/admin/magnets/bulk-import/route.ts | Bulk import magnets
   POST /api/admin/magnets/validate            | app/api/admin/magnets/validate/route.ts    | Validate magnet links
   GET /api/admin/seed-server/status           | app/api/admin/seed-server/status/route.ts | Seed server status
+  GET /api/admin/torrents/health              | app/api/admin/torrents/health/route.ts | Torrent health snapshot
 
 
 ================================================================================
@@ -454,7 +474,7 @@ animeverse/
   service-worker-register.tsx  Registers the service worker
   install-prompt.tsx           "Install App" prompt for PWA
 
-  --- recommendations/ — AI features ---
+  --- recommendations/ — Personalized discovery ---
   ai-recommendations.tsx          Recommendation list component
   ai-recommendations-section.tsx  Section wrapper for home page
 
@@ -545,14 +565,15 @@ animeverse/
     Room auto-cleanup after 24h inactivity.
 
   recommendations.ts (354 lines)
-    AI recommendation engine. Analyzes watch history to build genre/format/
+    Heuristic recommendation engine. Analyzes watch history to build genre/format/
     studio preference profiles. Scores candidate anime by match percentage.
     Provides human-readable reasons for each recommendation.
 
   analytics-tracker.ts (321 lines)
     Client-side analytics. Batches events (10 items or 30s interval).
     Tracks: playback_start, playback_end, fallback, buffering, torrent_stats,
-    quality_change. Sends to /api/analytics/events.
+    quality_change, playback_error. Sends batched payloads to
+    /api/analytics/events, including unload beacons.
 
   seed-tracker.ts (341 lines)
     Tracks P2P seed ratios. Manages seed sessions, computes stats, unlocks
@@ -611,7 +632,12 @@ animeverse/
     Achievement definitions and unlock requirement checking.
 
   alerts-manager.ts
-    Admin alert system for system notifications.
+    Admin alert system for system notifications. Uses shared monitoring-data
+    helpers instead of server-side relative fetch calls.
+
+  monitoring-data.ts
+    Shared analytics summary and health snapshot loader. Reads analytics event
+    logs and magnet data for admin routes and alerts.
 
   aniskip.ts
     AniSkip API client. Returns intro/outro timestamps for auto-skip.
@@ -1302,12 +1328,12 @@ animeverse/
   --- TRACE 1: User opens the home page ---
   1. Browser requests /
   2. Next.js renders app/layout.tsx (root layout, wraps with providers)
-  3. Next.js renders app/page.tsx (SERVER COMPONENT, force-dynamic)
+  3. Next.js renders app/page.tsx (SERVER COMPONENT, ISR with 5-minute revalidate)
   4. getTrendingAnime() → lib/anilist.ts → AniList GraphQL API
   5. getPopularAnime() → lib/anilist.ts → AniList GraphQL API
   6. getLatestEpisodes() → lib/anilist.ts → AniList GraphQL API
   7. getAiringSchedule() → lib/anilist.ts → AniList GraphQL API
-  8. Renders: Hero section, AnimeGrid, ContinueWatching, AIRecommendations
+  8. Renders: Hero section, AnimeGrid, ContinueWatching, personalized recommendations
   9. ContinueWatching reads from Zustand store (localStorage)
 
   --- TRACE 2: User clicks play on an episode ---
@@ -1348,7 +1374,7 @@ animeverse/
   5. Chat messages relayed through Socket.IO
 
   --- TRACE 6: Admin manages feature flags ---
-  1. Admin logs in via /admin → POST /api/admin/login → lib/auth.ts (JWT)
+  1. Admin logs in via /admin/login → POST /api/admin/login → lib/auth.ts (JWT)
   2. /admin/dashboard renders with admin JWT cookie
   3. Feature flags read from lib/feature-flags.ts
   4. PUT /api/admin/feature-flags → updates flag configuration
@@ -1372,10 +1398,12 @@ animeverse/
   2. Create file:     app/your-page/page.tsx
   3. If it needs client interactivity (store, state, effects):
        Add "use client" at top
-       Add export const dynamic = "force-dynamic"
+       Only add `export const dynamic = "force-dynamic"` if the route truly
+       depends on per-request behavior that ISR/static rendering cannot handle
   4. If it fetches data server-side:
        Do NOT add "use client"
        Export an async function that awaits data
+       Prefer `revalidate = ...` for cacheable content pages
        Pass data to client components as props
   5. Import shared components from @/components/
   6. Add link to navigation in components/layout/header.tsx
@@ -1459,10 +1487,10 @@ animeverse/
        const { animeId } = await params;
      NOT: const { animeId } = params; // This will fail silently
 
-  3. FORCE-DYNAMIC ON MOST PAGES
-     Almost every page has `export const dynamic = "force-dynamic"`. This
-     prevents static generation. The output config is "standalone" which
-     means the app runs as a Node.js server, not static export.
+  3. MIXED RENDERING MODES
+     The app uses a mix of force-dynamic routes, client-heavy pages, and ISR.
+     Prefer ISR/revalidation for cacheable content pages, and reserve
+     `force-dynamic` for routes that truly require per-request behavior.
 
   4. WEBPACK, NOT TURBOPACK FOR PRODUCTION
      next.config.ts enables Turbopack for dev but the build uses webpack.

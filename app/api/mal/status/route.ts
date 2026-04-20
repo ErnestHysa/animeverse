@@ -11,6 +11,7 @@ export async function DELETE() {
     cookieStore.delete('mal_token');
     cookieStore.delete('mal_refresh_token');
     cookieStore.delete('mal_token_expires');
+    cookieStore.delete('mal_user');
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('[MAL Status] Error clearing cookies:', error);

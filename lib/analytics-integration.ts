@@ -120,6 +120,8 @@ export function trackTorrentStats(params: {
   uploadSpeed: number;
   progress: number;
   infoHash: string;
+  p2pBytes?: number;
+  cdnBytes?: number;
 }): void {
   try {
     const tracker = getAnalyticsTracker();
@@ -133,6 +135,8 @@ export function trackTorrentStats(params: {
       uploadSpeed: params.uploadSpeed,
       progress: params.progress,
       infoHash: params.infoHash,
+      p2pBytes: params.p2pBytes,
+      cdnBytes: params.cdnBytes,
     });
   } catch (error) {
     console.error("Failed to track torrent stats:", error);

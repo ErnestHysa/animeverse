@@ -69,6 +69,8 @@ export interface TorrentStatsEvent extends StreamingEvent {
   uploadSpeed: number; // bytes per second
   progress: number; // 0-1
   infoHash: string;
+  p2pBytes?: number;
+  cdnBytes?: number;
 }
 
 export interface QualityChangeEvent extends StreamingEvent {

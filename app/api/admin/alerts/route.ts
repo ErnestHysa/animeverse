@@ -3,7 +3,7 @@
  * Endpoint for managing alerts
  *
  * GET /api/admin/alerts - Get all alerts
- * PUT /api/admin/alerts/:id/resolve - Resolve an alert
+ * PATCH /api/admin/alerts?id=:id - Resolve an alert
  *
  * Phase 9: Monitoring & Analytics
  * Phase 11: Production Deployment - Added authentication
@@ -15,6 +15,8 @@ import { isAdminRequest } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+getAlertsManager();
 
 /**
  * GET /api/admin/alerts

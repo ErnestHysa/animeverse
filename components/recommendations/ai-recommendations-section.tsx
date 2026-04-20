@@ -1,5 +1,5 @@
 /**
- * Client-side AI Recommendations Section Wrapper
+ * Client-side personalized recommendations wrapper
  * Uses hooks for watch history and favorites
  */
 
@@ -46,7 +46,7 @@ export function AIRecommendationsSection({ allAnime }: AIRecommendationsSectionP
       watchHistory={watchHistory}
       favorites={favorites}
       limit={12}
-      title="AI Picks For You"
+      title="Picked For You"
     />
   );
 }

@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Bell, BellOff, Check, X } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import {
   getAnimeNotificationPreferences,
   setAnimeNotificationEnabled,
 } from "@/lib/notifications";
+import { safeGetItem, safeSetItem } from "@/lib/storage";
 
 // ===================================
 // Types
@@ -174,13 +175,18 @@ export function EpisodeNotifications({ airingSchedule = [] }: EpisodeNotificatio
   const [showSettings, setShowSettings] = useState(false);
   const [enabledCount, setEnabledCount] = useState(0);
   const [animeTitles, setAnimeTitles] = useState<Map<number, string>>(new Map());
+  const trackedAnime = useMemo(
+    () => [...new Set([...watchlist, ...favorites])],
+    [favorites, watchlist]
+  );
+  const hasTrackedAnime = trackedAnime.length > 0;
+  const hasEnabledNotifications = enabledCount > 0;
 
-  // Fetch anime titles for tracked anime
+  // Fetch anime titles only when the settings panel is opened.
   useEffect(() => {
-    async function fetchAnimeTitles() {
-      const trackedAnime = [...new Set([...watchlist, ...favorites])];
-      if (trackedAnime.length === 0) return;
+    if (!showSettings || !hasTrackedAnime) return;
 
+    async function fetchAnimeTitles() {
       try {
         const { anilist } = await import("@/lib/anilist");
         const result = await anilist.getByIds(trackedAnime);
@@ -199,7 +205,7 @@ export function EpisodeNotifications({ airingSchedule = [] }: EpisodeNotificatio
     }
 
     fetchAnimeTitles();
-  }, [watchlist, favorites]);
+  }, [hasTrackedAnime, showSettings, trackedAnime]);
 
   // Initialize notification manager
   useEffect(() => {
@@ -239,7 +245,7 @@ export function EpisodeNotifications({ airingSchedule = [] }: EpisodeNotificatio
 
   // Check for new episodes and send notifications
   useEffect(() => {
-    if (permission !== "granted" || airingSchedule.length === 0) return;
+    if (permission !== "granted" || airingSchedule.length === 0 || !hasEnabledNotifications) return;
 
     const checkInterval = setInterval(() => {
       if (document.hidden) return;
@@ -266,14 +272,16 @@ export function EpisodeNotifications({ airingSchedule = [] }: EpisodeNotificatio
     }, 60000); // Check every minute
 
     return () => clearInterval(checkInterval);
-  }, [permission, airingSchedule]);
+  }, [airingSchedule, hasEnabledNotifications, permission]);
 
   // Auto-check for upcoming episodes in user's watchlist
   useEffect(() => {
-    if (permission !== 'granted') return;
+    if (permission !== "granted" || !hasEnabledNotifications || !hasTrackedAnime) return;
 
     const checkUpcomingEpisodes = async () => {
       try {
+        if (document.hidden) return;
+
         const trackedIds = new Set([...watchlist, ...favorites]);
         if (trackedIds.size === 0) return;
 
@@ -314,14 +322,11 @@ export function EpisodeNotifications({ airingSchedule = [] }: EpisodeNotificatio
         const schedules = data?.data?.Page?.airingSchedules || [];
 
         // Filter to user's watchlist
-        const notifiedKey = 'notified-episodes';
-        let notified: string[];
-        try {
-          notified = JSON.parse(localStorage.getItem(notifiedKey) || '[]');
-        } catch {
-          localStorage.removeItem(notifiedKey);
-          notified = [];
-        }
+        const notifiedKey = "notified-episodes";
+        const storedNotified = safeGetItem<string[]>(notifiedKey);
+        let notified = storedNotified.success && Array.isArray(storedNotified.data)
+          ? storedNotified.data
+          : [];
 
         for (const schedule of schedules) {
           if (!trackedIds.has(schedule.media?.id)) continue;
@@ -346,19 +351,16 @@ export function EpisodeNotifications({ airingSchedule = [] }: EpisodeNotificatio
         }
 
         // Keep only last 200 notified keys
-        localStorage.setItem(notifiedKey, JSON.stringify(notified.slice(-200)));
+        safeSetItem(notifiedKey, notified.slice(-200));
       } catch {
         // Silently fail - notifications are non-critical
       }
     };
 
     checkUpcomingEpisodes();
-    const interval = setInterval(checkUpcomingEpisodes, 5 * 60 * 1000); // every 5 min
+    const interval = setInterval(checkUpcomingEpisodes, 15 * 60 * 1000); // every 15 min
     return () => clearInterval(interval);
-  }, [favorites, permission, watchlist]);
-
-  // Combine watchlist and favorites for notification settings
-  const trackedAnime = [...new Set([...watchlist, ...favorites])];
+  }, [favorites, hasEnabledNotifications, hasTrackedAnime, permission, watchlist]);
 
   return (
     <div className="relative">

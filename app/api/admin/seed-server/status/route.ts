@@ -10,21 +10,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/lib/auth";
+import { getSeedServerStatusSnapshot } from "@/lib/monitoring-data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-// Seed server status (in production, fetch from actual seed server)
-// For now, return mock data
-let seedServerStatus = {
-  online: true,
-  activeTorrents: 0,
-  totalPeers: 0,
-  uploadSpeed: 0,
-  uptime: 0,
-  lastHeartbeat: Date.now(),
-  version: "1.0.0",
-};
 
 /**
  * GET /api/admin/seed-server/status
@@ -37,26 +26,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // In production, fetch from actual seed server
-    // For now, return mock data with some randomness
-
-    const now = Date.now();
-    const uptime = Math.floor((now - seedServerStatus.lastHeartbeat) / 1000);
-
-    // Simulate some activity (deterministic defaults for mock data)
-    const mockStatus = {
-      online: true,
-      activeTorrents: 0,
-      totalPeers: 0,
-      uploadSpeed: 0,
-      uptime: uptime,
-      lastHeartbeat: now,
-      version: "1.0.0",
-    };
-
-    seedServerStatus = mockStatus;
-
-    return NextResponse.json(seedServerStatus);
+    const status = await getSeedServerStatusSnapshot();
+    return NextResponse.json(status);
   } catch (error) {
     console.error("Error fetching seed server status:", error);
     return NextResponse.json(

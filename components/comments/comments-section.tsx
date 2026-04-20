@@ -5,12 +5,13 @@
 
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { MessageSquare, ThumbsUp, ThumbsDown, Reply, User, Star } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
 import { toast } from "react-hot-toast";
 import { useAniListAuth } from "@/store";
+import { safeGetItem, safeSetItem } from "@/lib/storage";
 
 interface Comment {
   id: string;
@@ -49,6 +50,7 @@ interface CommentsSectionProps {
 }
 
 export function CommentsSection({ animeId, animeTitle }: CommentsSectionProps) {
+  const storageKey = `comments-${animeId}`;
   const [comments, setComments] = useState<Comment[]>([]);
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [newComment, setNewComment] = useState("");
@@ -59,17 +61,11 @@ export function CommentsSection({ animeId, animeTitle }: CommentsSectionProps) {
   const currentTime = useCurrentTime(); // Hook that updates every minute
   const { anilistUser, isAuthenticated } = useAniListAuth();
 
-  // Load comments from localStorage
   useEffect(() => {
     const loadComments = () => {
-      try {
-        const stored = localStorage.getItem(`comments-${animeId}`);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          setComments(parsed);
-        }
-      } catch {
-        // Ignore errors
+      const stored = safeGetItem<Comment[]>(storageKey);
+      if (stored.success && stored.data) {
+        setComments(stored.data);
       }
     };
 
@@ -79,7 +75,7 @@ export function CommentsSection({ animeId, animeTitle }: CommentsSectionProps) {
     const handleStorage = () => loadComments();
     window.addEventListener("storage", handleStorage);
     return () => window.removeEventListener("storage", handleStorage);
-  }, [animeId]);
+  }, [storageKey]);
 
   const handleSubmit = () => {
     if (!newComment.trim()) {
@@ -113,7 +109,7 @@ export function CommentsSection({ animeId, animeTitle }: CommentsSectionProps) {
       : [comment, ...comments];
 
     setComments(updatedComments);
-    localStorage.setItem(`comments-${animeId}`, JSON.stringify(updatedComments));
+    safeSetItem(storageKey, updatedComments);
     setNewComment("");
     setUserRating(0);
     setReplyTo(null);
@@ -134,7 +130,7 @@ export function CommentsSection({ animeId, animeTitle }: CommentsSectionProps) {
       return c;
     });
     setComments(updatedComments);
-    localStorage.setItem(`comments-${animeId}`, JSON.stringify(updatedComments));
+    safeSetItem(storageKey, updatedComments);
 
     setLikedComments((prev) => {
       const next = new Set(prev);
@@ -170,7 +166,7 @@ export function CommentsSection({ animeId, animeTitle }: CommentsSectionProps) {
       return c;
     });
     setComments(updatedComments);
-    localStorage.setItem(`comments-${animeId}`, JSON.stringify(updatedComments));
+    safeSetItem(storageKey, updatedComments);
 
     setDislikedComments((prev) => {
       const next = new Set(prev);

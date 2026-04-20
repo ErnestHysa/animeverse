@@ -28,6 +28,7 @@ import {
   Filter,
 } from "lucide-react";
 import { createScopedLogger } from "@/lib/logger";
+import { fetchAdminSession } from "@/lib/admin-client";
 
 const logger = createScopedLogger('admin-magnets');
 
@@ -37,14 +38,6 @@ async function safeJson<T>(res: Response): Promise<T> {
   } catch {
     throw new Error('Invalid JSON response');
   }
-}
-
-function getAuthHeaders(): Record<string, string> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('admin_token') : null;
-  return {
-    'Content-Type': 'application/json',
-    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-  };
 }
 
 function csvSafeCell(value: string): string {
@@ -75,12 +68,37 @@ interface MagnetEntry {
 }
 
 export default function AdminMagnetsPage() {
-  // Client-side auth guard
   const router = useRouter();
+  const [authChecked, setAuthChecked] = useState(false);
+
   useEffect(() => {
-    const token = localStorage.getItem('admin_token');
-    if (!token) { router.push('/admin/login'); return; }
-  }, []);
+    let cancelled = false;
+
+    async function verifySession() {
+      try {
+        const session = await fetchAdminSession();
+        if (!session.authenticated && !cancelled) {
+          router.replace("/admin/login");
+          return;
+        }
+      } catch (error) {
+        logger.warn("Failed to verify admin session:", error);
+        if (!cancelled) {
+          router.replace("/admin/login");
+          return;
+        }
+      } finally {
+        if (!cancelled) {
+          setAuthChecked(true);
+        }
+      }
+    }
+
+    verifySession();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   const [magnets, setMagnets] = useState<MagnetEntry[]>([]);
   const [filteredMagnets, setFilteredMagnets] = useState<MagnetEntry[]>([]);
@@ -115,8 +133,13 @@ export default function AdminMagnetsPage() {
       try {
         setLoading(true);
         const response = await fetch("/api/admin/magnets", {
-          headers: getAuthHeaders(),
+          credentials: "include",
+          cache: "no-store",
         });
+        if (response.status === 401) {
+          router.replace("/admin/login");
+          return;
+        }
         const data = await safeJson<any>(response);
         setMagnets(data.magnets || []);
       } catch (error) {
@@ -127,7 +150,7 @@ export default function AdminMagnetsPage() {
       }
     };
     loadMagnets();
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     filterMagnets();
@@ -137,8 +160,13 @@ export default function AdminMagnetsPage() {
     try {
       setLoading(true);
       const response = await fetch("/api/admin/magnets", {
-        headers: getAuthHeaders(),
+        credentials: "include",
+        cache: "no-store",
       });
+      if (response.status === 401) {
+        router.replace("/admin/login");
+        return;
+      }
       const data = await safeJson<any>(response);
       setMagnets(data.magnets || []);
     } catch (error) {
@@ -180,7 +208,8 @@ export default function AdminMagnetsPage() {
     try {
       const response = await fetch("/api/admin/magnets", {
         method: "POST",
-        headers: getAuthHeaders(),
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(newMagnet),
       });
 
@@ -217,7 +246,8 @@ export default function AdminMagnetsPage() {
       setImporting(true);
       const response = await fetch("/api/admin/magnets/bulk-import", {
         method: "POST",
-        headers: getAuthHeaders(),
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ format: "csv", data: csvData }),
       });
 
@@ -243,7 +273,8 @@ export default function AdminMagnetsPage() {
     try {
       const response = await fetch("/api/admin/magnets/validate", {
         method: "POST",
-        headers: getAuthHeaders(),
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ id }),
       });
 
@@ -268,7 +299,7 @@ export default function AdminMagnetsPage() {
         try {
           const response = await fetch(`/api/admin/magnets?id=${id}`, {
             method: "DELETE",
-            headers: getAuthHeaders(),
+            credentials: "include",
           });
 
           const data = await safeJson<any>(response);
@@ -307,6 +338,17 @@ export default function AdminMagnetsPage() {
       </span>
     );
   };
+
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white flex items-center justify-center">
+        <div className="flex items-center gap-3 text-sm text-gray-300">
+          <RefreshCw className="w-5 h-5 animate-spin" />
+          Verifying admin session...
+        </div>
+      </div>
+    );
+  }
 
   const exportToCSV = () => {
     const headers = ["animeId", "animeTitle", "episode", "magnet", "quality", "notes"];

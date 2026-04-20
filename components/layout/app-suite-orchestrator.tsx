@@ -36,8 +36,6 @@ export function AppSuiteOrchestrator() {
   const watchHistory = useStore((state) => state.watchHistory);
   const favorites = useStore((state) => state.favorites);
   const mediaCache = useStore((state) => state.mediaCache);
-  const achievements = useStore((state) => state.achievements);
-  const unlockedAchievements = useStore((state) => state.unlockedAchievements);
   const checkAndUnlockAchievements = useStore((state) => state.checkAndUnlockAchievements);
   const updateAchievementProgress = useStore((state) => state.updateAchievementProgress);
   const { lists } = useCustomLists();
@@ -64,6 +62,7 @@ export function AppSuiteOrchestrator() {
         new Set([...(legacy.unlocked ?? []), ...state.unlockedAchievements])
       ),
     }));
+    localStorage.removeItem("animeverse_achievements");
   }, []);
 
   useEffect(() => {
@@ -81,24 +80,6 @@ export function AppSuiteOrchestrator() {
   useEffect(() => {
     updateAchievementProgress("list-creator", lists.length);
   }, [lists.length, updateAchievementProgress]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    if (!unlockedAchievements.length && !Object.keys(achievements).length) {
-      return;
-    }
-
-    localStorage.setItem(
-      "animeverse_achievements",
-      JSON.stringify({
-        achievements,
-        unlocked: unlockedAchievements,
-      })
-    );
-  }, [achievements, unlockedAchievements]);
 
   return (
     <Toaster

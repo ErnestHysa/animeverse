@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getEpisodeSources, getDemoSources } from "@/lib/video-sources-robust";
+import { getEpisodeSources } from "@/lib/video-sources-robust";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,22 +39,15 @@ export async function GET(
     ? parseInt(searchParams.get("malId")!, 10)
     : animeIdNum;
   const language = searchParams.get("language") === "dub" ? "dub" : "sub";
+  const allowDemoPreview = searchParams.get("preview") === "1";
 
   try {
-    // Set overall timeout for the request
-    const controller = new AbortController();
-    const SERVER_TIMEOUT = 15000; // 15 seconds server timeout
-    const timeoutId = setTimeout(() => {
-      controller.abort();
-    }, SERVER_TIMEOUT);
-
-    // Fetch video sources using robust implementation
-    let result;
-    try {
-      result = await getEpisodeSources(animeIdNum, episodeNumber, { title, malId, language });
-    } finally {
-      clearTimeout(timeoutId);
-    }
+    const result = await getEpisodeSources(
+      animeIdNum,
+      episodeNumber,
+      { title, malId, language },
+      { allowDemoFallback: allowDemoPreview }
+    );
 
     const elapsed = Date.now() - startTime;
 
@@ -65,40 +58,24 @@ export async function GET(
         { type: "dub", available: false },
       ],
       hasSubtitles: (result.subtitles?.length || 0) > 0,
+      previewMode: Boolean(result.isDemo),
       responseTime: elapsed,
     });
   } catch (error) {
     const elapsed = Date.now() - startTime;
 
-    // Check if timeout
-    const isTimeout = error instanceof Error && (
-      error.name === 'AbortError' ||
-      error.message.includes('timeout') ||
-      error.message.includes('aborted')
-    );
-
-    if (isTimeout) {
-      // Return demo video on timeout
-      const demoResult = getDemoSources(animeIdNum, episodeNumber, title);
-      return NextResponse.json({
-        ...demoResult,
-        availableLanguages: [
-          { type: "sub", available: true },
-          { type: "dub", available: false },
-        ],
-        hasSubtitles: false,
-        isTimeout: true,
-        responseTime: elapsed,
-      });
-    }
+    const message = error instanceof Error ? error.message : "Failed to fetch video sources";
+    const isTimeout = error instanceof Error && message.toLowerCase().includes("timeout");
 
     return NextResponse.json(
       {
-        error: "SCRAPER_ERROR",
-        message: error instanceof Error ? error.message : "Failed to fetch video sources",
+        error: isTimeout ? "SOURCE_TIMEOUT" : "SCRAPER_ERROR",
+        message,
         sources: [],
+        previewAvailable: true,
+        responseTime: elapsed,
       },
-      { status: 500 }
+      { status: isTimeout ? 504 : 502 }
     );
   }
 }

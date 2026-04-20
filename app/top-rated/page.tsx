@@ -4,7 +4,7 @@
  * Distinct from /popular (which ranks by view count / community size).
  */
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";

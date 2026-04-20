@@ -227,6 +227,8 @@ class AnalyticsTracker {
     uploadSpeed: number;
     progress: number;
     infoHash: string;
+    p2pBytes?: number;
+    cdnBytes?: number;
   }): void {
     const event: TorrentStatsEvent = {
       id: this.generateEventId(),
@@ -242,6 +244,8 @@ class AnalyticsTracker {
       uploadSpeed: params.uploadSpeed,
       progress: params.progress,
       infoHash: params.infoHash,
+      p2pBytes: params.p2pBytes,
+      cdnBytes: params.cdnBytes,
     };
 
     this.queueEvent(event);
@@ -321,6 +325,7 @@ class AnalyticsTracker {
         headers: {
           "Content-Type": "application/json",
         },
+        keepalive: true,
         body: JSON.stringify({ events: eventsToSend }),
       });
 
@@ -393,10 +398,11 @@ class AnalyticsTracker {
     if (this.eventQueue.length > 0 && typeof navigator !== 'undefined' && navigator.sendBeacon) {
       const payload = JSON.stringify({
         events: this.eventQueue,
-        batchSize: this.eventQueue.length,
       });
-      navigator.sendBeacon('/api/analytics/batch', payload);
-      this.eventQueue = [];
+      const blob = new Blob([payload], { type: "application/json" });
+      if (navigator.sendBeacon("/api/analytics/events", blob)) {
+        this.eventQueue = [];
+      }
     } else {
       // Fallback: fire-and-forget flush
       this.flush().catch(() => {});

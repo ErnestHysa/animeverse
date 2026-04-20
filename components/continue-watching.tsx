@@ -27,6 +27,7 @@ interface AnimeWithProgress {
 export function ContinueWatching() {
   const { getContinueWatching } = useWatchHistory();
   const setMediaCache = useStore((state) => state.setMediaCache);
+  const mediaCache = useStore((state) => state.mediaCache);
   const [animeWithProgress, setAnimeWithProgress] = useState<AnimeWithProgress[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -40,13 +41,22 @@ export function ContinueWatching() {
         return;
       }
 
-      // Fetch anime details for each history item
       const animeIds = history.map((h: WatchHistoryItem) => h.mediaId);
-      const result = await anilist.getByIds(animeIds);
-      const mediaList = result.data?.Page.media ?? [];
-      mediaList.forEach((anime: Media) => {
-        setMediaCache(anime);
-      });
+      const cachedMedia = animeIds
+        .map((id) => mediaCache[id])
+        .filter((anime): anime is Media => Boolean(anime));
+      const missingIds = animeIds.filter((id) => !mediaCache[id]);
+
+      let fetchedMedia: Media[] = [];
+      if (missingIds.length > 0) {
+        const result = await anilist.getByIds(missingIds);
+        fetchedMedia = result.data?.Page.media ?? [];
+        fetchedMedia.forEach((anime: Media) => {
+          setMediaCache(anime);
+        });
+      }
+
+      const mediaList = [...cachedMedia, ...fetchedMedia];
 
       // Combine anime data with progress
       const combined = history.map((item: WatchHistoryItem) => {
@@ -71,7 +81,7 @@ export function ContinueWatching() {
     } finally {
       setLoading(false);
     }
-  }, [getContinueWatching, setMediaCache]);
+  }, [getContinueWatching, mediaCache, setMediaCache]);
 
   useEffect(() => {
     loadContinueWatching();

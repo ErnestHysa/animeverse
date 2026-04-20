@@ -6,6 +6,8 @@
  */
 
 import type { Alert } from "@/types/analytics";
+import type { AnalyticsSummaryResult } from "@/lib/monitoring-data";
+import { getAnalyticsSummaryData, getSeedServerStatusSnapshot, getTorrentHealthSnapshot } from "@/lib/monitoring-data";
 
 interface AlertRule {
   type: Alert["type"];
@@ -313,13 +315,9 @@ class AlertsManager {
   /**
    * Fetch analytics summary
    */
-  private async getAnalyticsSummary(period: string): Promise<any> {
+  private async getAnalyticsSummary(period: string): Promise<AnalyticsSummaryResult> {
     try {
-      const response = await fetch(`/api/analytics/summary?period=${period}`);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      const data = await response.json();
+      const data = await getAnalyticsSummaryData(period);
       this.lastSummary = data;
       return data;
     } catch (error) {
@@ -331,13 +329,9 @@ class AlertsManager {
   /**
    * Fetch seed server status
    */
-  private async getSeedServerStatus(): Promise<any> {
+  private async getSeedServerStatus(): Promise<{ online: boolean; lastHeartbeat: number }> {
     try {
-      const response = await fetch("/api/admin/seed-server/status");
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      const data = await response.json();
+      const data = await getSeedServerStatusSnapshot();
       this.lastSeedServerStatus = data;
       return data;
     } catch (error) {
@@ -349,11 +343,9 @@ class AlertsManager {
   /**
    * Fetch torrent health
    */
-  private async getTorrentHealth(): Promise<any[]> {
+  private async getTorrentHealth(): Promise<Array<{ status: string; seeders: number }>> {
     try {
-      const response = await fetch("/api/admin/torrents/health");
-      const data = await response.json();
-      this.lastTorrentHealth = data.torrents || [];
+      this.lastTorrentHealth = await getTorrentHealthSnapshot();
       return this.lastTorrentHealth;
     } catch (error) {
       console.error("Error fetching torrent health:", error);
@@ -361,9 +353,9 @@ class AlertsManager {
     }
   }
 
-  private lastSummary: any = null;
-  private lastSeedServerStatus: any = null;
-  private lastTorrentHealth: any[] = [];
+  private lastSummary: AnalyticsSummaryResult | null = null;
+  private lastSeedServerStatus: { online: boolean; lastHeartbeat: number } | null = null;
+  private lastTorrentHealth: Array<{ status: string; seeders: number }> = [];
 
   private getLastSummary() {
     return this.lastSummary || this.getDefaultSummary();
@@ -377,10 +369,33 @@ class AlertsManager {
     return this.lastTorrentHealth || [];
   }
 
-  private getDefaultSummary() {
+  private getDefaultSummary(): AnalyticsSummaryResult {
     return {
+      period: "hour",
+      totalStreams: 0,
+      methodDistribution: {
+        hls: 0,
+        webtorrent: 0,
+        hybrid: 0,
+      },
+      averageWatchTime: 0,
+      totalBandwidthSaved: 0,
       fallbackRate: 0,
+      deadTorrentRate: 0,
       averageSeederCount: 0,
+      averageBufferTime: 0,
+      topAnime: [],
+      playbackErrors: 0,
+      bandwidthSavings: {
+        period: "hour",
+        totalBytes: 0,
+        p2pBytes: 0,
+        cdnBytes: 0,
+        savingsPercent: 0,
+        costSavings: 0,
+        streamCount: 0,
+        estimated: false,
+      },
     };
   }
 
@@ -398,6 +413,7 @@ let alertsManagerInstance: AlertsManager | null = null;
 export function getAlertsManager(): AlertsManager {
   if (!alertsManagerInstance) {
     alertsManagerInstance = new AlertsManager();
+    alertsManagerInstance.startMonitoring();
   }
   return alertsManagerInstance;
 }

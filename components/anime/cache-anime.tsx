@@ -10,6 +10,7 @@ interface CacheAnimeProps {
 
 export function CacheAnime({ media }: CacheAnimeProps) {
   const setMediaCache = useStore((state) => state.setMediaCache);
+  const getMediaCache = useStore((state) => state.getMediaCache);
 
   // Use a serialized key to avoid re-running on new array references with same content
   const mediaKey = useMemo(() => {
@@ -21,9 +22,11 @@ export function CacheAnime({ media }: CacheAnimeProps) {
     const items = Array.isArray(media) ? media : media ? [media] : [];
 
     for (const item of items) {
-      setMediaCache(item);
+      if (!getMediaCache(item.id)) {
+        setMediaCache(item);
+      }
     }
-  }, [mediaKey, setMediaCache]);
+  }, [getMediaCache, mediaKey, setMediaCache]);
 
   return null;
 }

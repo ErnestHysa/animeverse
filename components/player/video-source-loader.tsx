@@ -67,7 +67,17 @@ interface VideoSourcesResponse {
     label: string;
   }>;
   availableLanguages?: AvailableLanguageResponse[];
+  previewMode?: boolean;
+  previewAvailable?: boolean;
 }
+
+const DEMO_PREVIEW_SOURCES: PlayerVideoQuality[] = [
+  {
+    url: "https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8",
+    quality: "auto",
+    label: "Preview (Sintel)",
+  },
+];
 
 // Bandwidth-aware initial quality selection
 function getPreferredQualityForNetwork(): string {
@@ -175,6 +185,7 @@ export function VideoSourceLoader({
   const [currentStreamingMethod, setCurrentStreamingMethod] = useState<StreamingMethod>("hls");
   const [fallbackOccurred, setFallbackOccurred] = useState(false);
   const [fallbackReason, setFallbackReason] = useState<string | null>(null);
+  const [previewAvailable, setPreviewAvailable] = useState(false);
 
   // Fix H7: Request generation counter to cancel stale fetches
   const fetchGenerationRef = useRef(0);
@@ -207,6 +218,7 @@ export function VideoSourceLoader({
       setError(null);
       setFallbackOccurred(false);
       setFallbackReason(null);
+      setPreviewAvailable(false);
     } else {
       setIsRetrying(true);
     }
@@ -327,6 +339,7 @@ export function VideoSourceLoader({
 
       // Reset subtitle tracks (will be loaded by player)
       setSubtitleTracks([]);
+      setIsFallback(false);
 
       setRetryCount(0); // Reset retry count on success
     } catch (err) {
@@ -348,7 +361,8 @@ export function VideoSourceLoader({
       // Don't retry 404 or "not available" errors
       const isFinalError = err instanceof Error && (
         err.message.includes("not available") ||
-        err.message.includes("not in our database")
+        err.message.includes("not in our database") ||
+        err.message.includes("No playable sources found")
       );
 
       // Retry logic for retryable errors
@@ -367,6 +381,7 @@ export function VideoSourceLoader({
         ? `${errorMessage} (Failed after ${MAX_RETRIES} retry attempts)`
         : errorMessage;
       setError(finalMessage);
+      setPreviewAvailable(true);
       onError?.(new Error(finalMessage));
       setRetryCount(retryAttempt);
     } finally {
@@ -393,18 +408,6 @@ export function VideoSourceLoader({
     }, 1000);
     return () => clearInterval(interval);
   }, [loading]);
-
-  // Auto-fallback to demo video after 12 seconds of loading
-  useEffect(() => {
-    if (loadingSeconds >= 12 && loading) {
-      const demoSources = [
-        { url: 'https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8', quality: 'auto' as const, label: 'Demo (Sintel)' }
-      ];
-      setSources({ type: 'direct', url: demoSources[0].url, qualities: demoSources });
-      setIsFallback(true);
-      setLoading(false);
-    }
-  }, [loadingSeconds, loading]);
 
   // Initial fetch and re-fetch when language changes
   useEffect(() => {
@@ -505,6 +508,20 @@ export function VideoSourceLoader({
     });
   };
 
+  const playPreview = () => {
+    setSources({
+      type: "direct",
+      url: DEMO_PREVIEW_SOURCES[0].url,
+      qualities: DEMO_PREVIEW_SOURCES,
+    });
+    setCurrentStreamingMethod("hls");
+    setError(null);
+    setLoading(false);
+    setIsFallback(true);
+    setFallbackReason("Preview stream");
+    toast("Playing preview stream instead of the requested episode", { duration: 4000 });
+  };
+
   // Loading state
   if (loading) {
     const isSlow = loadingSeconds >= 8;
@@ -543,16 +560,9 @@ export function VideoSourceLoader({
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => {
-                  const demoSources = [
-                    { url: 'https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8', quality: 'auto' as const, label: 'Demo (Sintel)' }
-                  ];
-                  setSources({ type: 'direct', url: demoSources[0].url, qualities: demoSources });
-                  setIsFallback(true);
-                  setLoading(false);
-                }}
+                onClick={playPreview}
               >
-                Use Demo Video
+                Play Preview Instead
               </Button>
             </div>
           )}
@@ -618,6 +628,11 @@ export function VideoSourceLoader({
                 Switch to {currentLanguage === "sub" ? "Dub" : "Sub"}
               </Button>
             )}
+            {previewAvailable && (
+              <Button onClick={playPreview} variant="outline">
+                Play Preview
+              </Button>
+            )}
           </div>
         </div>
       </GlassCard>
@@ -635,10 +650,10 @@ export function VideoSourceLoader({
               <AlertCircle className="w-4 h-4 text-yellow-500" />
             </div>
             <div className="flex-1">
-              <h4 className="font-semibold text-yellow-500">Demo Mode</h4>
+              <h4 className="font-semibold text-yellow-500">Preview Mode</h4>
               <p className="text-sm text-muted-foreground mt-1">
-                The requested anime is not currently available. Showing a demo video instead.
-                This typically happens when the anime isn&apos;t in our database yet.
+                You&apos;re watching a preview stream, not the requested episode. We only switch here
+                when real playback was unavailable and you chose to continue with a preview.
               </p>
             </div>
             <Button

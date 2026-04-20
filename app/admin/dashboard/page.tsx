@@ -25,18 +25,12 @@ import {
   Film,
   RefreshCw,
   Bell,
+  LogOut,
 } from "lucide-react";
 import { createScopedLogger } from "@/lib/logger";
+import { fetchAdminSession, logoutAdmin } from "@/lib/admin-client";
 
 const logger = createScopedLogger('admin-dashboard');
-
-function getAuthHeaders(): Record<string, string> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('admin_token') : null;
-  return {
-    'Content-Type': 'application/json',
-    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-  };
-}
 
 interface AnalyticsData {
   totalStreams: number;
@@ -86,12 +80,37 @@ interface Alert {
 }
 
 export default function AdminDashboardPage() {
-  // Client-side auth guard
   const router = useRouter();
+  const [authChecked, setAuthChecked] = useState(false);
+
   useEffect(() => {
-    const token = localStorage.getItem('admin_token');
-    if (!token) { router.push('/admin/login'); return; }
-  }, []);
+    let cancelled = false;
+
+    async function verifySession() {
+      try {
+        const session = await fetchAdminSession();
+        if (!session.authenticated && !cancelled) {
+          router.replace("/admin/login");
+          return;
+        }
+      } catch (error) {
+        logger.warn("Failed to verify admin session:", error);
+        if (!cancelled) {
+          router.replace("/admin/login");
+          return;
+        }
+      } finally {
+        if (!cancelled) {
+          setAuthChecked(true);
+        }
+      }
+    }
+
+    verifySession();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [seedServerStatus, setSeedServerStatus] = useState<SeedServerStatus | null>(null);
@@ -102,14 +121,17 @@ export default function AdminDashboardPage() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const authHeaders = getAuthHeaders();
       const [analyticsRes, serverRes, alertsRes] = await Promise.all([
-        fetch(`/api/analytics/summary?period=${period}`, { headers: authHeaders }),
-        fetch("/api/admin/seed-server/status", { headers: authHeaders }),
-        fetch("/api/admin/alerts", { headers: authHeaders }),
+        fetch(`/api/analytics/summary?period=${period}`, { cache: "no-store", credentials: "include" }),
+        fetch("/api/admin/seed-server/status", { cache: "no-store", credentials: "include" }),
+        fetch("/api/admin/alerts", { cache: "no-store", credentials: "include" }),
       ]);
 
       if (!analyticsRes.ok || !serverRes.ok || !alertsRes.ok) {
+        if ([analyticsRes.status, serverRes.status, alertsRes.status].includes(401)) {
+          router.replace("/admin/login");
+          return;
+        }
         throw new Error('Failed to fetch dashboard data');
       }
 
@@ -141,20 +163,31 @@ export default function AdminDashboardPage() {
 
   const resolveAlert = async (alertId: string) => {
     try {
-      const response = await fetch(`/api/admin/alerts/${alertId}/resolve`, {
-        method: "PUT",
-        headers: getAuthHeaders(),
+      const response = await fetch(`/api/admin/alerts?id=${encodeURIComponent(alertId)}`, {
+        method: "PATCH",
+        credentials: "include",
       });
 
       if (response.ok) {
         toast.success("Alert resolved");
-        setAlerts(alerts.filter((a) => a.id !== alertId));
+        setAlerts((currentAlerts) => currentAlerts.filter((a) => a.id !== alertId));
       }
     } catch (error) {
       logger.error("Error resolving alert:", error);
       toast.error("Failed to resolve alert");
     }
   };
+
+  async function handleLogout() {
+    try {
+      await logoutAdmin();
+      toast.success("Signed out");
+      router.replace("/admin/login");
+    } catch (error) {
+      logger.error("Admin logout failed:", error);
+      toast.error("Failed to sign out cleanly");
+    }
+  }
 
   const formatBytes = (bytes: number): string => {
     const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
@@ -176,6 +209,17 @@ export default function AdminDashboardPage() {
 
   const activeAlerts = alerts.filter((a) => !a.resolved);
 
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white flex items-center justify-center">
+        <div className="flex items-center gap-3 text-sm text-gray-300">
+          <RefreshCw className="w-5 h-5 animate-spin" />
+          Verifying admin session...
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white p-8">
       <div className="max-w-7xl mx-auto space-y-8">
@@ -188,6 +232,13 @@ export default function AdminDashboardPage() {
             <p className="text-gray-400 mt-2">Streaming analytics and monitoring</p>
           </div>
           <div className="flex items-center gap-4">
+            <button
+              onClick={handleLogout}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-900/60 px-4 py-2 text-sm text-gray-200 hover:bg-gray-800 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              Logout
+            </button>
             <button
               onClick={fetchDashboardData}
               disabled={loading}

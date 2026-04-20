@@ -34,18 +34,18 @@ const MEDIA_FULL_FRAGMENT = `id idMal title { romaji english native userPreferre
 // ===================================
 
 const QUERIES = {
-  trending: `query Trending($page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME, sort: TRENDING_DESC) { ${MEDIA_FULL_FRAGMENT} } } }`,
+  trending: `query Trending($page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME, sort: TRENDING_DESC) { ${MEDIA_MINIMAL_FRAGMENT} } } }`,
 
-  popular: `query Popular($page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME, sort: POPULARITY_DESC) { ${MEDIA_FULL_FRAGMENT} } } }`,
+  popular: `query Popular($page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME, sort: POPULARITY_DESC) { ${MEDIA_MINIMAL_FRAGMENT} } } }`,
 
-  seasonal: `query Seasonal($season: MediaSeason, $year: Int, $page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME, season: $season, seasonYear: $year, sort: POPULARITY_DESC) { ${MEDIA_FULL_FRAGMENT} } } }`,
+  seasonal: `query Seasonal($season: MediaSeason, $year: Int, $page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME, season: $season, seasonYear: $year, sort: POPULARITY_DESC) { ${MEDIA_MINIMAL_FRAGMENT} } } }`,
 
   airing: (sinceTimestamp?: number) => {
     const since = sinceTimestamp ?? Math.floor(Date.now() / 1000);
     return `query Airing($page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } airingSchedules(airingAt_greater: ${since}, sort: TIME) { id airingAt timeUntilAiring episode media { ${MEDIA_MINIMAL_FRAGMENT} } } } }`;
   },
 
-  search: `query Search($search: String, $page: Int, $perPage: Int, $sort: [MediaSort], $format: [MediaFormat], $genre: String, $status: MediaStatus, $year: Int, $season: MediaSeason, $minScore: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME search: $search sort: $sort format_in: $format genre: $genre status: $status seasonYear: $year season: $season averageScore_greater: $minScore) { ${MEDIA_FULL_FRAGMENT} } } }`,
+  search: `query Search($search: String, $page: Int, $perPage: Int, $sort: [MediaSort], $format: [MediaFormat], $genre: String, $status: MediaStatus, $year: Int, $season: MediaSeason, $minScore: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME search: $search sort: $sort format_in: $format genre: $genre status: $status seasonYear: $year season: $season averageScore_greater: $minScore) { ${MEDIA_MINIMAL_FRAGMENT} } } }`,
 
   byId: `query ById($id: Int) { Media(id: $id, type: ANIME) { ${MEDIA_FULL_FRAGMENT} } }`,
 
@@ -57,7 +57,7 @@ const QUERIES = {
 
   byStudio: `query ByStudio($studioId: Int, $page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME, studios: [$studioId], sort: POPULARITY_DESC) { ${MEDIA_MINIMAL_FRAGMENT} } } }`,
 
-  byGenre: `query ByGenre($genre: String!, $page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME, genre_in: [$genre], sort: POPULARITY_DESC) { ${MEDIA_FULL_FRAGMENT} } } }`,
+  byGenre: `query ByGenre($genre: String!, $page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { pageInfo { total perPage currentPage lastPage hasNextPage } media(type: ANIME, genre_in: [$genre], sort: POPULARITY_DESC) { ${MEDIA_MINIMAL_FRAGMENT} } } }`,
 };
 
 // ===================================

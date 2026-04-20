@@ -2,7 +2,7 @@
  * Home Page
  * Trending anime and featured content with Continue Watching
  */
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 
 import { Header } from "@/components/layout/header";

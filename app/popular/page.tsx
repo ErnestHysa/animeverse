@@ -3,7 +3,7 @@
  * All-time most popular anime with pagination
  */
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 import { Header } from "@/components/layout/header";
 

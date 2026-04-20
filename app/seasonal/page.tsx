@@ -3,7 +3,7 @@
  * Anime from current season
  */
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 import { Header } from "@/components/layout/header";
 

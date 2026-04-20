@@ -1,5 +1,5 @@
 /**
- * AI-Powered Recommendations Component
+ * Personalized Recommendations Component
  * Shows personalized anime recommendations based on watch history
  */
 
@@ -78,7 +78,7 @@ export function AIRecommendations({
         <div className="flex items-center gap-3 mb-6">
           <Zap className="w-6 h-6 text-primary animate-pulse" />
           <h2 className="text-xl font-display font-semibold">
-            {title || (basedOnAnime ? "Because You Watched" : "AI Picks For You")}
+            {title || (basedOnAnime ? "Because You Watched" : "Picked For You")}
           </h2>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
@@ -108,12 +108,12 @@ export function AIRecommendations({
         <div className="flex items-center gap-3">
           <Zap className="w-6 h-6 text-primary" />
           <h2 className="text-xl font-display font-semibold">
-            {title || (basedOnAnime ? `Because You Watched ${basedOnAnime.title?.romaji}` : "AI Picks For You")}
+            {title || (basedOnAnime ? `Because You Watched ${basedOnAnime.title?.romaji}` : "Picked For You")}
           </h2>
         </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <TrendingUp className="w-4 h-4" />
-          <span>Powered by AI</span>
+          <span>Based on your watch history</span>
         </div>
       </div>
 
