@@ -236,11 +236,11 @@ export function EpisodeList({
                 className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-medium flex-shrink-0 transition-colors"
                 style={{
                   backgroundColor: isCurrent
-                    ? "rgb(139, 92, 246)"
+                    ? "hsl(var(--accent))"
                     : isWatched
-                    ? "rgba(34, 197, 94, 0.2)"
-                    : "rgba(255, 255, 255, 0.05)",
-                  color: isCurrent ? "white" : isWatched ? "rgb(34, 197, 94)" : undefined,
+                    ? "hsl(142 71% 45% / 0.2)"
+                    : "hsl(var(--muted-foreground) / 0.1)",
+                  color: isCurrent ? "hsl(var(--accent-foreground))" : isWatched ? "hsl(142 71% 45%)" : undefined,
                 }}
               >
                 {isCurrent ? (
